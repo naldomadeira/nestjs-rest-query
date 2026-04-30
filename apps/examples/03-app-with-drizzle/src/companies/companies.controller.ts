@@ -11,13 +11,14 @@ import {
 import { CompaniesBusiness } from './companies.business';
 
 /**
- * Company entity shape for Swagger documentation.
- * TODO(2.0.0): Replace with actual DTO once DrizzleAdapter is available.
+ * Company entity shape for Swagger documentation. Relation slot
+ * reflects the table-grouped shape produced by `DrizzleAdapter`.
  */
 class CompanyDto {
   id: string;
   name: string;
   createdAt: Date;
+  users?: Array<{ id: string; name: string }>;
 }
 
 @ApiTags('companies')

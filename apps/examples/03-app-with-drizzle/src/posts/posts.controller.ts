@@ -11,8 +11,8 @@ import {
 import { PostsBusiness } from './posts.business';
 
 /**
- * Post entity shape for Swagger documentation.
- * TODO(2.0.0): Replace with actual DTO once DrizzleAdapter is available.
+ * Post entity shape for Swagger documentation. Relation slot
+ * reflects the table-grouped shape produced by `DrizzleAdapter`.
  */
 class PostDto {
   id: string;
@@ -20,6 +20,7 @@ class PostDto {
   content?: string;
   userId: string;
   createdAt: Date;
+  user?: { id: string; name: string };
 }
 
 @ApiTags('posts')

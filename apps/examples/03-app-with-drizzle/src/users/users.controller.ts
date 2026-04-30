@@ -11,8 +11,9 @@ import {
 import { UsersBusiness } from './users.business';
 
 /**
- * User entity shape for Swagger documentation.
- * TODO(2.0.0): Replace with actual DTO once DrizzleAdapter is available.
+ * User entity shape for Swagger documentation. Relation slots reflect
+ * the table-grouped shape produced by `DrizzleAdapter` so the
+ * generic-typed `RulesConfig<UserDto>` accepts include keys.
  */
 class UserDto {
   id: string;
@@ -20,6 +21,8 @@ class UserDto {
   email: string;
   companyId?: string;
   createdAt: Date;
+  company?: { id: string; name: string };
+  posts?: Array<{ id: string; title: string }>;
 }
 
 @ApiTags('users')

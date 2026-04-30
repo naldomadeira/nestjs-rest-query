@@ -1,14 +1,12 @@
 # Drizzle ORM Sample App
 
-NestJS example demonstrating `nestjs-rest-query` with Drizzle ORM (skeleton).
+NestJS example demonstrating `nestjs-rest-query` with Drizzle ORM.
 
 ## What's This?
 
-This is a **placeholder implementation** of a NestJS + Drizzle ORM app that mirrors the structure of `02-app-with-postgres` (which uses TypeORM). The controllers, routes, and query string formats are identical to the TypeORM version, but the persistence layer uses Drizzle instead.
+A NestJS + Drizzle ORM app that mirrors the structure of `02-app-with-postgres` (which uses TypeORM). The controllers, routes, and query string formats are **identical** to the TypeORM version — only the persistence layer differs. This is the value proposition of the adapter pattern: change the ORM, keep the API.
 
-**Important**: The `DrizzleAdapter` integration (the bridge between nestjs-rest-query and Drizzle) is **not yet published**. All business logic currently returns stub responses with `TODO(2.0.0)` comments marking where the adapter will be wired in.
-
-See [the Drizzle adapter plan](../../plans/orm-agnostic-and-drizzle/fase-02-drizzle-adapter.md) for implementation status.
+The `DynamicQueryBuilderModule` is configured with `DrizzleAdapter`, and each business class builds a `DrizzleSource` with `relations` and `primaryKey` so the adapter can auto-join, filter, search, sort, and paginate (including the two-phase strategy for 1:N relations like `users → posts`).
 
 ## Quick Start
 
@@ -98,31 +96,11 @@ curl "http://localhost:3002/posts?filters[title][ilike]=%featured%"
 curl "http://localhost:3002/posts?includes=user"
 ```
 
-## Current Status
+## Architecture
 
-- ✅ NestJS module structure
-- ✅ Drizzle schema (pgTable + relations)
-- ✅ Controllers with `@ApiDynamicQuery` and `@QueryRules` decorators
-- ✅ Business logic stubs with TODO markers
-- ⏳ **DrizzleAdapter integration** (pending parallel work)
-
-## Next Steps
-
-Once `DrizzleAdapter` is published:
-
-1. Import and register it in `AppModule`
-2. Replace the stub `return { data: [], ... }` responses in business files with actual:
-   ```typescript
-   const source = {
-     db: this.db,
-     table: this.db.schema.users,
-     primaryKey: 'id',
-     relations: this.db.schema.usersRelations,
-   };
-   return this.queryBuilderService.execute(source, query, rules);
-   ```
-3. Run seeds or manual data insertion
-4. Test query strings against live data
+- **`AppModule`** registers `DynamicQueryBuilderModule.forRoot({ adapter: new DrizzleAdapter(), ... })` so the service delegates every query to Drizzle.
+- **Business services** build a `DrizzleSource` per request: `{ db, table, primaryKey, relations }`, then call `queryBuilderService.execute(source, query, rules)`. The adapter auto-joins for any dotted path that appears in a filter/sort/include/search.
+- **1:N relations** like `users → posts` are declared with `cardinality: 'many'` + `primaryKey`; the adapter activates two-phase pagination (distinct root ids → `IN(...)` data → client-side aggregation) so `data.length === perPage` and `total` reflect distinct users, never the inflated joined-row count.
 
 ## Scripts
 

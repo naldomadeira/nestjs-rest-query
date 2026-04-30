@@ -1,4 +1,5 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { eq } from 'drizzle-orm';
 import {
   DynamicQueryDto,
   QueryBuilderService,
@@ -6,6 +7,7 @@ import {
   RulesConfig,
 } from 'nestjs-rest-query';
 import { DRIZZLE_INSTANCE } from '@app/db/drizzle.provider';
+import { posts, users } from '@app/db/schema';
 
 @Injectable()
 export class PostsBusiness {
@@ -19,24 +21,17 @@ export class PostsBusiness {
     query: DynamicQueryDto,
     rules: RulesConfig
   ): Promise<QueryResult<any>> {
-    // TODO(2.0.0): Wire in once DrizzleAdapter is published.
-    // For now, return a stub response structure.
-    // Expected usage:
-    // const source = {
-    //   db: this.db,
-    //   table: this.db.schema.posts,
-    //   primaryKey: 'id',
-    //   relations: this.db.schema.postsRelations,
-    //   columnMap: { /* field remapping if needed */ },
-    // };
-    // return this.queryBuilderService.execute(source, query, rules);
-
-    return {
-      data: [],
-      page: 1,
-      perPage: 10,
-      total: 0,
-      lastPage: 1,
+    const source = {
+      db: this.db,
+      table: posts,
+      primaryKey: posts.id,
+      relations: {
+        user: {
+          table: users,
+          on: eq(posts.userId, users.id),
+        },
+      },
     };
+    return this.queryBuilderService.execute(source as any, query, rules);
   }
 }
