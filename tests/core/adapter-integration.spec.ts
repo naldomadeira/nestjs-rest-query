@@ -31,7 +31,13 @@ function makeFakeAdapter(): RestQueryAdapter<any, any> & {
     applySorts: jest.fn(),
     applyPagination: jest
       .fn()
-      .mockResolvedValue({ data: [], page: 1, perPage: 10, total: 0, lastPage: 1 }),
+      .mockResolvedValue({
+        data: [],
+        page: 1,
+        perPage: 10,
+        total: 0,
+        lastPage: 1,
+      }),
     getMany: jest.fn().mockResolvedValue([]),
     customize: jest.fn((q: any, fn: (q: any) => void) => fn(q)),
   };
@@ -92,7 +98,7 @@ describe('QueryBuilderService — adapter integration (Phase 1)', () => {
           search: ['name'],
           fields: ['id', 'name'],
           sorts: ['createdAt'],
-        },
+        }
       );
 
       expect(fake.applyFilters).toHaveBeenCalledTimes(1);
@@ -133,7 +139,7 @@ describe('QueryBuilderService — adapter integration (Phase 1)', () => {
       const result = await service.execute(
         {} as any,
         { paginate: 'false' as any },
-        {},
+        {}
       );
       expect(fake.getMany).toHaveBeenCalledTimes(1);
       expect(fake.applyPagination).not.toHaveBeenCalled();
