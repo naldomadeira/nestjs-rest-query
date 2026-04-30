@@ -23,7 +23,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NEXT_PUBLIC_BASE_PATH: /nestjs-rest-query
-      NODE_ENV: production
       CI: "true"
     steps:
       - uses: actions/checkout@v4
