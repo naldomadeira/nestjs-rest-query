@@ -5,5 +5,7 @@ out
 .next
 apps/**/out
 apps/**/.next
+apps/docs/.source
+apps/docs/next-env.d.ts
 pnpm-lock.yaml
 *.tgz
