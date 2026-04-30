@@ -3,6 +3,10 @@ export { DynamicQueryBuilderModule } from './core/dynamic-query-builder.module';
 export { QueryBuilderService } from './core/query-builder.service';
 export { DQB_CONFIG_TOKEN } from './core/constants';
 
+// Adapters
+export { TypeOrmAdapter } from './infra/adapters';
+export type { RestQueryAdapter } from './contracts/rest-query-adapter.interface';
+
 // API — Decorators
 export { ApiDynamicQuery } from './api/decorators/api-dynamic-query.decorator';
 export { DynamicQuery } from './api/decorators/dynamic-query.decorator';

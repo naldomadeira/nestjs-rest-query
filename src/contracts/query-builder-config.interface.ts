@@ -1,4 +1,5 @@
 import { QueryOperator } from '@domain/operators/operator.types';
+import type { RestQueryAdapter } from './rest-query-adapter.interface';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export interface LoggerLike {
@@ -43,6 +44,13 @@ export interface LoggingConfig {
 }
 
 export interface QueryBuilderConfig {
+  /**
+   * ORM adapter implementation. Defaults to `TypeOrmAdapter` if omitted, so
+   * existing TypeORM consumers keep working without changes. Pass a
+   * different adapter (e.g. `DrizzleAdapter`) to use this library with
+   * another ORM.
+   */
+  adapter?: RestQueryAdapter;
   logging?: LoggingConfig;
   pagination?: PaginationConfig;
   operators?: OperatorsConfig;
