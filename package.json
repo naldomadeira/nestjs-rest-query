@@ -91,7 +91,7 @@
     "tsc-alias": "^1.8.10",
     "typeorm": "^0.3.26",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.0.1"
+    "typescript-eslint": "^8.59.1"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
