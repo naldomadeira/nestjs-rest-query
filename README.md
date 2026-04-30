@@ -41,8 +41,8 @@ NestJS has controllers. TypeORM has a query builder. The boilerplate between the
 | ORM     | Status         |
 | ------- | -------------- |
 | TypeORM | ✅ Stable      |
+| Drizzle | ✅ Stable      |
 | Prisma  | 🚧 Coming soon |
-| Drizzle | 🚧 Coming soon |
 
 Want a different ORM? [Open a discussion](https://github.com/naldomadeira/nestjs-rest-query/discussions).
 
@@ -54,7 +54,26 @@ pnpm add nestjs-rest-query
 npm install nestjs-rest-query
 ```
 
-Peer dependencies: `@nestjs/common`, `@nestjs/core`, `typeorm`, `reflect-metadata`. Add `@nestjs/swagger` for OpenAPI integration (optional).
+Peer dependencies: `@nestjs/common`, `@nestjs/core`, `reflect-metadata`. Optionally `typeorm` (for TypeORM) or `drizzle-orm` (for Drizzle). Add `@nestjs/swagger` for OpenAPI integration (optional).
+
+### Choose your ORM
+
+```typescript
+// TypeORM (default)
+import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
+
+DynamicQueryBuilderModule.forRoot({});
+
+// Drizzle
+import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
+import { DrizzleAdapter } from 'nestjs-rest-query/drizzle';
+
+DynamicQueryBuilderModule.forRoot({
+  adapter: new DrizzleAdapter(),
+});
+```
+
+See [Adapters](/docs/adapters) for more.
 
 ## Quick start
 

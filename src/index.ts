@@ -4,8 +4,18 @@ export { QueryBuilderService } from './core/query-builder.service';
 export { DQB_CONFIG_TOKEN } from './core/constants';
 
 // Adapters
-export { TypeOrmAdapter } from './infra/adapters';
+export {
+  TypeOrmAdapter,
+  DrizzleAdapter,
+  type DrizzleQB,
+} from './infra/adapters';
 export type { RestQueryAdapter } from './contracts/rest-query-adapter.interface';
+export type {
+  DrizzleSource,
+  DrizzleRelation,
+  DrizzleRelationOne,
+  DrizzleRelationMany,
+} from './contracts/drizzle-source.interface';
 
 // API — Decorators
 export { ApiDynamicQuery } from './api/decorators/api-dynamic-query.decorator';
