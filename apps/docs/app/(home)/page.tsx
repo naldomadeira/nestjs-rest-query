@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import { resolveDocsAssetPath } from '../../lib/asset-path';
 
 const features = [
   {
@@ -34,7 +35,7 @@ const HomePage = () => (
     <div className="flex flex-col items-center text-center gap-6 mb-14">
       <div className="flex items-center gap-2.5">
         <Image
-          src="/logomark.svg"
+          src={resolveDocsAssetPath('/logomark.svg')}
           alt="NestJS Dynamic Query Builder"
           width={40}
           height={40}
@@ -74,7 +75,7 @@ const HomePage = () => (
     {/* Preview — light/dark variants */}
     <div className="rounded-xl overflow-hidden border border-border shadow-md mb-16">
       <Image
-        src="/patterns.png"
+        src={resolveDocsAssetPath('/patterns.png')}
         alt="NestJS Dynamic Query Builder — visão geral"
         width={1200}
         height={630}
@@ -82,7 +83,7 @@ const HomePage = () => (
         priority
       />
       <Image
-        src="/patters-dark.png"
+        src={resolveDocsAssetPath('/patters-dark.png')}
         alt="NestJS Dynamic Query Builder — visão geral"
         width={1200}
         height={630}

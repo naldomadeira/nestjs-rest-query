@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { resolveDocsAssetPath } from "../lib/asset-path";
 
 type ThemedImageProps = {
   srcLight: string;
@@ -18,14 +19,14 @@ const ThemedImage = ({
   return (
     <div className="rounded-xl overflow-hidden border border-border shadow-md my-6">
       <Image
-        src={srcLight}
+        src={resolveDocsAssetPath(srcLight)}
         alt={alt}
         width={width}
         height={height}
         className="w-full h-auto dark:hidden"
       />
       <Image
-        src={srcDark}
+        src={resolveDocsAssetPath(srcDark)}
         alt={alt}
         width={width}
         height={height}

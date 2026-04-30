@@ -3,6 +3,7 @@ import { HomeLayout } from 'fumadocs-ui/layouts/home';
 import type { CSSProperties, ReactNode } from 'react';
 import Image from 'next/image';
 import { SiGitlab } from '@icons-pack/react-simple-icons';
+import { resolveDocsAssetPath } from '../../lib/asset-path';
 import { source } from '../../lib/source';
 
 type DocsRootLayoutProps = {
@@ -15,7 +16,7 @@ const GITHUB_URL =
 const navTitle = (
   <div className="flex items-center gap-2">
     <Image
-      src="/logomark.svg"
+      src={resolveDocsAssetPath('/logomark.svg')}
       alt="NestJS Dynamic Query Builder"
       width={22}
       height={22}
