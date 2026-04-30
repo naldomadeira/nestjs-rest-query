@@ -71,7 +71,11 @@ describe('QueryBuilderService', () => {
       const service = new QueryBuilderService();
       const qb = createMockQb();
       const repo = makeRepo(qb);
-      service.buildQuery(repo, { includes: 'category' }, { includes: ['category'] });
+      service.buildQuery(
+        repo,
+        { includes: 'category' },
+        { includes: ['category'] }
+      );
       expect(qb.leftJoinAndSelect).toHaveBeenCalledTimes(1);
     });
 
@@ -79,12 +83,18 @@ describe('QueryBuilderService', () => {
       const service = new QueryBuilderService();
       const qb = createMockQb();
       const repo = makeRepo(qb);
-      service.buildQuery(repo, { fields: 'id,name' }, { fields: ['id', 'name'] });
+      service.buildQuery(
+        repo,
+        { fields: 'id,name' },
+        { fields: ['id', 'name'] }
+      );
       expect(qb.select).toHaveBeenCalledTimes(1);
     });
 
     it('propagates operatorsConfig from global config to applyFilters', () => {
-      const service = new QueryBuilderService({ operators: { allowed: ['eq'] } });
+      const service = new QueryBuilderService({
+        operators: { allowed: ['eq'] },
+      });
       const qb = createMockQb();
       const repo = makeRepo(qb);
       expect(() =>
@@ -97,7 +107,9 @@ describe('QueryBuilderService', () => {
     });
 
     it('does not throw when filter uses allowed operator from config', () => {
-      const service = new QueryBuilderService({ operators: { allowed: ['eq', 'like'] } });
+      const service = new QueryBuilderService({
+        operators: { allowed: ['eq', 'like'] },
+      });
       const qb = createMockQb();
       const repo = makeRepo(qb);
       expect(() =>
@@ -145,7 +157,9 @@ describe('QueryBuilderService', () => {
       await service.execute(repo, {}, {}, (q) => {
         q.andWhere('root.active = :active', { active: true });
       });
-      expect(qb.andWhere).toHaveBeenCalledWith('root.active = :active', { active: true });
+      expect(qb.andWhere).toHaveBeenCalledWith('root.active = :active', {
+        active: true,
+      });
     });
 
     it('does not call customize when not provided', async () => {
@@ -155,7 +169,9 @@ describe('QueryBuilderService', () => {
     });
 
     it('applies pagination config from constructor', async () => {
-      const service = new QueryBuilderService({ pagination: { defaultPerPage: 5 } });
+      const service = new QueryBuilderService({
+        pagination: { defaultPerPage: 5 },
+      });
       const qb = createMockQb([], 0);
       const repo = makeRepo(qb);
       await service.execute(repo, {}, {});

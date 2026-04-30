@@ -4,9 +4,9 @@ on:
   push:
     branches: [main]
     paths:
-      - "apps/docs/**"
-      - "src/**"
-      - ".github/workflows/docs.yml"
+      - 'apps/docs/**'
+      - 'src/**'
+      - '.github/workflows/docs.yml'
   workflow_dispatch:
 
 permissions:
@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NEXT_PUBLIC_BASE_PATH: /nestjs-rest-query
-      CI: "true"
+      CI: 'true'
     steps:
       - uses: actions/checkout@v4
 

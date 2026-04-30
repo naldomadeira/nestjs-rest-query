@@ -1,6 +1,9 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@3.0.0/schema.json",
-  "changelog": ["@changesets/changelog-github", { "repo": "naldomadeira/nestjs-rest-query" }],
+  "changelog": [
+    "@changesets/changelog-github",
+    { "repo": "naldomadeira/nestjs-rest-query" }
+  ],
   "commit": false,
   "fixed": [],
   "linked": [],

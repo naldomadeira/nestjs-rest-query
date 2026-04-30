@@ -6,9 +6,13 @@ import { formatCnpj } from '../utils/seed.helpers';
  * Gera um objeto Company com dados fictícios usando faker pt_BR.
  * CNPJ gerado aleatoriamente e formatado (fictício, não válido).
  */
-export function makeCompany(overrides: Partial<Company> = {}): Partial<Company> {
+export function makeCompany(
+  overrides: Partial<Company> = {},
+): Partial<Company> {
   return {
-    cnpj: formatCnpj(faker.string.numeric({ length: 14, allowLeadingZeros: true })),
+    cnpj: formatCnpj(
+      faker.string.numeric({ length: 14, allowLeadingZeros: true }),
+    ),
     name: faker.company.name(),
     ...overrides,
   };

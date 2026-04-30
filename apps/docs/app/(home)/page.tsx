@@ -5,27 +5,33 @@ import { resolveDocsAssetPath } from '../../lib/asset-path';
 const features = [
   {
     title: 'Filtros dinâmicos',
-    description: 'Filtre por qualquer campo permitido com operadores como eq, like, in, between e isNull.',
+    description:
+      'Filtre por qualquer campo permitido com operadores como eq, like, in, between e isNull.',
   },
   {
     title: 'Ordenação multi-coluna',
-    description: 'Ordene por múltiplos campos com ASC/DESC, controlado por endpoint.',
+    description:
+      'Ordene por múltiplos campos com ASC/DESC, controlado por endpoint.',
   },
   {
     title: 'Paginação automática',
-    description: 'Paginação baseada em página ou limit/offset com metadados completos na resposta.',
+    description:
+      'Paginação baseada em página ou limit/offset com metadados completos na resposta.',
   },
   {
     title: 'Seleção de campos',
-    description: 'Retorne apenas as colunas que o cliente precisa, reduzindo o payload.',
+    description:
+      'Retorne apenas as colunas que o cliente precisa, reduzindo o payload.',
   },
   {
     title: 'Carregamento de relações',
-    description: 'Carregue relações TypeORM declaradas na whitelist do endpoint.',
+    description:
+      'Carregue relações TypeORM declaradas na whitelist do endpoint.',
   },
   {
     title: 'Whitelist de segurança',
-    description: 'Cada endpoint declara exatamente quais campos e operadores são permitidos.',
+    description:
+      'Cada endpoint declara exatamente quais campos e operadores são permitidos.',
   },
 ];
 
@@ -41,9 +47,7 @@ const HomePage = () => (
           height={40}
           className="dark:invert"
         />
-        <code className="text-sm text-muted-foreground">
-          nestjs-rest-query
-        </code>
+        <code className="text-sm text-muted-foreground">nestjs-rest-query</code>
       </div>
 
       <h1 className="text-5xl font-bold tracking-tight leading-tight">
@@ -100,7 +104,9 @@ const HomePage = () => (
           className="rounded-lg border border-border p-5 bg-card hover:bg-muted/50 transition-colors"
         >
           <h3 className="font-semibold mb-1 text-sm">{f.title}</h3>
-          <p className="text-sm text-muted-foreground leading-relaxed">{f.description}</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {f.description}
+          </p>
         </div>
       ))}
     </div>

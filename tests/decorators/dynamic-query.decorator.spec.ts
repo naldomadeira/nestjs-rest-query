@@ -69,14 +69,20 @@ describe('@QueryRules', () => {
 
     // Access the factory directly — createParamDecorator wraps the factory
     // We can test the behavior by calling Reflect.getMetadata directly as @QueryRules does
-    const result = Reflect.getMetadata(QUERY_RULES_METADATA_KEY, ctx.getHandler());
+    const result = Reflect.getMetadata(
+      QUERY_RULES_METADATA_KEY,
+      ctx.getHandler()
+    );
     expect(result).toEqual(RULES);
   });
 
   it('returns undefined when no @DynamicQuery is applied', () => {
     const fn = jest.fn();
     const ctx = makeCtx(fn);
-    const result = Reflect.getMetadata(QUERY_RULES_METADATA_KEY, ctx.getHandler());
+    const result = Reflect.getMetadata(
+      QUERY_RULES_METADATA_KEY,
+      ctx.getHandler()
+    );
     expect(result).toBeUndefined();
   });
 
@@ -95,7 +101,10 @@ describe('@QueryRules', () => {
   it('reads includes from stored rules', () => {
     const fn = jest.fn();
     DynamicQuery(RULES)({}, 'method', { value: fn });
-    const stored: RulesConfig = Reflect.getMetadata(QUERY_RULES_METADATA_KEY, fn);
+    const stored: RulesConfig = Reflect.getMetadata(
+      QUERY_RULES_METADATA_KEY,
+      fn
+    );
     expect(stored.includes).toEqual(['category']);
   });
 
@@ -103,7 +112,10 @@ describe('@QueryRules', () => {
     const fn = jest.fn();
     const rules: RulesConfig = { filters: ['name'], alias: 'company' };
     DynamicQuery(rules)({}, 'method', { value: fn });
-    const stored: RulesConfig = Reflect.getMetadata(QUERY_RULES_METADATA_KEY, fn);
+    const stored: RulesConfig = Reflect.getMetadata(
+      QUERY_RULES_METADATA_KEY,
+      fn
+    );
     expect(stored.alias).toBe('company');
   });
 });

@@ -20,7 +20,12 @@ export class AccessRequest {
   @Column({ name: 'user_id', type: 'integer' })
   userId: number;
 
-  @Column({ name: 'overall_status', type: 'varchar', length: 30, default: 'pending' })
+  @Column({
+    name: 'overall_status',
+    type: 'varchar',
+    length: 30,
+    default: 'pending',
+  })
   overallStatus: string;
 
   @DeleteDateColumn({ name: 'deleted_at' })

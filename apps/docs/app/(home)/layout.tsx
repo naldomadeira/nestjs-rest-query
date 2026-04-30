@@ -1,15 +1,14 @@
-import { HomeLayout } from "fumadocs-ui/layouts/home";
-import type { ReactNode } from "react";
-import Image from "next/image";
-import { SiGithub } from "@icons-pack/react-simple-icons";
-import { resolveDocsAssetPath } from "../../lib/asset-path";
+import { HomeLayout } from 'fumadocs-ui/layouts/home';
+import type { ReactNode } from 'react';
+import Image from 'next/image';
+import { SiGithub } from '@icons-pack/react-simple-icons';
+import { resolveDocsAssetPath } from '../../lib/asset-path';
 
 type HomeRootLayoutProps = {
   readonly children: ReactNode;
 };
 
-const GITHUB_URL =
-  "https://github.com/naldomadeira/nestjs-rest-query";
+const GITHUB_URL = 'https://github.com/naldomadeira/nestjs-rest-query';
 
 const HomeRootLayout = ({ children }: HomeRootLayoutProps) => (
   <HomeLayout
@@ -17,23 +16,25 @@ const HomeRootLayout = ({ children }: HomeRootLayoutProps) => (
       title: (
         <div className="flex items-center gap-2">
           <Image
-            src={resolveDocsAssetPath("/logomark.svg")}
+            src={resolveDocsAssetPath('/logomark.svg')}
             alt="nestjs-rest-query"
             width={22}
             height={22}
             className="dark:invert shrink-0"
           />
-          <span className="font-semibold text-sm leading-none">nestjs-rest-query</span>
+          <span className="font-semibold text-sm leading-none">
+            nestjs-rest-query
+          </span>
         </div>
       ),
-      url: "/",
+      url: '/',
     }}
     links={[
-      { text: "Docs", url: "/docs" },
+      { text: 'Docs', url: '/docs' },
       {
-        type: "icon" as const,
-        text: "GitHub",
-        label: "GitHub",
+        type: 'icon' as const,
+        text: 'GitHub',
+        label: 'GitHub',
         url: GITHUB_URL,
         icon: <SiGithub className="size-4" />,
         external: true,

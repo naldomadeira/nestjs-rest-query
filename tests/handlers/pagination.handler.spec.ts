@@ -23,7 +23,13 @@ describe('applyPagination', () => {
       const data = [{ id: 1 }, { id: 2 }];
       const qb = createPaginationQb(data, 2);
       const result = await applyPagination(qb, {});
-      expect(result).toEqual({ data, page: 1, perPage: 10, total: 2, lastPage: 1 });
+      expect(result).toEqual({
+        data,
+        page: 1,
+        perPage: 10,
+        total: 2,
+        lastPage: 1,
+      });
     });
   });
 
@@ -138,22 +144,30 @@ describe('applyPagination', () => {
   describe('parameter validation', () => {
     it('throws BadRequestException when page=0', async () => {
       const qb = createPaginationQb();
-      await expect(applyPagination(qb, { page: '0' })).rejects.toThrow(BadRequestException);
+      await expect(applyPagination(qb, { page: '0' })).rejects.toThrow(
+        BadRequestException
+      );
     });
 
     it('throws BadRequestException when page is negative', async () => {
       const qb = createPaginationQb();
-      await expect(applyPagination(qb, { page: '-1' })).rejects.toThrow(BadRequestException);
+      await expect(applyPagination(qb, { page: '-1' })).rejects.toThrow(
+        BadRequestException
+      );
     });
 
     it('throws BadRequestException when perPage=0', async () => {
       const qb = createPaginationQb();
-      await expect(applyPagination(qb, { perPage: '0' })).rejects.toThrow(BadRequestException);
+      await expect(applyPagination(qb, { perPage: '0' })).rejects.toThrow(
+        BadRequestException
+      );
     });
 
     it('throws BadRequestException when page is a non-numeric string', async () => {
       const qb = createPaginationQb();
-      await expect(applyPagination(qb, { page: 'abc' })).rejects.toThrow(BadRequestException);
+      await expect(applyPagination(qb, { page: 'abc' })).rejects.toThrow(
+        BadRequestException
+      );
     });
 
     it('error message mentions "page" for invalid page param', async () => {
@@ -163,7 +177,9 @@ describe('applyPagination', () => {
 
     it('error message mentions "perPage" for invalid perPage param', async () => {
       const qb = createPaginationQb();
-      await expect(applyPagination(qb, { perPage: '0' })).rejects.toThrow(/perPage/);
+      await expect(applyPagination(qb, { perPage: '0' })).rejects.toThrow(
+        /perPage/
+      );
     });
   });
 });

@@ -3,7 +3,7 @@
 ## Supported Versions
 
 | Version | Supported |
-|---------|-----------|
+| ------- | --------- |
 | 1.x     | ✅        |
 
 Older internal versions (published as `@multitechbr/nestjs-dynamic-query-builder`) are not supported.

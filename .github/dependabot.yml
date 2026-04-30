@@ -8,22 +8,22 @@ updates:
     groups:
       nestjs:
         patterns:
-          - "@nestjs/*"
+          - '@nestjs/*'
       typescript-eslint:
         patterns:
-          - "typescript-eslint"
-          - "@typescript-eslint/*"
-          - "eslint*"
+          - 'typescript-eslint'
+          - '@typescript-eslint/*'
+          - 'eslint*'
       jest:
         patterns:
-          - "jest"
-          - "@types/jest"
-          - "ts-jest"
-          - "jest-junit"
+          - 'jest'
+          - '@types/jest'
+          - 'ts-jest'
+          - 'jest-junit'
       dev-deps:
         dependency-type: development
     commit-message:
-      prefix: "chore"
+      prefix: 'chore'
       include: scope
 
   - package-ecosystem: github-actions
@@ -31,5 +31,5 @@ updates:
     schedule:
       interval: weekly
     commit-message:
-      prefix: "chore"
+      prefix: 'chore'
       include: scope

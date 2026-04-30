@@ -3,7 +3,6 @@ title: Instalação
 description: Como instalar e configurar o nestjs-rest-query no seu projeto.
 ---
 
-
 ## Instalar o pacote
 
 ```bash tab="pnpm"
@@ -39,7 +38,7 @@ app.useGlobalPipes(
     transformOptions: {
       enableImplicitConversion: true,
     },
-  }),
+  })
 );
 ```
 
@@ -60,7 +59,10 @@ SwaggerModule.setup('/', app, document, {
 O Swagger UI serializa filtros como múltiplos query params (`filter[name][eq]=foo`). Sem o interceptor, o browser envia esses parâmetros de forma que o Express pode não preservar a notação de colchetes corretamente. O `dqbSwaggerRequestInterceptor` reescreve a URL antes de disparar a requisição, garantindo que os filtros cheguem ao controller no formato esperado.
 
 <Callout type="info">
-  Este interceptor só é necessário para testar filtros pela interface do Swagger UI. Clientes externos (Postman, aplicações frontend, etc.) constroem a URL diretamente e não precisam dele. A seção [Swagger](/docs/swagger) explica o cenário completo.
+  Este interceptor só é necessário para testar filtros pela interface do Swagger
+  UI. Clientes externos (Postman, aplicações frontend, etc.) constroem a URL
+  diretamente e não precisam dele. A seção [Swagger](/docs/swagger) explica o
+  cenário completo.
 </Callout>
 
 ### Exemplo completo
@@ -85,15 +87,12 @@ async function bootstrap() {
       transformOptions: {
         enableImplicitConversion: true,
       },
-    }),
+    })
   );
 
   const document = SwaggerModule.createDocument(
     app,
-    new DocumentBuilder()
-      .setTitle('Minha API')
-      .setVersion('1.0')
-      .build(),
+    new DocumentBuilder().setTitle('Minha API').setVersion('1.0').build()
   );
 
   SwaggerModule.setup('/', app, document, {
@@ -135,17 +134,17 @@ O módulo é `@Global`, portanto não é necessário importá-lo em módulos de 
 
 Controla o comportamento padrão de paginação.
 
-| Opção            | Tipo     | Padrão | Descrição                                                 |
-| ---------------- | -------- | ------ | --------------------------------------------------------- |
-| `defaultPerPage` | `number` | `10`   | Quantidade de itens por página quando `perPage` não é informado na requisição. |
+| Opção            | Tipo     | Padrão | Descrição                                                                           |
+| ---------------- | -------- | ------ | ----------------------------------------------------------------------------------- |
+| `defaultPerPage` | `number` | `10`   | Quantidade de itens por página quando `perPage` não é informado na requisição.      |
 | `maxPerPage`     | `number` | `100`  | Limite máximo de itens por página, ignorando valores maiores enviados pelo cliente. |
 
 ### `operators`
 
 Restringe os operadores de filtro permitidos globalmente na aplicação.
 
-| Opção     | Tipo              | Padrão           | Descrição                                                                                              |
-| --------- | ----------------- | ---------------- | ------------------------------------------------------------------------------------------------------ |
+| Opção     | Tipo              | Padrão           | Descrição                                                                                         |
+| --------- | ----------------- | ---------------- | ------------------------------------------------------------------------------------------------- |
 | `allowed` | `QueryOperator[]` | todos permitidos | Lista de operadores aceitos. `undefined` = todos. `[]` (lista vazia) = nenhum operador permitido. |
 
 ```typescript
@@ -153,18 +152,18 @@ DynamicQueryBuilderModule.forRoot({
   operators: {
     allowed: ['eq', 'like', 'in', 'between'],
   },
-})
+});
 ```
 
 ### `logging`
 
 Habilita e configura os logs internos de construção de queries.
 
-| Opção     | Tipo                                         | Padrão        | Descrição                                                                                    |
-| --------- | -------------------------------------------- | ------------- | -------------------------------------------------------------------------------------------- |
-| `enabled` | `boolean`                                    | `false`       | Habilita logs internos.                                                                      |
-| `level`   | `'error' \| 'warn' \| 'info' \| 'debug'`    | `'info'`      | Nível mínimo de log emitido.                                                                 |
-| `logger`  | `LoggerLike`                                 | NestJS Logger | Logger customizado. Qualquer objeto com `error/warn/log/debug` funciona (winston, pino, etc.). |
+| Opção     | Tipo                                     | Padrão        | Descrição                                                                                      |
+| --------- | ---------------------------------------- | ------------- | ---------------------------------------------------------------------------------------------- |
+| `enabled` | `boolean`                                | `false`       | Habilita logs internos.                                                                        |
+| `level`   | `'error' \| 'warn' \| 'info' \| 'debug'` | `'info'`      | Nível mínimo de log emitido.                                                                   |
+| `logger`  | `LoggerLike`                             | NestJS Logger | Logger customizado. Qualquer objeto com `error/warn/log/debug` funciona (winston, pino, etc.). |
 
 ```typescript
 DynamicQueryBuilderModule.forRoot({
@@ -172,7 +171,7 @@ DynamicQueryBuilderModule.forRoot({
     enabled: true,
     level: 'debug',
   },
-})
+});
 ```
 
 ## Próximos passos

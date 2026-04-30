@@ -157,7 +157,10 @@ describe('operatorRegistry', () => {
   describe('notIn', () => {
     it('generates a NOT IN condition', () => {
       const qb = createMockQb();
-      operatorRegistry.notIn(qb as any, 'root', 'status', 'filter_0', ['a', 'b']);
+      operatorRegistry.notIn(qb as any, 'root', 'status', 'filter_0', [
+        'a',
+        'b',
+      ]);
       expect(qb.andWhere).toHaveBeenCalledWith(
         'root.status NOT IN (:...filter_0)',
         { filter_0: ['a', 'b'] }
@@ -168,7 +171,13 @@ describe('operatorRegistry', () => {
   describe('between', () => {
     it('generates a BETWEEN condition with _start and _end param keys', () => {
       const qb = createMockQb();
-      operatorRegistry.between(qb as any, 'root', 'price', 'filter_0', [10, 50]);
+      operatorRegistry.between(
+        qb as any,
+        'root',
+        'price',
+        'filter_0',
+        [10, 50]
+      );
       expect(qb.andWhere).toHaveBeenCalledWith(
         'root.price BETWEEN :filter_0_start AND :filter_0_end',
         { filter_0_start: 10, filter_0_end: 50 }
@@ -179,19 +188,37 @@ describe('operatorRegistry', () => {
   describe('isNull', () => {
     it('generates IS NULL when value is true', () => {
       const qb = createMockQb();
-      operatorRegistry.isNull(qb as any, 'root', 'deleted_at', 'filter_0', true);
+      operatorRegistry.isNull(
+        qb as any,
+        'root',
+        'deleted_at',
+        'filter_0',
+        true
+      );
       expect(qb.andWhere).toHaveBeenCalledWith('root.deleted_at IS NULL');
     });
 
     it('generates IS NOT NULL when value is false', () => {
       const qb = createMockQb();
-      operatorRegistry.isNull(qb as any, 'root', 'deleted_at', 'filter_0', false);
+      operatorRegistry.isNull(
+        qb as any,
+        'root',
+        'deleted_at',
+        'filter_0',
+        false
+      );
       expect(qb.andWhere).toHaveBeenCalledWith('root.deleted_at IS NOT NULL');
     });
 
     it('does not pass a params object (IS NULL uses no bound parameter)', () => {
       const qb = createMockQb();
-      operatorRegistry.isNull(qb as any, 'root', 'deleted_at', 'filter_0', true);
+      operatorRegistry.isNull(
+        qb as any,
+        'root',
+        'deleted_at',
+        'filter_0',
+        true
+      );
       const call = (qb.andWhere as jest.Mock).mock.calls[0];
       expect(call).toHaveLength(1);
     });
@@ -213,7 +240,13 @@ describe('operatorRegistry', () => {
   describe('alias with underscores (nested relation alias)', () => {
     it('handles aliases generated from nested paths (e.g. user_address)', () => {
       const qb = createMockQb();
-      operatorRegistry.eq(qb as any, 'user_address', 'city', 'filter_0', 'São Paulo');
+      operatorRegistry.eq(
+        qb as any,
+        'user_address',
+        'city',
+        'filter_0',
+        'São Paulo'
+      );
       expect(qb.andWhere).toHaveBeenCalledWith(
         'user_address.city = :filter_0',
         { filter_0: 'São Paulo' }

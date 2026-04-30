@@ -1,18 +1,16 @@
 const ABSOLUTE_URL_PATTERN = /^[a-z]+:\/\//i;
 
 const normalizeBasePath = (basePath: string) =>
-  basePath.endsWith("/") ? basePath.slice(0, -1) : basePath;
+  basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
 
 export const resolveDocsAssetPath = (src: string) => {
   if (!src || ABSOLUTE_URL_PATTERN.test(src)) {
     return src;
   }
 
-  const basePath = normalizeBasePath(
-    process.env.NEXT_PUBLIC_BASE_PATH ?? "",
-  );
+  const basePath = normalizeBasePath(process.env.NEXT_PUBLIC_BASE_PATH ?? '');
 
-  if (!basePath || !src.startsWith("/")) {
+  if (!basePath || !src.startsWith('/')) {
     return src;
   }
 

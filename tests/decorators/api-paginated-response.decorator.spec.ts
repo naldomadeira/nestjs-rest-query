@@ -22,8 +22,11 @@ describe('ApiPaginatedResponse', () => {
   describe('no-op path (swagger unavailable)', () => {
     it('returns the descriptor unchanged when swagger is not installed', () => {
       // Simulate swagger unavailable by calling the fallback branch directly
-      const noopDecorator = (_target: object, _key: string | symbol, descriptor: PropertyDescriptor) =>
-        descriptor;
+      const noopDecorator = (
+        _target: object,
+        _key: string | symbol,
+        descriptor: PropertyDescriptor
+      ) => descriptor;
 
       const fn = jest.fn();
       const descriptor = { value: fn };

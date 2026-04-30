@@ -1,7 +1,7 @@
 name: Feature request
 description: Suggest a new feature or enhancement
-title: "[Feature]: "
-labels: ["enhancement", "needs-triage"]
+title: '[Feature]: '
+labels: ['enhancement', 'needs-triage']
 body:
   - type: textarea
     id: problem
@@ -30,9 +30,9 @@ body:
     attributes:
       label: Is this a breaking change?
       options:
-        - "No"
-        - "Yes"
-        - "Not sure"
+        - 'No'
+        - 'Yes'
+        - 'Not sure'
     validations:
       required: true
 

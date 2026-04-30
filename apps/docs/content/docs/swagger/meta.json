@@ -2,7 +2,5 @@
   "title": "OpenAPI",
   "icon": "Braces",
   "defaultOpen": false,
-  "pages": [
-    "index"
-  ]
+  "pages": ["index"]
 }

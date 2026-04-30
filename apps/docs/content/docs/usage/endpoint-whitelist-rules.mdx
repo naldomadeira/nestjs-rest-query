@@ -11,22 +11,22 @@ O campo deve estar listado em `filters` do `RulesConfig` do endpoint — campos 
 
 ### Operadores disponíveis
 
-| Operador   | Descrição                                       |
-| ---------- | ----------------------------------------------- |
-| `eq`       | Igual                                           |
-| `ne`       | Diferente                                       |
-| `gt`       | Maior que                                       |
-| `gte`      | Maior ou igual                                  |
-| `lt`       | Menor que                                       |
-| `lte`      | Menor ou igual                                  |
-| `like`     | Contém (case-sensitive, wildcards automáticos)  |
+| Operador   | Descrição                                        |
+| ---------- | ------------------------------------------------ |
+| `eq`       | Igual                                            |
+| `ne`       | Diferente                                        |
+| `gt`       | Maior que                                        |
+| `gte`      | Maior ou igual                                   |
+| `lt`       | Menor que                                        |
+| `lte`      | Menor ou igual                                   |
+| `like`     | Contém (case-sensitive, wildcards automáticos)   |
 | `ilike`    | Contém (case-insensitive, portável entre bancos) |
-| `notLike`  | Não contém (case-sensitive)                     |
-| `notIlike` | Não contém (case-insensitive)                   |
-| `in`       | Dentro de uma lista (CSV)                       |
-| `notIn`    | Fora de uma lista (CSV)                         |
-| `between`  | Entre dois valores (`val1,val2`)                |
-| `isNull`   | Nulo (`true`) ou não nulo (`false`)             |
+| `notLike`  | Não contém (case-sensitive)                      |
+| `notIlike` | Não contém (case-insensitive)                    |
+| `in`       | Dentro de uma lista (CSV)                        |
+| `notIn`    | Fora de uma lista (CSV)                          |
+| `between`  | Entre dois valores (`val1,val2`)                 |
+| `isNull`   | Nulo (`true`) ou não nulo (`false`)              |
 
 ### Operadores com comportamento especial
 
@@ -66,7 +66,7 @@ DynamicQueryBuilderModule.forRoot({
   operators: {
     allowed: ['eq', 'ne', 'like', 'in'],
   },
-})
+});
 ```
 
 Operadores fora da lista lançam `BadRequestException`.
@@ -129,7 +129,7 @@ DynamicQueryBuilderModule.forRoot({
     defaultPerPage: 20,
     maxPerPage: 200,
   },
-})
+});
 ```
 
 ### Resposta com paginação ativa

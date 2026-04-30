@@ -1,15 +1,15 @@
-"use client";
+'use client';
 
-import { Maximize2, X } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { Maximize2, X } from 'lucide-react';
+import { useEffect, useId, useState } from 'react';
 
 type MermaidProps = {
   chart: string;
 };
 
 const Mermaid = ({ chart }: MermaidProps) => {
-  const id = useId().replace(/:/g, "");
-  const [svg, setSvg] = useState<string>("");
+  const id = useId().replace(/:/g, '');
+  const [svg, setSvg] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
 
@@ -18,14 +18,14 @@ const Mermaid = ({ chart }: MermaidProps) => {
 
     const render = async () => {
       try {
-        const { default: mermaid } = await import("mermaid");
+        const { default: mermaid } = await import('mermaid');
 
         mermaid.initialize({
           startOnLoad: false,
-          securityLevel: "strict",
-          theme: document.documentElement.classList.contains("dark")
-            ? "dark"
-            : "default",
+          securityLevel: 'strict',
+          theme: document.documentElement.classList.contains('dark')
+            ? 'dark'
+            : 'default',
         });
 
         const result = await mermaid.render(`dqb-mermaid-${id}`, chart);
@@ -42,7 +42,9 @@ const Mermaid = ({ chart }: MermaidProps) => {
         }
 
         const message =
-          err instanceof Error ? err.message : "Failed to render Mermaid chart.";
+          err instanceof Error
+            ? err.message
+            : 'Failed to render Mermaid chart.';
         setError(message);
       }
     };
@@ -57,10 +59,10 @@ const Mermaid = ({ chart }: MermaidProps) => {
   useEffect(() => {
     if (!fullscreen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setFullscreen(false);
+      if (e.key === 'Escape') setFullscreen(false);
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [fullscreen]);
 
   if (error) {
@@ -83,7 +85,7 @@ const Mermaid = ({ chart }: MermaidProps) => {
   // That inline style takes precedence over Tailwind classes, keeping the SVG
   // at its original small size even inside the fullscreen container.
   // Strip that constraint so the SVG can scale to fill available space.
-  const fullscreenSvg = svg.replace(/max-width:\s*[\d.]+px;?\s*/g, "");
+  const fullscreenSvg = svg.replace(/max-width:\s*[\d.]+px;?\s*/g, '');
 
   return (
     <>

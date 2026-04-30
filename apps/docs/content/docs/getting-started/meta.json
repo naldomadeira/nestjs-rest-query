@@ -2,9 +2,5 @@
   "title": "Primeiros Passos",
   "icon": "BookOpen",
   "defaultOpen": false,
-  "pages": [
-    "prerequisites",
-    "installation",
-    "first-endpoint"
-  ]
+  "pages": ["prerequisites", "installation", "first-endpoint"]
 }

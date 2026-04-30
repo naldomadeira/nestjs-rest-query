@@ -17,7 +17,14 @@ export class AccessRequestsBusiness {
     private readonly queryBuilderService: QueryBuilderService,
   ) {}
 
-  async findAll(query: DynamicQueryDto, rules: RulesConfig): Promise<QueryResult<AccessRequest>> {
-    return this.queryBuilderService.execute(this.accessRequestRepository, query, rules);
+  async findAll(
+    query: DynamicQueryDto,
+    rules: RulesConfig,
+  ): Promise<QueryResult<AccessRequest>> {
+    return this.queryBuilderService.execute(
+      this.accessRequestRepository,
+      query,
+      rules,
+    );
   }
 }

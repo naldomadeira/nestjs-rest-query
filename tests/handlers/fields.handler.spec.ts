@@ -71,7 +71,12 @@ describe('applyFields', () => {
   describe('deduplication', () => {
     it('removes duplicate fields from the selection', () => {
       const qb = createMockQb();
-      applyFields(qb as any, { fields: 'name,name,cnpj' }, 'root', ALLOWED_FIELDS);
+      applyFields(
+        qb as any,
+        { fields: 'name,name,cnpj' },
+        'root',
+        ALLOWED_FIELDS
+      );
       const [selected] = (qb.select as jest.Mock).mock.calls[0];
       const nameOccurrences = selected.filter((f: string) => f === 'root.name');
       expect(nameOccurrences).toHaveLength(1);
@@ -95,7 +100,13 @@ describe('applyFields', () => {
 
     it('prefixes a non-relation field with the root alias', () => {
       const qb = createMockQb();
-      applyFields(qb as any, { fields: 'name' }, 'root', ALLOWED_FIELDS, ALLOWED_INCLUDES);
+      applyFields(
+        qb as any,
+        { fields: 'name' },
+        'root',
+        ALLOWED_FIELDS,
+        ALLOWED_INCLUDES
+      );
       const [selected] = (qb.select as jest.Mock).mock.calls[0];
       expect(selected).toContain('root.name');
     });
@@ -118,7 +129,13 @@ describe('applyFields', () => {
   describe('allowedIncludes absent', () => {
     it('prefixes all fields when allowedIncludes is undefined', () => {
       const qb = createMockQb();
-      applyFields(qb as any, { fields: 'name' }, 'root', ALLOWED_FIELDS, undefined);
+      applyFields(
+        qb as any,
+        { fields: 'name' },
+        'root',
+        ALLOWED_FIELDS,
+        undefined
+      );
       const [selected] = (qb.select as jest.Mock).mock.calls[0];
       expect(selected).toContain('root.name');
     });
@@ -144,7 +161,12 @@ describe('applyFields', () => {
     it('throws BadRequestException for a field with SQL injection characters', () => {
       const qb = createMockQb();
       expect(() =>
-        applyFields(qb as any, { fields: 'name; DROP TABLE' }, 'root', ALLOWED_FIELDS)
+        applyFields(
+          qb as any,
+          { fields: 'name; DROP TABLE' },
+          'root',
+          ALLOWED_FIELDS
+        )
       ).toThrow(BadRequestException);
     });
   });

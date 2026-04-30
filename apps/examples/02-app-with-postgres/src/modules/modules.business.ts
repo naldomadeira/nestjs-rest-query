@@ -17,7 +17,14 @@ export class ModulesBusiness {
     private readonly queryBuilderService: QueryBuilderService,
   ) {}
 
-  async findAll(query: DynamicQueryDto, rules: RulesConfig): Promise<QueryResult<ModuleEntity>> {
-    return this.queryBuilderService.execute(this.moduleRepository, query, rules);
+  async findAll(
+    query: DynamicQueryDto,
+    rules: RulesConfig,
+  ): Promise<QueryResult<ModuleEntity>> {
+    return this.queryBuilderService.execute(
+      this.moduleRepository,
+      query,
+      rules,
+    );
   }
 }

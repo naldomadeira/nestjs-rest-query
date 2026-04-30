@@ -40,21 +40,30 @@ describe('buildDQBSwaggerDecorators', () => {
 
   it('adds fields ApiQuery when rules.fields is provided', () => {
     const rulesWithFields: RulesConfig = { fields: ['id', 'name'] };
-    const withFields = buildDQBSwaggerDecorators(rulesWithFields, ALL_OPERATORS);
+    const withFields = buildDQBSwaggerDecorators(
+      rulesWithFields,
+      ALL_OPERATORS
+    );
     const withoutFields = buildDQBSwaggerDecorators({}, ALL_OPERATORS);
     expect(withFields.length).toBeGreaterThan(withoutFields.length);
   });
 
   it('adds includes ApiQuery when rules.includes is provided', () => {
     const rulesWithIncludes: RulesConfig = { includes: ['category'] };
-    const withIncludes = buildDQBSwaggerDecorators(rulesWithIncludes, ALL_OPERATORS);
+    const withIncludes = buildDQBSwaggerDecorators(
+      rulesWithIncludes,
+      ALL_OPERATORS
+    );
     const withoutIncludes = buildDQBSwaggerDecorators({}, ALL_OPERATORS);
     expect(withIncludes.length).toBeGreaterThan(withoutIncludes.length);
   });
 
   it('adds filter ApiQuery when rules.filters is provided', () => {
     const rulesWithFilters: RulesConfig = { filters: ['name'] };
-    const withFilters = buildDQBSwaggerDecorators(rulesWithFilters, ALL_OPERATORS);
+    const withFilters = buildDQBSwaggerDecorators(
+      rulesWithFilters,
+      ALL_OPERATORS
+    );
     const withoutFilters = buildDQBSwaggerDecorators({}, ALL_OPERATORS);
     expect(withFilters.length).toBeGreaterThan(withoutFilters.length);
   });
@@ -109,7 +118,10 @@ describe('@ApiDynamicQuery', () => {
     const fn = jest.fn();
     const rules: RulesConfig = { filters: ['name'], alias: 'company' };
     ApiDynamicQuery(rules)({}, 'method', { value: fn });
-    const stored: RulesConfig = Reflect.getMetadata(QUERY_RULES_METADATA_KEY, fn);
+    const stored: RulesConfig = Reflect.getMetadata(
+      QUERY_RULES_METADATA_KEY,
+      fn
+    );
     expect(stored.alias).toBe('company');
   });
 

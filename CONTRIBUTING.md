@@ -12,12 +12,12 @@ Requires Node 20+ and pnpm 9+.
 
 ## Common commands
 
-- pnpm test                 — run unit tests
-- pnpm test:cov             — with coverage
-- pnpm lint                 — eslint
-- pnpm typecheck            — type-check only
-- pnpm s02:dev              — sample app (postgres)
-- pnpm docs:dev             — docs site
+- pnpm test — run unit tests
+- pnpm test:cov — with coverage
+- pnpm lint — eslint
+- pnpm typecheck — type-check only
+- pnpm s02:dev — sample app (postgres)
+- pnpm docs:dev — docs site
 
 ## Branching
 
@@ -34,7 +34,7 @@ Every PR that changes published behavior must include a changeset:
 - pnpm changeset
 - Pick patch / minor / major
 - Describe the user-visible change in 1-2 lines
-- Commit the generated .changeset/*.md file
+- Commit the generated .changeset/\*.md file
 
 ## PR checklist
 

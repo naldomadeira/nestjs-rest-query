@@ -17,7 +17,10 @@ export class UsersBusiness {
     private readonly queryBuilderService: QueryBuilderService,
   ) {}
 
-  async findAll(query: DynamicQueryDto, rules: RulesConfig): Promise<QueryResult<User>> {
+  async findAll(
+    query: DynamicQueryDto,
+    rules: RulesConfig,
+  ): Promise<QueryResult<User>> {
     return this.queryBuilderService.execute(this.userRepository, query, rules);
   }
 }

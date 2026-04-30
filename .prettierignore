@@ -1,2 +1,9 @@
 node_modules
 dist
+coverage
+out
+.next
+apps/**/out
+apps/**/.next
+pnpm-lock.yaml
+*.tgz

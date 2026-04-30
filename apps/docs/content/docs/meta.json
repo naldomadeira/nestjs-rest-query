@@ -1,9 +1,3 @@
 {
-  "pages": [
-    "index",
-    "getting-started",
-    "swagger",
-    "usage",
-    "advanced"
-  ]
+  "pages": ["index", "getting-started", "swagger", "usage", "advanced"]
 }

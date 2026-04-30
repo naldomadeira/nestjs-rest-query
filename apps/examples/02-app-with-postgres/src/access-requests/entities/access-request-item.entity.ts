@@ -28,7 +28,12 @@ export class AccessRequestItem {
   @Column({ name: 'status', type: 'varchar', length: 30, default: 'pending' })
   status: string;
 
-  @Column({ name: 'evaluated_by', type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'evaluated_by',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   evaluatedBy: string | null;
 
   @Column({ name: 'evaluated_at', type: 'timestamp', nullable: true })

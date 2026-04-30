@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class CreateAccessRequestsTable1731112260003 implements MigrationInterface {
+export class CreateAccessRequestsTable1731112260003
+  implements MigrationInterface
+{
   name = 'CreateAccessRequestsTable1731112260003';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -24,9 +26,15 @@ export class CreateAccessRequestsTable1731112260003 implements MigrationInterfac
       ON DELETE CASCADE ON UPDATE NO ACTION
     `);
 
-    await queryRunner.query(`CREATE INDEX "IDX_access_requests_user_id" ON "access_requests" ("user_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_access_requests_overall_status" ON "access_requests" ("overall_status")`);
-    await queryRunner.query(`CREATE INDEX "IDX_access_requests_created_at" ON "access_requests" ("created_at")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_access_requests_user_id" ON "access_requests" ("user_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_access_requests_overall_status" ON "access_requests" ("overall_status")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_access_requests_created_at" ON "access_requests" ("created_at")`,
+    );
 
     // access_request_items — itens granulares (empresa + módulo por solicitação)
     await queryRunner.query(`
@@ -66,26 +74,44 @@ export class CreateAccessRequestsTable1731112260003 implements MigrationInterfac
       ON DELETE CASCADE ON UPDATE NO ACTION
     `);
 
-    await queryRunner.query(`CREATE INDEX "IDX_access_request_items_access_request_id" ON "access_request_items" ("access_request_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_access_request_items_company_id" ON "access_request_items" ("company_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_access_request_items_module_id" ON "access_request_items" ("module_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_access_request_items_status" ON "access_request_items" ("status")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_access_request_items_access_request_id" ON "access_request_items" ("access_request_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_access_request_items_company_id" ON "access_request_items" ("company_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_access_request_items_module_id" ON "access_request_items" ("module_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_access_request_items_status" ON "access_request_items" ("status")`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP INDEX "IDX_access_request_items_status"`);
     await queryRunner.query(`DROP INDEX "IDX_access_request_items_module_id"`);
     await queryRunner.query(`DROP INDEX "IDX_access_request_items_company_id"`);
-    await queryRunner.query(`DROP INDEX "IDX_access_request_items_access_request_id"`);
-    await queryRunner.query(`ALTER TABLE "access_request_items" DROP CONSTRAINT "FK_access_request_items_module_id"`);
-    await queryRunner.query(`ALTER TABLE "access_request_items" DROP CONSTRAINT "FK_access_request_items_company_id"`);
-    await queryRunner.query(`ALTER TABLE "access_request_items" DROP CONSTRAINT "FK_access_request_items_access_request_id"`);
+    await queryRunner.query(
+      `DROP INDEX "IDX_access_request_items_access_request_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "access_request_items" DROP CONSTRAINT "FK_access_request_items_module_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "access_request_items" DROP CONSTRAINT "FK_access_request_items_company_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "access_request_items" DROP CONSTRAINT "FK_access_request_items_access_request_id"`,
+    );
     await queryRunner.query(`DROP TABLE "access_request_items"`);
 
     await queryRunner.query(`DROP INDEX "IDX_access_requests_created_at"`);
     await queryRunner.query(`DROP INDEX "IDX_access_requests_overall_status"`);
     await queryRunner.query(`DROP INDEX "IDX_access_requests_user_id"`);
-    await queryRunner.query(`ALTER TABLE "access_requests" DROP CONSTRAINT "FK_access_requests_user_id"`);
+    await queryRunner.query(
+      `ALTER TABLE "access_requests" DROP CONSTRAINT "FK_access_requests_user_id"`,
+    );
     await queryRunner.query(`DROP TABLE "access_requests"`);
   }
 }

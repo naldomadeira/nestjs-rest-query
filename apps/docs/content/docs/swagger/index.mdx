@@ -36,12 +36,12 @@ async function bootstrap() {
     new ValidationPipe({
       transform: true,
       transformOptions: { enableImplicitConversion: true },
-    }),
+    })
   );
 
   const document = SwaggerModule.createDocument(
     app,
-    new DocumentBuilder().setTitle('Minha API').setVersion('1.0').build(),
+    new DocumentBuilder().setTitle('Minha API').setVersion('1.0').build()
   );
 
   SwaggerModule.setup('/', app, document, {

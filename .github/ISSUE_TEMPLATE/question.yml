@@ -1,0 +1,27 @@
+name: Question
+description: Ask a specific question about nestjs-rest-query
+title: '[Question]: '
+labels: ['question']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For general discussion, use GitHub Discussions. Use this template for a concrete question that is likely to turn into an issue or doc improvement.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Relevant code, docs page, or behavior you are looking at.
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What are you trying to achieve?

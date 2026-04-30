@@ -56,14 +56,28 @@ describe('applySorts', () => {
   describe('multiple sorts (CSV)', () => {
     it('applies two sorts in input order', () => {
       const qb = createMockQb();
-      applySorts(qb as any, { sort: 'name,-created_at' }, 'root', ALLOWED_SORTS);
+      applySorts(
+        qb as any,
+        { sort: 'name,-created_at' },
+        'root',
+        ALLOWED_SORTS
+      );
       expect(qb.addOrderBy).toHaveBeenNthCalledWith(1, 'root.name', 'ASC');
-      expect(qb.addOrderBy).toHaveBeenNthCalledWith(2, 'root.created_at', 'DESC');
+      expect(qb.addOrderBy).toHaveBeenNthCalledWith(
+        2,
+        'root.created_at',
+        'DESC'
+      );
     });
 
     it('calls addOrderBy once per unique field', () => {
       const qb = createMockQb();
-      applySorts(qb as any, { sort: 'name,cnpj,created_at' }, 'root', ALLOWED_SORTS);
+      applySorts(
+        qb as any,
+        { sort: 'name,cnpj,created_at' },
+        'root',
+        ALLOWED_SORTS
+      );
       expect(qb.addOrderBy).toHaveBeenCalledTimes(3);
     });
   });
@@ -122,7 +136,12 @@ describe('applySorts', () => {
     it('throws listing all invalid fields when multiple are disallowed', () => {
       const qb = createMockQb();
       expect(() =>
-        applySorts(qb as any, { sort: 'password,secret' }, 'root', ALLOWED_SORTS)
+        applySorts(
+          qb as any,
+          { sort: 'password,secret' },
+          'root',
+          ALLOWED_SORTS
+        )
       ).toThrow(BadRequestException);
     });
   });
@@ -131,7 +150,12 @@ describe('applySorts', () => {
     it('throws BadRequestException for a field with SQL injection characters', () => {
       const qb = createMockQb();
       expect(() =>
-        applySorts(qb as any, { sort: 'name; DROP TABLE' }, 'root', ALLOWED_SORTS)
+        applySorts(
+          qb as any,
+          { sort: 'name; DROP TABLE' },
+          'root',
+          ALLOWED_SORTS
+        )
       ).toThrow(BadRequestException);
     });
 
@@ -147,28 +171,43 @@ describe('applySorts', () => {
     it('allows sorting by a field present in fieldsRule', () => {
       const qb = createMockQb();
       expect(() =>
-        applySorts(qb as any, { sort: 'name' }, 'root', ALLOWED_SORTS, ['id', 'name'])
+        applySorts(qb as any, { sort: 'name' }, 'root', ALLOWED_SORTS, [
+          'id',
+          'name',
+        ])
       ).not.toThrow();
     });
 
     it('throws when sorting by a field absent from fieldsRule', () => {
       const qb = createMockQb();
       expect(() =>
-        applySorts(qb as any, { sort: 'created_at' }, 'root', ALLOWED_SORTS, ['id', 'name'])
+        applySorts(qb as any, { sort: 'created_at' }, 'root', ALLOWED_SORTS, [
+          'id',
+          'name',
+        ])
       ).toThrow(BadRequestException);
     });
 
     it('throws with a message mentioning the missing field', () => {
       const qb = createMockQb();
       expect(() =>
-        applySorts(qb as any, { sort: 'created_at' }, 'root', ALLOWED_SORTS, ['id', 'name'])
+        applySorts(qb as any, { sort: 'created_at' }, 'root', ALLOWED_SORTS, [
+          'id',
+          'name',
+        ])
       ).toThrow(/created_at/);
     });
 
     it('skips fieldsRule validation when fieldsRule is undefined', () => {
       const qb = createMockQb();
       expect(() =>
-        applySorts(qb as any, { sort: 'name' }, 'root', ALLOWED_SORTS, undefined)
+        applySorts(
+          qb as any,
+          { sort: 'name' },
+          'root',
+          ALLOWED_SORTS,
+          undefined
+        )
       ).not.toThrow();
     });
 
@@ -182,7 +221,10 @@ describe('applySorts', () => {
     it('does not validate relation fields (dot notation) against fieldsRule', () => {
       const qb = createMockQb();
       expect(() =>
-        applySorts(qb as any, { sort: 'user.name' }, 'root', ALLOWED_SORTS, ['id', 'name'])
+        applySorts(qb as any, { sort: 'user.name' }, 'root', ALLOWED_SORTS, [
+          'id',
+          'name',
+        ])
       ).not.toThrow();
     });
   });

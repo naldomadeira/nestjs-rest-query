@@ -80,14 +80,7 @@ export class UsersController {
   @ApiDynamicQuery({
     filters: ['username', 'email', 'firstName', 'lastName', 'createdAt'],
     sorts: ['username', 'email', 'createdAt'],
-    fields: [
-      'id',
-      'username',
-      'email',
-      'firstName',
-      'lastName',
-      'createdAt',
-    ],
+    fields: ['id', 'username', 'email', 'firstName', 'lastName', 'createdAt'],
   })
   @ApiPaginatedResponse(User)
   async findAll(
@@ -134,32 +127,32 @@ export class UsersBusiness {
 
 ## Parâmetros de query suportados
 
-| Parâmetro  | Formato                           | Exemplo                                       |
-| ---------- | --------------------------------- | --------------------------------------------- |
-| `filter`   | `filter[campo][operador]=valor`   | `filter[email][eq]=joao@email.com`            |
-| `sort`     | CSV de campos (`-` para desc)     | `sort=-createdAt,name`                       |
-| `fields`   | lista CSV                         | `fields=id,name,email`                        |
-| `includes` | lista CSV                         | `includes=company,roles`                      |
-| `page`     | número                            | `page=2`                                      |
-| `perPage`  | número                            | `perPage=25`                                  |
-| `paginate` | `true` / `false`                  | `paginate=false` (retorna todos os registros) |
+| Parâmetro  | Formato                         | Exemplo                                       |
+| ---------- | ------------------------------- | --------------------------------------------- |
+| `filter`   | `filter[campo][operador]=valor` | `filter[email][eq]=joao@email.com`            |
+| `sort`     | CSV de campos (`-` para desc)   | `sort=-createdAt,name`                        |
+| `fields`   | lista CSV                       | `fields=id,name,email`                        |
+| `includes` | lista CSV                       | `includes=company,roles`                      |
+| `page`     | número                          | `page=2`                                      |
+| `perPage`  | número                          | `perPage=25`                                  |
+| `paginate` | `true` / `false`                | `paginate=false` (retorna todos os registros) |
 
 ### Operadores de filtro disponíveis
 
-| Operador    | Descrição                             | Exemplo                                             |
-| ----------- | ------------------------------------- | --------------------------------------------------- |
-| `eq`        | Igual                                 | `filter[status][eq]=active`                         |
-| `ne`        | Diferente                             | `filter[status][ne]=inactive`                       |
-| `gt`        | Maior que                             | `filter[age][gt]=18`                                |
-| `gte`       | Maior ou igual                        | `filter[age][gte]=18`                               |
-| `lt`        | Menor que                             | `filter[price][lt]=100`                             |
-| `lte`       | Menor ou igual                        | `filter[price][lte]=100`                            |
-| `like`      | Contém (case-sensitive)               | `filter[name][like]=João`                           |
-| `ilike`     | Contém (case-insensitive, portável)   | `filter[name][ilike]=joao`                          |
-| `in`        | Dentro de uma lista (CSV)             | `filter[status][in]=active,pending`                 |
-| `notIn`     | Fora de uma lista (CSV)               | `filter[status][notIn]=deleted`                     |
-| `between`   | Entre dois valores (`val1,val2`)      | `filter[createdAt][between]=2024-01-01,2024-12-31` |
-| `isNull`    | Nulo (`true`) ou não nulo (`false`)   | `filter[deletedAt][isNull]=true`                   |
+| Operador  | Descrição                           | Exemplo                                            |
+| --------- | ----------------------------------- | -------------------------------------------------- |
+| `eq`      | Igual                               | `filter[status][eq]=active`                        |
+| `ne`      | Diferente                           | `filter[status][ne]=inactive`                      |
+| `gt`      | Maior que                           | `filter[age][gt]=18`                               |
+| `gte`     | Maior ou igual                      | `filter[age][gte]=18`                              |
+| `lt`      | Menor que                           | `filter[price][lt]=100`                            |
+| `lte`     | Menor ou igual                      | `filter[price][lte]=100`                           |
+| `like`    | Contém (case-sensitive)             | `filter[name][like]=João`                          |
+| `ilike`   | Contém (case-insensitive, portável) | `filter[name][ilike]=joao`                         |
+| `in`      | Dentro de uma lista (CSV)           | `filter[status][in]=active,pending`                |
+| `notIn`   | Fora de uma lista (CSV)             | `filter[status][notIn]=deleted`                    |
+| `between` | Entre dois valores (`val1,val2`)    | `filter[createdAt][between]=2024-01-01,2024-12-31` |
+| `isNull`  | Nulo (`true`) ou não nulo (`false`) | `filter[deletedAt][isNull]=true`                   |
 
 ## Resposta paginada
 

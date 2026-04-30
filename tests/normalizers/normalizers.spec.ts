@@ -73,7 +73,9 @@ describe('parseIntParam', () => {
   });
 
   it('throws BadRequestException when value is an array', () => {
-    expect(() => parseIntParam(['1', '2'], 'page', 1)).toThrow(BadRequestException);
+    expect(() => parseIntParam(['1', '2'], 'page', 1)).toThrow(
+      BadRequestException
+    );
   });
 });
 

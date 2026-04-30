@@ -2,12 +2,12 @@ import {
   defineConfig,
   defineDocs,
   frontmatterSchema,
-} from "fumadocs-mdx/config";
-import { remarkMdxMermaid } from "fumadocs-core/mdx-plugins";
-import { z } from "zod";
+} from 'fumadocs-mdx/config';
+import { remarkMdxMermaid } from 'fumadocs-core/mdx-plugins';
+import { z } from 'zod';
 
 export const { docs, meta } = defineDocs({
-  dir: "content",
+  dir: 'content',
   docs: {
     schema: frontmatterSchema.extend({
       dependencies: z.array(z.string()).optional(),

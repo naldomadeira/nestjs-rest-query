@@ -1,5 +1,5 @@
-import Image from "next/image";
-import { resolveDocsAssetPath } from "../lib/asset-path";
+import Image from 'next/image';
+import { resolveDocsAssetPath } from '../lib/asset-path';
 
 type ThemedImageProps = {
   srcLight: string;

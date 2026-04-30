@@ -30,19 +30,19 @@ Behavior is preserved 1:1. Whitelist semantics, all 15 operators, pagination sha
 
 A future release will rename the public API surface to align with the new package name:
 
-| Today (1.0.0)             | Planned                  |
-|---------------------------|--------------------------|
-| `DynamicQueryBuilderModule` | `RestQueryModule`        |
-| `QueryBuilderService`     | `RestQueryService`       |
-| `@DynamicQuery`           | `@RestQuery`             |
-| `@ApiDynamicQuery`        | `@ApiRestQuery`          |
-| `RulesConfig`             | `RestQueryRules`         |
-| `QueryInput`              | `RestQueryInput`         |
-| `QueryResult`             | `RestQueryResult`        |
-| `QueryBuilderConfig`      | `RestQueryConfig`        |
-| `DQB_CONFIG_TOKEN`        | `REST_QUERY_CONFIG`      |
+| Today (1.0.0)                  | Planned                       |
+| ------------------------------ | ----------------------------- |
+| `DynamicQueryBuilderModule`    | `RestQueryModule`             |
+| `QueryBuilderService`          | `RestQueryService`            |
+| `@DynamicQuery`                | `@RestQuery`                  |
+| `@ApiDynamicQuery`             | `@ApiRestQuery`               |
+| `RulesConfig`                  | `RestQueryRules`              |
+| `QueryInput`                   | `RestQueryInput`              |
+| `QueryResult`                  | `RestQueryResult`             |
+| `QueryBuilderConfig`           | `RestQueryConfig`             |
+| `DQB_CONFIG_TOKEN`             | `REST_QUERY_CONFIG`           |
 | `dqbSwaggerRequestInterceptor` | `restQuerySwaggerInterceptor` |
-| `DynamicQueryDto`         | `RestQueryDto`           |
+| `DynamicQueryDto`              | `RestQueryDto`                |
 
 That rename will ship in a major version bump with this guide updated. Track progress in the [migration plan](./plans/migration-to-github-and-npm/).
 

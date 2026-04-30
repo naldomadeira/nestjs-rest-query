@@ -10,8 +10,7 @@ type DocsRootLayoutProps = {
   readonly children: ReactNode;
 };
 
-const GITHUB_URL =
-  'https://github.com/naldomadeira/nestjs-rest-query';
+const GITHUB_URL = 'https://github.com/naldomadeira/nestjs-rest-query';
 
 const navTitle = (
   <div className="flex items-center gap-2">
