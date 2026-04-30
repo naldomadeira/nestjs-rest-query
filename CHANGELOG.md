@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.0.0
+
+### Major Changes
+
+- [`645d597`](https://github.com/naldomadeira/nestjs-rest-query/commit/645d5973080f27570e38d2bcabd1c6c7682fb6f7) Thanks [@naldomadeira](https://github.com/naldomadeira)! - First public open source release as `nestjs-rest-query`.
+
+  Renamed from the internal `@multitechbr/nestjs-dynamic-query-builder` (GitLab). Same library, MIT-licensed, on npm.
+  - Public package on the npm registry.
+  - MIT license.
+  - TypeORM support.
+  - Prisma and Drizzle support coming soon.
+
+  See [MIGRATION.md](./MIGRATION.md) for upgrade notes from the previous internal package.
+
 ## [4.0.2-beta.0] - 2026-04-07
 
 ### Added
