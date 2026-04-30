@@ -1,0 +1,57 @@
+@baseUrl = http://localhost:3002
+
+# POSTS — drizzle adapter
+
+### Listar tudo
+GET {{baseUrl}}/posts
+
+### Paginação
+GET {{baseUrl}}/posts?page=1&perPage=5
+
+### Sem paginação
+GET {{baseUrl}}/posts?paginate=false
+
+# FILTROS
+
+### Exato
+GET {{baseUrl}}/posts?filter[title][eq]=Hello
+
+### Like / ILike
+GET {{baseUrl}}/posts?filter[title][ilike]=intro
+
+GET {{baseUrl}}/posts?filter[title][notLike]=draft
+
+### Comparação por data
+GET {{baseUrl}}/posts?filter[createdAt][gte]=2024-01-01
+
+### IN
+GET {{baseUrl}}/posts?filter[userId][in]=00000000-0000-0000-0000-000000000001,00000000-0000-0000-0000-000000000002
+
+### Between
+GET {{baseUrl}}/posts?filter[createdAt][between]=2024-01-01,2025-12-31
+
+# ORDENAÇÃO
+
+GET {{baseUrl}}/posts?sort=title
+
+GET {{baseUrl}}/posts?sort=-createdAt
+
+GET {{baseUrl}}/posts?sort=title,-createdAt
+
+# CAMPOS
+
+GET {{baseUrl}}/posts?fields=id,title
+
+GET {{baseUrl}}/posts?fields=id,title,content&page=1&perPage=5
+
+# INCLUDES — 1:1 (user)
+### Resultado: rows como { post: {...}, user: {...} | null }
+### Cardinality 'one' — sem two-phase, single query.
+GET {{baseUrl}}/posts?includes=user
+
+GET {{baseUrl}}/posts?includes=user&page=1&perPage=10
+
+# COMBINAÇÕES
+
+### Filter + sort + include + paginação
+GET {{baseUrl}}/posts?filter[title][ilike]=hello&sort=-createdAt&includes=user&page=1&perPage=5

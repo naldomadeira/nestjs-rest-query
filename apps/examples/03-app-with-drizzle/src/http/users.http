@@ -1,0 +1,103 @@
+@baseUrl = http://localhost:3002
+
+# USERS — drizzle adapter
+
+### Listar tudo
+GET {{baseUrl}}/users
+
+### Paginação
+GET {{baseUrl}}/users?page=1&perPage=5
+
+### Sem paginação
+GET {{baseUrl}}/users?paginate=false
+
+# FILTROS — root columns
+
+### Exato (implícito)
+GET {{baseUrl}}/users?filter[email]=ana@acme.com
+
+### Exato (explícito)
+GET {{baseUrl}}/users?filter[email][eq]=ana@acme.com
+
+### Diferente
+GET {{baseUrl}}/users?filter[name][ne]=admin
+
+### Like / ILike (Drizzle: contains; o adapter envolve com %)
+GET {{baseUrl}}/users?filter[email][like]=acme
+
+GET {{baseUrl}}/users?filter[email][ilike]=ACME
+
+GET {{baseUrl}}/users?filter[name][notLike]=spam
+
+GET {{baseUrl}}/users?filter[name][notIlike]=DELETED
+
+### Comparação por data
+GET {{baseUrl}}/users?filter[createdAt][gt]=2024-01-01
+
+GET {{baseUrl}}/users?filter[createdAt][gte]=2024-01-01T00:00:00Z
+
+GET {{baseUrl}}/users?filter[createdAt][lt]=2026-01-01
+
+GET {{baseUrl}}/users?filter[createdAt][lte]=2026-12-31
+
+### IN / NOT IN
+GET {{baseUrl}}/users?filter[email][in]=ana@acme.com,bia@acme.com
+
+GET {{baseUrl}}/users?filter[email][notIn]=spam@example.com
+
+### NULL / BETWEEN
+GET {{baseUrl}}/users?filter[companyId][isNull]=true
+
+GET {{baseUrl}}/users?filter[companyId][isNull]=false
+
+GET {{baseUrl}}/users?filter[createdAt][between]=2024-01-01,2025-12-31
+
+# ORDENAÇÃO
+
+### Simples
+GET {{baseUrl}}/users?sort=name
+
+### Descendente
+GET {{baseUrl}}/users?sort=-createdAt
+
+### Múltipla
+GET {{baseUrl}}/users?sort=name,-email
+
+# CAMPOS
+
+### Seleção de campos (root.id é auto-injetado pelo adapter)
+GET {{baseUrl}}/users?fields=name,email
+
+### Campos + paginação
+GET {{baseUrl}}/users?fields=id,name,email&page=1&perPage=3
+
+# INCLUDES — Drizzle adapter
+
+### Include 1:1 (company)
+### Resultado: rows como { user: {...}, company: {...} | null }
+GET {{baseUrl}}/users?includes=company
+
+### Include 1:N (posts) — ATIVA TWO-PHASE PAGINATION
+### data.length === perPage (sem inflação por linhas joinadas), posts é array
+### Resultado: rows como { user: {...}, posts: [...] }
+GET {{baseUrl}}/users?includes=posts&page=1&perPage=2
+
+### Múltiplos includes (1:1 + 1:N juntos)
+GET {{baseUrl}}/users?includes=company,posts&page=1&perPage=3
+
+# COMBINAÇÕES
+
+### Filter + sort + fields + page (caminho feliz)
+GET {{baseUrl}}/users?filter[createdAt][gte]=2024-01-01&sort=-createdAt&fields=id,name,email,createdAt&page=1&perPage=10
+
+### Filter + includes 1:N (two-phase + filter no root)
+GET {{baseUrl}}/users?filter[email][ilike]=acme&includes=posts&page=1&perPage=5
+
+# ERROS ESPERADOS — confirmam contratos do adapter
+
+### ORDER BY em coluna de relação 'many' → 400 Bad Request
+### Mensagem: DrizzleAdapter: ORDER BY a column from 'many' relation "posts" is not supported. ...
+GET {{baseUrl}}/users?sort=-posts.title
+
+### Filter em campo não whitelistado → 400 Bad Request
+GET {{baseUrl}}/users?filter[password][eq]=anything

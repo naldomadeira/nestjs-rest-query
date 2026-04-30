@@ -1,0 +1,51 @@
+@baseUrl = http://localhost:3002
+
+# COMPANIES — drizzle adapter
+
+### Listar tudo
+GET {{baseUrl}}/companies
+
+### Paginação
+GET {{baseUrl}}/companies?page=1&perPage=5
+
+### Sem paginação
+GET {{baseUrl}}/companies?paginate=false
+
+# FILTROS
+
+### Exato
+GET {{baseUrl}}/companies?filter[name][eq]=Acme
+
+### Like / ILike
+GET {{baseUrl}}/companies?filter[name][ilike]=tech
+
+### Comparação por data
+GET {{baseUrl}}/companies?filter[createdAt][gte]=2024-01-01
+
+### IN
+GET {{baseUrl}}/companies?filter[name][in]=Acme,Globex,Initech
+
+# ORDENAÇÃO
+
+GET {{baseUrl}}/companies?sort=name
+
+GET {{baseUrl}}/companies?sort=-createdAt
+
+# CAMPOS
+
+GET {{baseUrl}}/companies?fields=id,name
+
+# INCLUDES — 1:N (users)
+### Two-phase pagination ativa porque users é cardinality 'many'
+### Resultado: rows como { company: {...}, users: [...] }
+GET {{baseUrl}}/companies?includes=users&page=1&perPage=2
+
+# COMBINAÇÕES
+
+### Filter + include 1:N + paginação (two-phase + filter no root)
+GET {{baseUrl}}/companies?filter[name][ilike]=acme&includes=users&page=1&perPage=5
+
+# ERROS ESPERADOS
+
+### ORDER BY em coluna da relação 'many' (users) → 400
+GET {{baseUrl}}/companies?sort=-users.name
