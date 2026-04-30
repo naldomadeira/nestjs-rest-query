@@ -47,7 +47,8 @@ export function coerceValue(value: any): string | number | boolean {
       if (Number.isSafeInteger(n)) return n;
       return trimmed;
     }
-    if (/^-?\d+\.\d+$/.test(trimmed) && !/^0\d/.test(trimmed)) return parseFloat(trimmed);
+    if (/^-?\d+\.\d+$/.test(trimmed) && !/^0\d/.test(trimmed))
+      return parseFloat(trimmed);
     if (trimmed.toLowerCase() === 'true') return true;
     if (trimmed.toLowerCase() === 'false') return false;
 

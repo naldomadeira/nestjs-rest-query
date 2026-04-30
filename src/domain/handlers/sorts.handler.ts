@@ -27,7 +27,8 @@ function validateSortTokens(tokens: SortToken[], allowedSorts: string[]): void {
     }
 
     const root = field.split('.')[0];
-    if (!allowedSorts.includes(field) && !allowedSorts.includes(root)) notAllowed.push(field);
+    if (!allowedSorts.includes(field) && !allowedSorts.includes(root))
+      notAllowed.push(field);
   }
 
   if (unsafePaths.length > 0) {

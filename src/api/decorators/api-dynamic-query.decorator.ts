@@ -23,7 +23,9 @@ import { buildDQBSwaggerDecorators } from '../swagger/dqb-swagger.builder';
  * }
  * ```
  */
-export function ApiDynamicQuery<T = any>(rules: RulesConfig<T>): MethodDecorator {
+export function ApiDynamicQuery<T = any>(
+  rules: RulesConfig<T>
+): MethodDecorator {
   return (
     target: object,
     propertyKey: string | symbol,

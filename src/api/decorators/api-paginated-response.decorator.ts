@@ -59,6 +59,6 @@ export function ApiPaginatedResponse<T>(
           lastPage: { type: 'number', example: 10 },
         },
       },
-    }),
+    })
   );
 }

@@ -12,5 +12,10 @@ export default [
   ...tseslint.configs.recommended,
   eslintConfigPrettier,
   eslintPluginPrettierRecommended,
+  {
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'warn',
+    },
+  },
   { ignores: ['node_modules/*', 'dist/*', 'coverage/*', 'apps/examples/*'] },
 ];
