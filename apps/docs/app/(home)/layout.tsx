@@ -1,7 +1,7 @@
 import { HomeLayout } from "fumadocs-ui/layouts/home";
 import type { ReactNode } from "react";
 import Image from "next/image";
-import { SiGitlab } from "@icons-pack/react-simple-icons";
+import { SiGithub } from "@icons-pack/react-simple-icons";
 import { resolveDocsAssetPath } from "../../lib/asset-path";
 
 type HomeRootLayoutProps = {
@@ -9,7 +9,7 @@ type HomeRootLayoutProps = {
 };
 
 const GITHUB_URL =
-  "https://github.com/nestjs-rest-query/nestjs-rest-query";
+  "https://github.com/naldomadeira/nestjs-rest-query";
 
 const HomeRootLayout = ({ children }: HomeRootLayoutProps) => (
   <HomeLayout
@@ -18,12 +18,12 @@ const HomeRootLayout = ({ children }: HomeRootLayoutProps) => (
         <div className="flex items-center gap-2">
           <Image
             src={resolveDocsAssetPath("/logomark.svg")}
-            alt="NestJS Dynamic Query Builder"
+            alt="nestjs-rest-query"
             width={22}
             height={22}
             className="dark:invert shrink-0"
           />
-          <span className="font-semibold text-sm leading-none">NestJS DQB</span>
+          <span className="font-semibold text-sm leading-none">nestjs-rest-query</span>
         </div>
       ),
       url: "/",
@@ -35,7 +35,7 @@ const HomeRootLayout = ({ children }: HomeRootLayoutProps) => (
         text: "GitHub",
         label: "GitHub",
         url: GITHUB_URL,
-        icon: <SiGitlab className="size-4" />,
+        icon: <SiGithub className="size-4" />,
         external: true,
       },
     ]}

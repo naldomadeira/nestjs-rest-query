@@ -2,7 +2,7 @@ import { DocsLayout } from 'fumadocs-ui/layouts/docs';
 import { HomeLayout } from 'fumadocs-ui/layouts/home';
 import type { CSSProperties, ReactNode } from 'react';
 import Image from 'next/image';
-import { SiGitlab } from '@icons-pack/react-simple-icons';
+import { SiGithub } from '@icons-pack/react-simple-icons';
 import { resolveDocsAssetPath } from '../../lib/asset-path';
 import { source } from '../../lib/source';
 
@@ -11,19 +11,19 @@ type DocsRootLayoutProps = {
 };
 
 const GITHUB_URL =
-  'https://github.com/nestjs-rest-query/nestjs-rest-query';
+  'https://github.com/naldomadeira/nestjs-rest-query';
 
 const navTitle = (
   <div className="flex items-center gap-2">
     <Image
       src={resolveDocsAssetPath('/logomark.svg')}
-      alt="NestJS Dynamic Query Builder"
+      alt="nestjs-rest-query"
       width={22}
       height={22}
       className="dark:invert shrink-0"
     />
     <span className="font-semibold text-sm leading-none">
-      NestJS Dynamic Query Builder
+      nestjs-rest-query
     </span>
   </div>
 );
@@ -35,7 +35,7 @@ const navLinks = [
     text: 'GitHub',
     label: 'GitHub',
     url: GITHUB_URL,
-    icon: <SiGitlab className="size-4" />,
+    icon: <SiGithub className="size-4" />,
     external: true,
   },
 ];

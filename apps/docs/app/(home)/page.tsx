@@ -36,7 +36,7 @@ const HomePage = () => (
       <div className="flex items-center gap-2.5">
         <Image
           src={resolveDocsAssetPath('/logomark.svg')}
-          alt="NestJS Dynamic Query Builder"
+          alt="nestjs-rest-query"
           width={40}
           height={40}
           className="dark:invert"
@@ -47,13 +47,13 @@ const HomePage = () => (
       </div>
 
       <h1 className="text-5xl font-bold tracking-tight leading-tight">
-        NestJS Dynamic{' '}
-        <span className="text-primary">Query Builder</span>
+        nestjs-rest-query
       </h1>
 
       <p className="text-lg text-muted-foreground max-w-xl">
         Filtros, paginação e ordenação dinâmicos a partir de parâmetros HTTP.
-        TypeORM-first. Whitelist de segurança por endpoint.
+        TypeORM-first. HTTP Query Builder com whitelist de segurança por
+        endpoint.
       </p>
 
       <div className="flex items-center gap-3">
@@ -76,7 +76,7 @@ const HomePage = () => (
     <div className="rounded-xl overflow-hidden border border-border shadow-md mb-16">
       <Image
         src={resolveDocsAssetPath('/patterns.png')}
-        alt="NestJS Dynamic Query Builder — visão geral"
+        alt="nestjs-rest-query — visão geral"
         width={1200}
         height={630}
         className="w-full h-auto dark:hidden"
@@ -84,7 +84,7 @@ const HomePage = () => (
       />
       <Image
         src={resolveDocsAssetPath('/patters-dark.png')}
-        alt="NestJS Dynamic Query Builder — visão geral"
+        alt="nestjs-rest-query — visão geral"
         width={1200}
         height={630}
         className="w-full h-auto hidden dark:block"

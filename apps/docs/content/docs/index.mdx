@@ -1,9 +1,9 @@
 ---
 title: Introdução
-description: O que é o NestJS Dynamic Query Builder e por que utilizá-lo.
+description: O que é o nestjs-rest-query e por que utilizá-lo.
 ---
 
-**NestJS Dynamic Query Builder** é uma biblioteca para NestJS que constrói instâncias de `SelectQueryBuilder` do TypeORM de forma dinâmica a partir de parâmetros de query HTTP — filtros, ordenações, paginação, seleção de campos e carregamento de relações — tudo controlado por uma whitelist de segurança por endpoint.
+**`nestjs-rest-query`** é uma biblioteca para NestJS que constrói instâncias de `SelectQueryBuilder` do TypeORM de forma dinâmica a partir de parâmetros de query HTTP — filtros, ordenações, paginação, seleção de campos e carregamento de relações — tudo controlado por uma whitelist de segurança por endpoint.
 
 ## Fluxo principal
 
@@ -17,7 +17,7 @@ flowchart TD
     D["@ApiDynamicQuery / @DynamicQuery\ndefine: filters · sorts · fields · includes"]
   end
 
-  subgraph LIB["nestjs-dynamic-query-builder"]
+  subgraph LIB["nestjs-rest-query"]
     W["Whitelist de segurança\nvalida campos e operadores permitidos"]
     H["applyFilters · applySorts · applyFields\napplyIncludes · applyPagination"]
     W --> H
