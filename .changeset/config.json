@@ -5,6 +5,7 @@
     { "repo": "naldomadeira/nestjs-rest-query" }
   ],
   "commit": false,
+  "createGithubReleases": true,
   "fixed": [],
   "linked": [],
   "access": "public",
