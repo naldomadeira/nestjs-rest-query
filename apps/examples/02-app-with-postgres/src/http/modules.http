@@ -1,0 +1,59 @@
+@baseUrl = http://localhost:3001
+
+# MODULES
+
+### Listar tudo
+GET {{baseUrl}}/modules
+
+### Paginação
+GET {{baseUrl}}/modules?page=1&perPage=5
+
+### Sem paginação
+GET {{baseUrl}}/modules?paginate=false
+
+# FILTROS
+
+### Status
+GET {{baseUrl}}/modules?filter[status]=active
+
+GET {{baseUrl}}/modules?filter[status]=inactive
+
+GET {{baseUrl}}/modules?filter[status][in]=active,inactive
+
+### Nome e slug
+GET {{baseUrl}}/modules?filter[name]=Financeiro
+
+GET {{baseUrl}}/modules?filter[slug]=financeiro
+
+### Data
+GET {{baseUrl}}/modules?filter[createdAt][gte]=2024-01-01
+
+# ORDENAÇÃO
+
+### Por nome
+GET {{baseUrl}}/modules?sort=name
+
+GET {{baseUrl}}/modules?sort=-name
+
+### Múltipla
+GET {{baseUrl}}/modules?sort=status,name
+
+GET {{baseUrl}}/modules?sort=-status,createdAt
+
+# CAMPOS
+
+### Seleção de campos
+GET {{baseUrl}}/modules?fields=id,name,status
+
+GET {{baseUrl}}/modules?fields=id,slug,status,icon
+
+# COMBINAÇÕES
+
+### Ativos + nome + sem paginação
+GET {{baseUrl}}/modules?filter[status]=active&sort=name&paginate=false
+
+### Ativos + campos mínimos + página
+GET {{baseUrl}}/modules?filter[status]=active&fields=id,name,slug,status&sort=name&page=1&perPage=10
+
+### Data + ordenação + campos + página
+GET {{baseUrl}}/modules?filter[createdAt][gte]=2024-01-01&sort=status,name&fields=id,name,slug,status,createdAt&page=1&perPage=20

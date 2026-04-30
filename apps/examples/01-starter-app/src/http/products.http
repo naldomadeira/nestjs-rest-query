@@ -1,0 +1,84 @@
+@baseUrl = http://localhost:3000
+
+# PRODUCTS
+
+### Listar tudo
+GET {{baseUrl}}/products
+
+### Paginação
+GET {{baseUrl}}/products?page=1&perPage=10
+
+GET {{baseUrl}}/products?page=2&perPage=20
+
+### Sem paginação
+GET {{baseUrl}}/products?paginate=false
+
+# FILTROS
+
+### Nome
+GET {{baseUrl}}/products?filter[name]=Air Fryer
+
+GET {{baseUrl}}/products?filter[name][ilike]=%25multilaser%25
+
+### Preço
+GET {{baseUrl}}/products?filter[price][gte]=100
+
+GET {{baseUrl}}/products?filter[price][between]=100,500
+
+### Categoria
+GET {{baseUrl}}/products?filter[categoryId]=1
+
+GET {{baseUrl}}/products?filter[categoryId][isNull]=false
+
+### Filtro em relacionamento
+GET {{baseUrl}}/products?includes=category&filter[category.name][eq]=Áudio
+
+# ORDENAÇÃO
+
+### Por nome
+GET {{baseUrl}}/products?sort=name
+
+GET {{baseUrl}}/products?sort=-name
+
+### Múltipla
+GET {{baseUrl}}/products?sort=price,-createdAt
+
+# CAMPOS
+
+### Seleção de campos
+GET {{baseUrl}}/products?fields=id,name,price
+
+GET {{baseUrl}}/products?fields=id,name,price,createdAt
+
+# INCLUDES
+
+### Categoria
+GET {{baseUrl}}/products?includes=category
+
+GET {{baseUrl}}/products?includes=category&fields=id,name,price,category
+
+# COMBINAÇÕES
+
+### Filtro + ordenação + campos
+GET {{baseUrl}}/products?filter[price][gte]=200&sort=-price&fields=id,name,price
+
+### Include + filtro em relação + paginação
+GET {{baseUrl}}/products?includes=category&filter[category.name][in]=Áudio,Vídeo&sort=name&page=1&perPage=10
+
+### Sem paginação com include
+GET {{baseUrl}}/products?includes=category&paginate=false
+
+# CENÁRIOS DE ERRO
+
+### Campo não permitido
+GET {{baseUrl}}/products?filter[description][eq]=Tablet
+
+### Operador inválido
+GET {{baseUrl}}/products?filter[price][startsWith]=12
+
+### Limite acima do máximo
+GET {{baseUrl}}/products?perPage=1000
+
+### Between inválido
+GET {{baseUrl}}/products?filter[price][between]=500
+

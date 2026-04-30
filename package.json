@@ -1,0 +1,115 @@
+{
+  "name": "nestjs-rest-query",
+  "version": "1.0.0",
+  "description": "Declarative, whitelist-first REST query params for NestJS and TypeORM.",
+  "keywords": [
+    "nestjs",
+    "typeorm",
+    "rest",
+    "query",
+    "query-params",
+    "filter",
+    "filters",
+    "pagination",
+    "sorting",
+    "search",
+    "swagger",
+    "openapi",
+    "whitelist"
+  ],
+  "scripts": {
+    "build": "./scripts/build.sh",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "lint": "eslint \"src/**/*.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "test": "jest --passWithNoTests --runInBand",
+    "test:cov": "jest --coverage --passWithNoTests --runInBand",
+    "prepublishOnly": "pnpm build",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "pnpm build && changeset publish",
+    "s02:dev": "pnpm --filter 02-app-with-postgres dev",
+    "docs:dev": "pnpm --filter docs dev",
+    "docs:build": "pnpm --filter docs build",
+    "docs:start": "pnpm --filter docs start"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "homepage": "https://github.com/naldomadeira/nestjs-rest-query#readme",
+  "bugs": {
+    "url": "https://github.com/naldomadeira/nestjs-rest-query/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/naldomadeira/nestjs-rest-query.git"
+  },
+  "author": "Naldo Madeira <naldomadeira@gmail.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "@eslint/js": "^9.7.0",
+    "@golevelup/ts-jest": "^0.7.0",
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/core": "^11.1.6",
+    "@nestjs/platform-express": "^11.1.6",
+    "@nestjs/swagger": "^11.0.0",
+    "@nestjs/testing": "^11.1.6",
+    "@types/jest": "^29.5.12",
+    "@types/node": "^22.2.0",
+    "eslint": "9.x",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.2.1",
+    "jest": "^29.7.0",
+    "jest-junit": "^16.0.0",
+    "prettier": "^3.3.3",
+    "reflect-metadata": "^0.2.0",
+    "rxjs": "^7.8.2",
+    "ts-jest": "^29.2.3",
+    "ts-node": "^10.9.2",
+    "tsc-alias": "^1.8.10",
+    "typeorm": "^0.3.26",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.0.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@scarf/scarf",
+      "sqlite3"
+    ]
+  },
+  "lint-staged": {
+    "*.ts": "eslint --fix"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/swagger": "^11.0.0",
+    "reflect-metadata": "^0.2.0",
+    "typeorm": "^0.3.26"
+  },
+  "peerDependenciesMeta": {
+    "@nestjs/swagger": {
+      "optional": true
+    }
+  }
+}

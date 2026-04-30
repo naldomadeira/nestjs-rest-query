@@ -1,0 +1,9 @@
+{
+  "pages": [
+    "index",
+    "getting-started",
+    "swagger",
+    "usage",
+    "advanced"
+  ]
+}

@@ -1,0 +1,63 @@
+@baseUrl = http://localhost:3001
+
+# COMPANIES
+
+### Listar tudo
+GET {{baseUrl}}/companies
+
+### Paginação
+GET {{baseUrl}}/companies?page=1&perPage=5
+
+### Sem paginação
+GET {{baseUrl}}/companies?paginate=false
+
+# FILTROS
+
+### Search customizado (nome ou CNPJ)
+GET {{baseUrl}}/companies?search=Magazine
+
+GET {{baseUrl}}/companies?search=47.960.950/0001-21
+
+### Nome
+GET {{baseUrl}}/companies?filter[name]=Acme Corp
+
+GET {{baseUrl}}/companies?filter[name][like]=Acme
+
+### CNPJ
+GET {{baseUrl}}/companies?filter[cnpj]=12.345.678/0001-99
+
+### Data
+GET {{baseUrl}}/companies?filter[createdAt][gte]=2024-01-01
+
+GET {{baseUrl}}/companies?filter[createdAt][between]=2024-01-01,2024-12-31
+
+# ORDENAÇÃO
+
+### Por nome
+GET {{baseUrl}}/companies?sort=name
+
+GET {{baseUrl}}/companies?sort=-name
+
+### Por data
+GET {{baseUrl}}/companies?sort=-createdAt
+
+### Múltipla
+GET {{baseUrl}}/companies?sort=name,-createdAt
+
+# CAMPOS
+
+### Seleção de campos
+GET {{baseUrl}}/companies?fields=id,cnpj,name
+
+GET {{baseUrl}}/companies?fields=id,name,createdAt,updatedAt
+
+# COMBINAÇÕES
+
+### Nome like + ordenação + campos
+GET {{baseUrl}}/companies?filter[name][like]=Acme&sort=name&fields=id,cnpj,name
+
+### Criadas em 2024 + ordenação + página
+GET {{baseUrl}}/companies?filter[createdAt][between]=2024-01-01,2024-12-31&sort=name&page=1&perPage=10
+
+### Por CNPJ + campos mínimos
+GET {{baseUrl}}/companies?sort=cnpj&fields=id,cnpj,name&paginate=false

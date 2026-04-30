@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or general discussion
+    url: https://github.com/naldomadeira/nestjs-rest-query/discussions
+    about: Use GitHub Discussions for questions, ideas, and general help.
+  - name: Security vulnerability
+    url: https://github.com/naldomadeira/nestjs-rest-query/blob/main/SECURITY.md
+    about: Please report security issues privately, not as a public issue.

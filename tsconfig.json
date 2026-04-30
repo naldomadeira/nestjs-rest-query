@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "ignoreDeprecations": "5.0",
+    "outDir": "./dist",
+    "rootDirs": ["./src", "./test", "./tests"],
+    "baseUrl": "./",
+    "module": "commonjs",
+    "target": "ES2022",
+    "lib": ["esnext"],
+    "alwaysStrict": true,
+    "strict": true,
+    "strictPropertyInitialization": false,
+    "moduleResolution": "node",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "removeComments": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "typeRoots": ["./node_modules/@types"],
+    "allowJs": false,
+    "resolveJsonModule": true,
+    "paths": {
+      "@src/*": ["src/*"],
+      "@core/*": ["src/core/*"],
+      "@api/*": ["src/api/*"],
+      "@domain/*": ["src/domain/*"],
+      "@contracts/*": ["src/contracts/*"],
+      "@contracts": ["src/contracts/index.ts"],
+      "@domain/handlers": ["src/domain/handlers/index.ts"],
+      "@infra/*": ["src/infra/*"],
+      "@test/*": ["test/*"]
+    }
+  },
+  "include": ["./src/**/*.ts", "./test/**/*.ts", "./tests/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

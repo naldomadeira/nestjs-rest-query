@@ -1,0 +1,8 @@
+# Example applications - ignore build artifacts and dependencies
+**/dist
+**/build
+**/node_modules
+**/pnpm-lock.yaml
+**/*.sqlite
+**/.env
+**/coverage

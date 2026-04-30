@@ -1,0 +1,140 @@
+@baseUrl = http://localhost:3001
+
+# ACCESS REQUESTS
+
+### Listar tudo
+GET {{baseUrl}}/access-requests
+
+### Paginação
+GET {{baseUrl}}/access-requests?page=1&perPage=5
+
+GET {{baseUrl}}/access-requests?page=2&perPage=10
+
+### Sem paginação
+GET {{baseUrl}}/access-requests?paginate=false
+
+# FILTROS
+
+### Status exato
+GET {{baseUrl}}/access-requests?filter[overallStatus]=pending
+
+GET {{baseUrl}}/access-requests?filter[overallStatus][eq]=pending
+
+### Por userId
+GET {{baseUrl}}/access-requests?filter[userId]=1
+
+### Lista de status
+GET {{baseUrl}}/access-requests?filter[overallStatus][in]=pending,approved
+
+GET {{baseUrl}}/access-requests?filter[overallStatus][notIn]=rejected
+
+### Data
+GET {{baseUrl}}/access-requests?filter[createdAt][gte]=2024-01-01
+
+GET {{baseUrl}}/access-requests?filter[createdAt][between]=2024-01-01,2024-12-31
+
+### Soft delete
+GET {{baseUrl}}/access-requests?filter[deletedAt][isNull]=true
+
+GET {{baseUrl}}/access-requests?filter[deletedAt][isNull]=false
+
+### Combinado
+GET {{baseUrl}}/access-requests?filter[overallStatus]=pending&filter[deletedAt][isNull]=true
+
+# ORDENAÇÃO
+
+### Por data
+GET {{baseUrl}}/access-requests?sort=createdAt
+
+GET {{baseUrl}}/access-requests?sort=-createdAt
+
+### Por status + data
+GET {{baseUrl}}/access-requests?sort=overallStatus,-createdAt
+
+### Por campo de relacionamento
+GET {{baseUrl}}/access-requests?includes=user&sort=user.firstName
+
+GET {{baseUrl}}/access-requests?includes=user&sort=-user.firstName
+
+# CAMPOS
+
+### Seleção de campos
+GET {{baseUrl}}/access-requests?fields=id,userId,overallStatus
+
+GET {{baseUrl}}/access-requests?fields=id,overallStatus,createdAt,updatedAt
+
+# INCLUDES
+
+### Usuário
+GET {{baseUrl}}/access-requests?includes=user
+
+### Itens
+GET {{baseUrl}}/access-requests?includes=items
+
+GET {{baseUrl}}/access-requests?includes=items&fields=items
+
+### Itens com relacionamentos aninhados
+GET {{baseUrl}}/access-requests?includes=items.company
+
+GET {{baseUrl}}/access-requests?includes=items,items.company,items.module
+
+### Tudo
+GET {{baseUrl}}/access-requests?includes=user,items,items.company,items.module
+
+# SEARCH
+
+### Includes completos para inspecionar o resultado do search
+@searchIncludes = user,items,items.company,items.module
+
+#       'user.firstName',
+#       'user.document',
+#       'items.company.name',
+#       'items.company.cnpj'
+
+
+### Busca no usuario admin fixo
+GET {{baseUrl}}/access-requests?includes={{searchIncludes}}&search=Admin
+
+### Busca por documento do admin
+GET {{baseUrl}}/access-requests?includes={{searchIncludes}}&search=00000000000
+
+### Busca aninhada em empresa
+GET {{baseUrl}}/access-requests?includes={{searchIncludes}}&search=Magazine
+
+### Busca aninhada por CNPJ da empresa
+GET {{baseUrl}}/access-requests?includes={{searchIncludes}}&search=14.380.200/0001-21
+
+### Busca aninhada em modulo
+GET {{baseUrl}}/access-requests?includes={{searchIncludes}}&search=Mercury
+
+### Busca combinando fields restritos com search
+GET {{baseUrl}}/access-requests?includes={{searchIncludes}}&fields=id,userId,overallStatus,createdAt&search=Admin
+
+### Search vazio deve ser noop
+GET {{baseUrl}}/access-requests?includes={{searchIncludes}}&search=
+
+### Search com wildcard no input deve ser tratado como texto literal
+GET {{baseUrl}}/access-requests?includes={{searchIncludes}}&search=%25admin%25
+
+# COMBINAÇÕES
+
+### Pending + includes + ordenação + página
+GET {{baseUrl}}/access-requests?filter[overallStatus]=pending&includes=user,items&sort=-createdAt&page=1&perPage=5
+
+### Ativos + campos mínimos + ordenação
+GET {{baseUrl}}/access-requests?filter[deletedAt][isNull]=true&fields=id,userId,overallStatus,createdAt&sort=userId
+
+### Data + includes completo + campos + página
+GET {{baseUrl}}/access-requests?filter[createdAt][gte]=2024-01-01&includes=user,items,items.company,items.module&fields=id,userId,overallStatus,createdAt&sort=-createdAt&page=1&perPage=20
+
+### Ativos + status in + user + userId agrupado
+GET {{baseUrl}}/access-requests?filter[deletedAt][isNull]=true&filter[overallStatus][in]=pending,approved&includes=user&sort=userId,-createdAt&page=1&perPage=10
+
+### Ativos + tudo + ordem por nome do usuário
+GET {{baseUrl}}/access-requests?filter[deletedAt][isNull]=true&includes=user,items,items.company,items.module&sort=user.firstName,overallStatus&paginate=false
+
+### Search em relacionamento + filtro + ordenacao + pagina
+GET {{baseUrl}}/access-requests?filter[deletedAt][isNull]=true&includes={{searchIncludes}}&search=Mercury&sort=-createdAt&page=1&perPage=10
+
+### Search com join reutilizado por includes completo
+GET {{baseUrl}}/access-requests?includes={{searchIncludes}}&search=Magazine&sort=user.firstName&page=1&perPage=10

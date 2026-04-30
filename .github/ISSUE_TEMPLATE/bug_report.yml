@@ -1,0 +1,101 @@
+name: Bug report
+description: Report a bug in nestjs-rest-query
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report. Please fill out the fields below so we can reproduce and fix the issue quickly.
+
+  - type: input
+    id: lib-version
+    attributes:
+      label: nestjs-rest-query version
+      placeholder: e.g. 1.0.0
+    validations:
+      required: true
+
+  - type: input
+    id: nestjs-version
+    attributes:
+      label: NestJS version
+      placeholder: e.g. 11.1.6
+    validations:
+      required: true
+
+  - type: input
+    id: typeorm-version
+    attributes:
+      label: TypeORM version
+      placeholder: e.g. 0.3.26
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node version
+      placeholder: e.g. 20.18.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: database
+    attributes:
+      label: Database
+      options:
+        - PostgreSQL
+        - MySQL
+        - MariaDB
+        - SQLite
+        - MSSQL
+        - Oracle
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: rules
+    attributes:
+      label: Rules config
+      description: The RulesConfig object passed to the decorator/service.
+      render: typescript
+    validations:
+      required: true
+
+  - type: textarea
+    id: query
+    attributes:
+      label: Query string used
+      description: The raw HTTP query string that triggered the issue.
+      render: text
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include error messages and stack traces if available.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: Link to a repository or paste a minimal controller/service that reproduces the issue.
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true

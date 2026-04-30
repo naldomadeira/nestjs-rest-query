@@ -1,0 +1,24 @@
+name: Documentation issue
+description: Something is wrong, missing, or unclear in the documentation
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: input
+    id: page
+    attributes:
+      label: Page URL or file path
+      placeholder: https://... or apps/docs/content/docs/...
+    validations:
+      required: true
+
+  - type: textarea
+    id: issue
+    attributes:
+      label: What is wrong, missing, or unclear?
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested change (optional)

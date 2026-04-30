@@ -1,0 +1,9 @@
+{
+  "title": "Guia de Uso",
+  "icon": "BookOpenCheck",
+  "defaultOpen": false,
+  "pages": [
+    "index",
+    "endpoint-whitelist-rules"
+  ]
+}

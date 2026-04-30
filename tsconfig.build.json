@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "skipLibCheck": true,
+    "declaration": true
+  },
+  "include": ["./src/**/*.ts"],
+  "exclude": [
+    "node_modules",
+    "**/__tests__/*",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "architecture",
+    "apps/examples",
+    "test",
+    "coverage",
+    "scripts",
+    "analise"
+  ]
+}

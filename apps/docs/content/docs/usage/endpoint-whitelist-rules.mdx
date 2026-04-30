@@ -1,0 +1,153 @@
+---
+title: Regras de permissões do endpoint
+description: Referência completa dos parâmetros de query suportados — filtros, operadores, sorts, fields, includes e paginação.
+---
+
+## Filtros e operadores
+
+Formato: `filter[campo][operador]=valor`
+
+O campo deve estar listado em `filters` do `RulesConfig` do endpoint — campos não autorizados são silenciosamente ignorados.
+
+### Operadores disponíveis
+
+| Operador   | Descrição                                       |
+| ---------- | ----------------------------------------------- |
+| `eq`       | Igual                                           |
+| `ne`       | Diferente                                       |
+| `gt`       | Maior que                                       |
+| `gte`      | Maior ou igual                                  |
+| `lt`       | Menor que                                       |
+| `lte`      | Menor ou igual                                  |
+| `like`     | Contém (case-sensitive, wildcards automáticos)  |
+| `ilike`    | Contém (case-insensitive, portável entre bancos) |
+| `notLike`  | Não contém (case-sensitive)                     |
+| `notIlike` | Não contém (case-insensitive)                   |
+| `in`       | Dentro de uma lista (CSV)                       |
+| `notIn`    | Fora de uma lista (CSV)                         |
+| `between`  | Entre dois valores (`val1,val2`)                |
+| `isNull`   | Nulo (`true`) ou não nulo (`false`)             |
+
+### Operadores com comportamento especial
+
+**`in` e `notIn`** — o valor é uma lista CSV. Cada item é tratado como elemento separado:
+
+```
+filter[status][in]=active,pending
+filter[status][notIn]=deleted,banned
+```
+
+**`between`** — dois valores separados por vírgula, aplicados como `BETWEEN val1 AND val2`:
+
+```
+filter[createdAt][between]=2024-01-01,2024-12-31
+filter[price][between]=10,99
+```
+
+**`isNull`** — `true` gera `IS NULL`, `false` gera `IS NOT NULL`. Não há operador separado `isNotNull`:
+
+```
+filter[deletedAt][isNull]=true
+filter[photoUrl][isNull]=false
+```
+
+**`ilike`** — usa `LOWER()` para garantir portabilidade entre PostgreSQL, MySQL e SQLite. Para PostgreSQL com grandes volumes, considere criar um índice funcional `LOWER(campo)` para melhor desempenho:
+
+```
+filter[name][ilike]=joao
+```
+
+### Restringindo operadores globalmente
+
+Por padrão todos os operadores são permitidos. Para restringir, configure `operators.allowed` no `forRoot`:
+
+```typescript
+DynamicQueryBuilderModule.forRoot({
+  operators: {
+    allowed: ['eq', 'ne', 'like', 'in'],
+  },
+})
+```
+
+Operadores fora da lista lançam `BadRequestException`.
+
+---
+
+## Sorts
+
+Formato: `sort=campo,-outro` (prefixo `-` para desc, sem prefixo para asc)
+
+O campo deve estar listado em `sorts` do `RulesConfig`.
+
+<Callout type="warn">
+  **Atenção:** quando `fields` está definido no `RulesConfig`, os campos de
+  `sort` também precisam estar em `fields`. Se um campo estiver em `sorts` mas
+  ausente de `fields`, o TypeORM gera erro porque o campo não foi selecionado na
+  query. Mantenha `sorts` e `fields` em sincronia, ou omita `fields` se não
+  precisar restringir a seleção de colunas.
+</Callout>
+
+---
+
+## Fields
+
+Formato: `fields=id,name,email`
+
+Restringe as colunas retornadas pela query (`SELECT`). Quando omitido, todas as colunas da entidade são retornadas.
+
+O campo deve estar listado em `fields` do `RulesConfig`. Campos não autorizados são ignorados.
+
+<Callout type="warn">
+  Definir `fields` no `RulesConfig` afeta também os sorts — veja o aviso acima.
+</Callout>
+
+---
+
+## Includes
+
+Formato: `includes=company,roles`
+
+Carrega relações TypeORM via `leftJoinAndSelect`. Cada relação precisa estar listada em `includes` do `RulesConfig` — relações não autorizadas são ignoradas.
+
+Não há eager load implícito: includes só são aplicados quando o parâmetro `includes` estiver presente na query string.
+
+---
+
+## Paginação
+
+| Parâmetro  | Tipo             | Padrão | Descrição                                               |
+| ---------- | ---------------- | ------ | ------------------------------------------------------- |
+| `page`     | número           | `1`    | Página atual                                            |
+| `perPage`  | número           | `10`   | Itens por página (máximo: `100`)                        |
+| `paginate` | `true` / `false` | `true` | `false` desativa paginação e retorna todos os registros |
+
+Os defaults e o máximo de `perPage` são configuráveis via `forRoot`:
+
+```typescript
+DynamicQueryBuilderModule.forRoot({
+  pagination: {
+    defaultPerPage: 20,
+    maxPerPage: 200,
+  },
+})
+```
+
+### Resposta com paginação ativa
+
+```json
+{
+  "data": [...],
+  "page": 1,
+  "perPage": 10,
+  "total": 42,
+  "lastPage": 5
+}
+```
+
+### Resposta com `paginate=false`
+
+```json
+{
+  "data": [...]
+}
+```

@@ -1,0 +1,80 @@
+@baseUrl = http://localhost:3001
+
+# USERS
+
+### Listar tudo
+GET {{baseUrl}}/users
+ 
+
+### Search por document
+GET {{baseUrl}}/users?filter[document]=00080941722
+
+### Paginação
+GET {{baseUrl}}/users?page=1&perPage=5
+
+### Sem paginação
+GET {{baseUrl}}/users?paginate=false
+
+# FILTROS
+
+### Exato (implícito)
+GET {{baseUrl}}/users?filter[username]=joaquim.costa.KzjK
+
+### Exato (explícito)
+GET {{baseUrl}}/users?filter[username][eq]=jdoe
+
+### Diferente
+GET {{baseUrl}}/users?filter[lastName][ne]=Smith
+
+### Like / ILike
+GET {{baseUrl}}/users?filter[email][like]=%gmail.com
+
+GET {{baseUrl}}/users?filter[firstName][ilike]=jo%
+
+GET {{baseUrl}}/users?filter[email][notLike]=%hotmail%
+
+GET {{baseUrl}}/users?filter[firstName][notIlike]=ma%
+
+### Comparação
+GET {{baseUrl}}/users?filter[createdAt][gt]=2023-01-01
+
+GET {{baseUrl}}/users?filter[createdAt][gte]=2023-01-01T00:00:00Z
+
+GET {{baseUrl}}/users?filter[createdAt][lt]=2025-01-01
+
+GET {{baseUrl}}/users?filter[createdAt][lte]=2025-12-31
+
+### Lista
+GET {{baseUrl}}/users?filter[username][in]=user1,user2
+
+GET {{baseUrl}}/users?filter[username][notIn]=admin,root
+
+### Nulo / Between
+GET {{baseUrl}}/users?filter[document][isNull]=true
+
+GET {{baseUrl}}/users?filter[email][isNull]=false
+
+GET {{baseUrl}}/users?filter[createdAt][between]=2023-01-01,2023-12-31
+
+# ORDENAÇÃO
+
+### Simples
+GET {{baseUrl}}/users?sort=username
+
+GET {{baseUrl}}/users?sort=-createdAt
+
+### Múltipla
+GET {{baseUrl}}/users?sort=username,-email
+
+# CAMPOS
+
+### Seleção de campos
+GET {{baseUrl}}/users?fields=id,email
+
+### Campos + filtro
+GET {{baseUrl}}/users?fields=firstName,lastName&page=1&perPage=3
+
+# COMBINAÇÕES
+
+### Data + nome + ordenação + campos + página
+GET {{baseUrl}}/users?filter[createdAt][gte]=2023-01-01&filter[firstName][ilike]=a%&sort=-createdAt&fields=id,username,email,createdAt&page=1&perPage=10

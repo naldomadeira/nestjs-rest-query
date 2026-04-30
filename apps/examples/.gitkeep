@@ -1,0 +1,7 @@
+# This file keeps the examples directory in version control
+
+# Example applications are meant for testing the library locally
+
+# They should NOT be published to npm (see .npmignore)
+
+# They should NOT clutter the repository (see .gitignore for dist, node_modules, etc)
