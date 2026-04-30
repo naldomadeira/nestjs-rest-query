@@ -29,15 +29,13 @@ function makeFakeAdapter(): RestQueryAdapter<any, any> & {
     applySearch: jest.fn(),
     applyFields: jest.fn(),
     applySorts: jest.fn(),
-    applyPagination: jest
-      .fn()
-      .mockResolvedValue({
-        data: [],
-        page: 1,
-        perPage: 10,
-        total: 0,
-        lastPage: 1,
-      }),
+    applyPagination: jest.fn().mockResolvedValue({
+      data: [],
+      page: 1,
+      perPage: 10,
+      total: 0,
+      lastPage: 1,
+    }),
     getMany: jest.fn().mockResolvedValue([]),
     customize: jest.fn((q: any, fn: (q: any) => void) => fn(q)),
   };
