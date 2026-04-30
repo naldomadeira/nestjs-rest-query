@@ -19,23 +19,21 @@ The `DynamicQueryBuilderModule` is configured with `DrizzleAdapter`, and each bu
 ### Setup
 
 ```bash
-# 1. Install dependencies
-pnpm install
-
-# 2. Start the database
-pnpm db:up
-
-# 3. Copy environment variables
-cp .env.example .env
-
-# 4. Run schema migrations
-pnpm db:push
-
-# 5. Start the dev server
-pnpm dev
+pnpm install            # 1. dependencies
+cp .env.example .env    # 2. environment
+pnpm db:up              # 3. start Postgres in Docker
+pnpm db:push            # 4. apply schema (creates tables from src/db/schema.ts)
+pnpm seed               # 5. populate sample data (5 companies + 17 users + 30 posts)
+pnpm dev                # 6. start the API
 ```
 
-The app will start on `http://localhost:3002`. Swagger docs are available at `http://localhost:3002/`.
+App: `http://localhost:3002` · Swagger: `http://localhost:3002/`.
+
+To re-seed (wipes and reinserts):
+
+```bash
+pnpm seed:reset
+```
 
 ## Database
 
@@ -109,8 +107,11 @@ pnpm dev              # Start dev server
 pnpm build            # Compile TypeScript
 pnpm db:up            # Start Postgres container
 pnpm db:down          # Stop Postgres container
-pnpm db:push          # Run Drizzle schema migrations
-pnpm db:generate      # Generate migration files
+pnpm db:push          # Apply schema to the database (drizzle-kit push --force)
+pnpm db:generate      # Generate SQL migration files
+pnpm db:setup         # Convenience: db:push && seed
+pnpm seed             # Insert deterministic sample data
+pnpm seed:reset       # Wipe and re-seed (idempotent)
 ```
 
 ## Conventions

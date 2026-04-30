@@ -10,6 +10,7 @@ export default defineConfig({
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'postgres',
     database: process.env.DB_NAME || 'app_db_drizzle',
+    ssl: false,
   },
   verbose: true,
   strict: true,

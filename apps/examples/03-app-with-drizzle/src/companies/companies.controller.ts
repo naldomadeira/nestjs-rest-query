@@ -33,10 +33,13 @@ export class CompaniesController {
       'Fetch companies with support for filters, sorting, and pagination',
   })
   @ApiDynamicQuery<CompanyDto>({
-    filters: ['id', 'name', 'createdAt'],
+    // 'users' (1:N) declared as a filter root so `?filter[users.email][...]` works.
+    filters: ['id', 'name', 'createdAt', 'users'],
+    // 'users' is intentionally NOT in sorts — ORDER BY through 'many' is rejected.
     sorts: ['name', 'createdAt'],
     fields: ['id', 'name', 'createdAt'],
     includes: ['users'],
+    search: ['name'],
   })
   @ApiPaginatedResponse<CompanyDto>(CompanyDto, {
     status: 200,

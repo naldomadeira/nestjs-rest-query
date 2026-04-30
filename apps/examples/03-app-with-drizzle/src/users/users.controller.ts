@@ -37,10 +37,15 @@ export class UsersController {
       'Fetch users with support for filters, sorting, pagination, and relationships',
   })
   @ApiDynamicQuery<UserDto>({
-    filters: ['id', 'name', 'email', 'companyId', 'createdAt'],
-    sorts: ['name', 'email', 'createdAt'],
+    // 'company' (1:1) and 'posts' (1:N) declared as filter roots so dotted paths
+    // like `?filter[company.name][...]` and `?filter[posts.title][...]` are accepted.
+    filters: ['id', 'name', 'email', 'companyId', 'createdAt', 'company', 'posts'],
+    // sort on 'posts' is intentionally NOT allowed: ORDER BY through a 'many'
+    // relation is rejected by the adapter (semantic ambiguity under DISTINCT).
+    sorts: ['name', 'email', 'createdAt', 'company'],
     fields: ['id', 'name', 'email', 'companyId', 'createdAt'],
     includes: ['company', 'posts'],
+    search: ['name', 'email', 'company.name'],
   })
   @ApiPaginatedResponse<UserDto>(UserDto, {
     status: 200,
