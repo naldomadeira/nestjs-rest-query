@@ -50,4 +50,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - run: pnpm pack --dry-run
+      - run: pnpm pack --pack-destination /tmp
+      - name: Inspect tarball contents
+        run: tar -tzf /tmp/nestjs-rest-query-*.tgz | sort
