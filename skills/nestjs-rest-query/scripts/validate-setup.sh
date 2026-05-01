@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# validate-setup.sh — Validates nestjs-dynamic-query-builder setup in a NestJS project.
+# validate-setup.sh — Validates nestjs-rest-query setup in a NestJS project.
 # Usage: bash validate-setup.sh [project-root]
 # Exit codes: 0 = all checks pass, 1 = one or more checks failed
 
@@ -22,32 +22,36 @@ pass() { echo -e "${GREEN}✓${NC} $1"; }
 fail() { echo -e "${RED}✗${NC} $1"; echo -e "  ${YELLOW}→ $2${NC}"; ERRORS=$((ERRORS + 1)); }
 warn() { echo -e "${YELLOW}⚠${NC} $1"; }
 
-echo "Validating nestjs-dynamic-query-builder setup in: $PROJECT_ROOT"
+echo "Validating nestjs-rest-query setup in: $PROJECT_ROOT"
 echo "---"
 
 # 1. Check package is installed
 if [ -f "$PROJECT_ROOT/package.json" ]; then
-  if grep -q '@multitechbr/nestjs-dynamic-query-builder' "$PROJECT_ROOT/package.json"; then
-    pass "Package @multitechbr/nestjs-dynamic-query-builder found in package.json"
+  if grep -q '"nestjs-rest-query"' "$PROJECT_ROOT/package.json"; then
+    pass "Package nestjs-rest-query found in package.json"
   else
     fail "Package not found in package.json" \
-      "Run: npm install @multitechbr/nestjs-dynamic-query-builder"
+      "Run: pnpm add nestjs-rest-query  (or: npm install nestjs-rest-query)"
   fi
 else
   fail "No package.json found in $PROJECT_ROOT" \
     "Are you running this from the project root?"
 fi
 
-# 2. Check .npmrc exists
-if [ -f "$PROJECT_ROOT/.npmrc" ]; then
-  if grep -q '@multitechbr:registry' "$PROJECT_ROOT/.npmrc"; then
-    pass ".npmrc has @multitechbr registry configured"
-  else
-    fail ".npmrc missing @multitechbr registry" \
-      "Add: @multitechbr:registry=https://gitlab.com/api/v4/packages/npm"
-  fi
+# 2. Detect which ORM is in use (TypeORM is the default; Drizzle is opt-in)
+HAS_TYPEORM=0
+HAS_DRIZZLE=0
+if [ -f "$PROJECT_ROOT/package.json" ]; then
+  if grep -q '"typeorm"' "$PROJECT_ROOT/package.json"; then HAS_TYPEORM=1; fi
+  if grep -q '"drizzle-orm"' "$PROJECT_ROOT/package.json"; then HAS_DRIZZLE=1; fi
+fi
+
+if [ $HAS_TYPEORM -eq 0 ] && [ $HAS_DRIZZLE -eq 0 ]; then
+  fail "Neither typeorm nor drizzle-orm is installed" \
+    "Install one peer ORM: pnpm add typeorm @nestjs/typeorm  OR  pnpm add drizzle-orm"
 else
-  warn "No .npmrc found — package may not install from GitLab registry"
+  [ $HAS_TYPEORM -eq 1 ] && pass "TypeORM detected in package.json"
+  [ $HAS_DRIZZLE -eq 1 ] && pass "Drizzle ORM detected in package.json"
 fi
 
 # 3. Check main.ts for query parser
@@ -94,18 +98,18 @@ if [ -n "$APP_MODULE" ]; then
     fail "DynamicQueryBuilderModule not found in $(basename "$APP_MODULE")" \
       "Add: DynamicQueryBuilderModule.forRoot() to AppModule imports"
   fi
+
+  # If Drizzle is installed, expect the adapter to be configured.
+  if [ $HAS_DRIZZLE -eq 1 ] && [ $HAS_TYPEORM -eq 0 ]; then
+    if grep -q "DrizzleAdapter" "$APP_MODULE"; then
+      pass "DrizzleAdapter configured in $(basename "$APP_MODULE")"
+    else
+      fail "DrizzleAdapter not found in $(basename "$APP_MODULE")" \
+        "Add: forRoot({ adapter: new DrizzleAdapter() }) and import from 'nestjs-rest-query/drizzle'"
+    fi
+  fi
 else
   warn "Could not find app.module.ts — skipping module check"
-fi
-
-# 5. Check TypeORM is installed
-if [ -f "$PROJECT_ROOT/package.json" ]; then
-  if grep -q '"typeorm"' "$PROJECT_ROOT/package.json"; then
-    pass "TypeORM found in package.json"
-  else
-    fail "TypeORM not found in package.json" \
-      "Run: npm install typeorm @nestjs/typeorm"
-  fi
 fi
 
 echo "---"

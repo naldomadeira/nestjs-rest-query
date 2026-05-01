@@ -1,49 +1,66 @@
 {
-  "skill_name": "nestjs-dynamic-query-builder",
+  "skill_name": "nestjs-rest-query",
   "evals": [
     {
       "id": 1,
-      "prompt": "Estou criando um projeto NestJS do zero com TypeORM e PostgreSQL. Preciso instalar e configurar o @multitechbr/nestjs-dynamic-query-builder pra usar filtros dinâmicos nos meus endpoints. Me ajuda a fazer o setup completo — .npmrc, main.ts, app.module.ts — tudo que precisa pra funcionar.",
-      "expected_output": "Complete setup with: .npmrc with GitLab registry, main.ts with extended query parser + ValidationPipe with enableImplicitConversion, app.module.ts with DynamicQueryBuilderModule.forRoot(). All three bootstrap steps present and correct.",
+      "prompt": "Estou criando um projeto NestJS do zero com TypeORM e PostgreSQL. Preciso instalar e configurar o nestjs-rest-query pra usar filtros dinâmicos nos meus endpoints. Me ajuda a fazer o setup completo — main.ts, app.module.ts — tudo que precisa pra funcionar.",
+      "expected_output": "Complete setup with: pnpm/npm install command for nestjs-rest-query, main.ts with extended query parser + ValidationPipe with enableImplicitConversion, app.module.ts with DynamicQueryBuilderModule.forRoot(). All bootstrap steps present and correct. NO references to private GitLab registry or @multitechbr scope.",
       "files": [],
       "expectations": [
-        "Output includes .npmrc configuration with @multitechbr:registry pointing to gitlab.com",
+        "Output includes pnpm add nestjs-rest-query OR npm install nestjs-rest-query",
+        "Output does NOT include any .npmrc with @multitechbr or GitLab registry",
         "Output includes app.set('query parser', 'extended') in main.ts",
         "Output includes ValidationPipe with transform: true and enableImplicitConversion: true",
         "Output includes DynamicQueryBuilderModule.forRoot() in app.module.ts imports",
-        "Output imports from @multitechbr/nestjs-dynamic-query-builder correctly",
-        "Output does NOT skip any of the 3 mandatory bootstrap steps",
+        "Output imports from 'nestjs-rest-query' (NOT '@multitechbr/nestjs-dynamic-query-builder')",
+        "Output does NOT skip any of the mandatory bootstrap steps",
         "Code examples are syntactically valid TypeScript"
       ]
     },
     {
       "id": 2,
-      "prompt": "Tenho uma entidade Product com campos: id, name, price, category, created_at, deleted_at. Preciso criar um endpoint GET /products que suporte filtrar por name (case-insensitive), price (range), category (múltiplos valores), ordenar por name e price, paginar, e excluir soft-deleted automaticamente. Usa o nestjs-dynamic-query-builder.",
-      "expected_output": "Controller with @ApiDynamicQuery having filters for name/price/category, sorts for name/price, and a service using queryBuilderService.execute() with customize callback for soft delete (deleted_at IS NULL). Uses ilike for name, between for price range, in for category.",
+      "prompt": "Tenho uma entidade Product com campos: id, name, price, category, createdAt, deletedAt. Preciso criar um endpoint GET /products que suporte filtrar por name (case-insensitive), price (range), category (múltiplos valores), ordenar por name e price, paginar, e excluir soft-deleted automaticamente. Usa o nestjs-rest-query.",
+      "expected_output": "Controller with @ApiDynamicQuery having filters for name/price/category, sorts for name/price, and a service using queryBuilderService.execute() with customize callback for soft delete (deletedAt IS NULL). Uses ilike for name, between for price range, in for category.",
       "files": [],
       "expectations": [
         "Controller uses @ApiDynamicQuery decorator with filters array including name, price, category",
         "Controller uses @QueryRules() parameter decorator paired with @Query() DynamicQueryDto",
-        "Sorts whitelist includes name and price (not created_at or deleted_at)",
+        "Sorts whitelist includes name and price (not createdAt or deletedAt)",
         "Service uses queryBuilderService.execute() with repository, query, and rules parameters",
-        "Customize callback adds andWhere for deleted_at IS NULL (soft delete filtering)",
-        "Does NOT expose deleted_at in filters whitelist (security)",
-        "Code mentions ilike for case-insensitive name search or documents operator usage"
+        "Customize callback adds andWhere for deletedAt IS NULL (soft delete filtering)",
+        "Does NOT expose deletedAt in filters whitelist (security)",
+        "Code mentions ilike for case-insensitive name search or documents operator usage",
+        "Imports come from 'nestjs-rest-query' (NOT the old @multitechbr scope)"
       ]
     },
     {
       "id": 3,
-      "prompt": "Tenho entidades Order (id, status, total, created_at) com ManyToOne para Customer (id, name, email) e OneToMany para OrderItem (id, quantity, unit_price) que tem ManyToOne para Product (id, name). Preciso de um endpoint GET /orders que permita filtrar por status, customer.name (case-insensitive), incluir customer e items com items.product, e ordenar por created_at e total. Também preciso de field selection e que a resposta seja paginada.",
+      "prompt": "Tenho entidades Order (id, status, total, createdAt) com ManyToOne para Customer (id, name, email) e OneToMany para OrderItem (id, quantity, unitPrice) que tem ManyToOne para Product (id, name). Preciso de um endpoint GET /orders que permita filtrar por status, customer.name (case-insensitive), incluir customer e items com items.product, e ordenar por createdAt e total. Também preciso de field selection e que a resposta seja paginada.",
       "expected_output": "Controller with @ApiDynamicQuery having nested filters (customer.name), includes for customer/items/items.product, fields selection, sorts. Service using execute(). Correct dot-notation for nested filtering with parent relation in includes.",
       "files": [],
       "expectations": [
         "Filters include 'status' and 'customer.name' with dot notation for nested field",
         "Includes array has 'customer', 'items', 'items.product' for nested relationships",
-        "Fields array is defined and includes sort fields (created_at, total must be in fields)",
-        "Sorts array has 'created_at' and 'total' and both are also present in fields array",
+        "Fields array is defined and includes sort fields (createdAt, total must be in fields)",
+        "Sorts array has 'createdAt' and 'total' and both are also present in fields array",
         "Uses @ApiDynamicQuery or @DynamicQuery decorator (not manual query building)",
         "@QueryRules() is used to inject rules into the handler method",
         "Service delegates to queryBuilderService.execute() with all parameters"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Quero usar nestjs-rest-query num projeto que já está rodando com Drizzle ORM e Postgres (não tenho TypeORM). Como faço o setup pra que execute() trabalhe com a minha tabela users (com relação ManyToOne para companies)? Mostra desde forRoot até o serviço.",
+      "expected_output": "AppModule registers DynamicQueryBuilderModule.forRoot({ adapter: new DrizzleAdapter() }) imported from 'nestjs-rest-query/drizzle'. Service builds a DrizzleSource with db, table, and relations, and passes it to queryBuilderService.execute(source, query, rules). No TypeORM Repository involved.",
+      "files": [],
+      "expectations": [
+        "forRoot is called with adapter: new DrizzleAdapter()",
+        "DrizzleAdapter is imported from 'nestjs-rest-query/drizzle' (subpath export)",
+        "Service constructs a DrizzleSource object with db, table, and relations keys",
+        "relations declares 'company' with type: 'one' and an on: { localKey, foreignKey } shape",
+        "queryBuilderService.execute() receives the DrizzleSource (not a TypeORM Repository)",
+        "Output does NOT import @nestjs/typeorm or use InjectRepository",
+        "Bootstrap (main.ts) still includes query parser 'extended' and ValidationPipe with enableImplicitConversion"
       ]
     }
   ]

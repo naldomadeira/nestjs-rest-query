@@ -4,7 +4,7 @@
 
 **Declarative, whitelist-first REST query params for NestJS.**
 
-Turn `?filters[email][like]=acme&sorts=-createdAt&page=2` into safe, typed database queries — without writing a single `WHERE` clause.
+Turn `?filter[email][like]=acme&sorts=-createdAt&page=2` into safe, typed database queries — without writing a single `WHERE` clause.
 
 [![npm version](https://img.shields.io/npm/v/nestjs-rest-query.svg?style=flat-square&logo=npm)](https://www.npmjs.com/package/nestjs-rest-query)
 [![npm downloads](https://img.shields.io/npm/dm/nestjs-rest-query.svg?style=flat-square)](https://www.npmjs.com/package/nestjs-rest-query)
@@ -26,7 +26,7 @@ NestJS has controllers. TypeORM has a query builder. The boilerplate between the
 ## Features
 
 - 🎯 **Whitelist-first** — unknown query params are silently ignored. Defense by default.
-- 🔍 **15 comparison operators** — `eq`, `ne`, `like`, `ilike`, `gt`, `gte`, `lt`, `lte`, `in`, `notIn`, `between`, `isNull`, `notNull`, `notLike`, `notIlike`.
+- 🔍 **14 comparison operators** — `eq`, `ne`, `like`, `ilike`, `notLike`, `notIlike`, `gt`, `gte`, `lt`, `lte`, `in`, `notIn`, `between`, `isNull`.
 - 📑 **Pagination** with `{ data, page, perPage, total, lastPage }`.
 - ↕️ **Multi-field sorting** with `+`/`-` prefix.
 - 🔗 **Relations on demand** via `?includes=`.
@@ -145,8 +145,8 @@ export class UsersController {
 
 ```http
 GET /users
-  ?filters[email][ilike]=%@acme.com
-  &filters[createdAt][gte]=2025-01-01
+  ?filter[email][ilike]=%@acme.com
+  &filter[createdAt][gte]=2025-01-01
   &sorts=-createdAt,name
   &includes=company
   &fields=id,name,email
@@ -178,23 +178,22 @@ That's the whole loop.
 
 ## Operators
 
-All operators target a whitelisted column and use the `filters[<column>][<operator>]=<value>` syntax.
+All operators target a whitelisted column and use the `filter[<column>][<operator>]=<value>` syntax.
 
-| Operator     | Example                                             | SQL equivalent                  |
-| ------------ | --------------------------------------------------- | ------------------------------- |
-| `eq`         | `filters[status][eq]=active`                        | `status = 'active'`             |
-| `ne`         | `filters[status][ne]=archived`                      | `status <> 'archived'`          |
-| `gt` / `gte` | `filters[age][gte]=18`                              | `age >= 18`                     |
-| `lt` / `lte` | `filters[price][lt]=100`                            | `price < 100`                   |
-| `like`       | `filters[name][like]=%souza%`                       | `name LIKE '%souza%'`           |
-| `ilike`      | `filters[email][ilike]=%@acme.com`                  | `email ILIKE '%@acme.com'`      |
-| `notLike`    | `filters[name][notLike]=%spam%`                     | `name NOT LIKE '%spam%'`        |
-| `notIlike`   | `filters[email][notIlike]=%@spam.io`                | `email NOT ILIKE '%@spam.io'`   |
-| `in`         | `filters[role][in]=admin,editor`                    | `role IN ('admin','editor')`    |
-| `notIn`      | `filters[role][notIn]=guest`                        | `role NOT IN ('guest')`         |
-| `between`    | `filters[createdAt][between]=2025-01-01,2025-12-31` | `createdAt BETWEEN ... AND ...` |
-| `isNull`     | `filters[deletedAt][isNull]=true`                   | `deletedAt IS NULL`             |
-| `notNull`    | `filters[deletedAt][notNull]=true`                  | `deletedAt IS NOT NULL`         |
+| Operator     | Example                                            | SQL equivalent                  |
+| ------------ | -------------------------------------------------- | ------------------------------- |
+| `eq`         | `filter[status][eq]=active`                        | `status = 'active'`             |
+| `ne`         | `filter[status][ne]=archived`                      | `status <> 'archived'`          |
+| `gt` / `gte` | `filter[age][gte]=18`                              | `age >= 18`                     |
+| `lt` / `lte` | `filter[price][lt]=100`                            | `price < 100`                   |
+| `like`       | `filter[name][like]=%souza%`                       | `name LIKE '%souza%'`           |
+| `ilike`      | `filter[email][ilike]=%@acme.com`                  | `email ILIKE '%@acme.com'`      |
+| `notLike`    | `filter[name][notLike]=%spam%`                     | `name NOT LIKE '%spam%'`        |
+| `notIlike`   | `filter[email][notIlike]=%@spam.io`                | `email NOT ILIKE '%@spam.io'`   |
+| `in`         | `filter[role][in]=admin,editor`                    | `role IN ('admin','editor')`    |
+| `notIn`      | `filter[role][notIn]=guest`                        | `role NOT IN ('guest')`         |
+| `between`    | `filter[createdAt][between]=2025-01-01,2025-12-31` | `createdAt BETWEEN ... AND ...` |
+| `isNull`     | `filter[deletedAt][isNull]=true`                   | `deletedAt IS NULL`             |
 
 Restrict the available operators globally via `forRoot({ operators: { allowed: ['eq', 'in', 'gte'] } })`.
 

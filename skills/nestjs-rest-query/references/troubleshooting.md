@@ -121,7 +121,7 @@ Relations are NOT loaded by default — the client must explicitly request them.
 
 **Fix:**
 ```typescript
-import { dqbSwaggerRequestInterceptor } from '@multitechbr/nestjs-dynamic-query-builder';
+import { dqbSwaggerRequestInterceptor } from 'nestjs-rest-query';
 
 SwaggerModule.setup('docs', app, document, {
   swaggerOptions: {
@@ -165,4 +165,55 @@ DynamicQueryBuilderModule.forRoot({
 })
 ```
 
-If `operators.allowed` is not set (undefined), all 13 operators are available.
+If `operators.allowed` is not set (undefined), all 14 operators are available.
+
+---
+
+### Drizzle: relation not joining / "unknown relation"
+
+**Cause:** The `DrizzleSource` does not declare the relation, or the relation name doesn't match what the client sent in `?includes=`.
+
+**Fix:** Declare every includable relation on the source object that you pass to `execute()`:
+
+```typescript
+const source: DrizzleSource = {
+  db,
+  table: users,
+  relations: {
+    company: {
+      type: 'one',
+      table: companies,
+      on: { localKey: 'companyId', foreignKey: 'id' },
+    },
+    orders: {
+      type: 'many',
+      table: orders,
+      on: { localKey: 'id', foreignKey: 'userId' },
+    },
+  },
+};
+```
+
+Then add the same names to the rules:
+
+```typescript
+@ApiDynamicQuery({
+  includes: ['company', 'orders'],
+})
+```
+
+---
+
+### Switched to Drizzle but service still tries to use TypeORM
+
+**Cause:** `DynamicQueryBuilderModule.forRoot()` was called without `adapter: new DrizzleAdapter()`. The default adapter is TypeORM.
+
+**Fix:**
+
+```typescript
+import { DrizzleAdapter } from 'nestjs-rest-query/drizzle';
+
+DynamicQueryBuilderModule.forRoot({ adapter: new DrizzleAdapter() });
+```
+
+Restart the app — the adapter is resolved at module init.

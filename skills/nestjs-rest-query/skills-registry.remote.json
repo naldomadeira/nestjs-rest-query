@@ -1,27 +1,29 @@
 {
-  "name": "nestjs-dynamic-query-builder",
-  "version": "1.0.0",
-  "description": "Guia para instalar, configurar e usar @multitechbr/nestjs-dynamic-query-builder em projetos NestJS com TypeORM, incluindo filtros, ordenação, paginação, includes e search opcional.",
+  "name": "nestjs-rest-query",
+  "version": "2.0.0",
+  "description": "Guia para instalar, configurar e usar a biblioteca nestjs-rest-query em projetos NestJS com TypeORM ou Drizzle, cobrindo filtros, ordenação, paginação, includes, busca textual e troubleshooting.",
   "tags": [
     "nestjs",
     "typeorm",
+    "drizzle",
     "typescript",
     "backend",
-    "query-builder",
+    "rest-query",
     "pagination",
     "filter"
   ],
-  "author": "Backend Team",
+  "author": "Naldo Madeira",
   "category": "backend",
-  "content": "# nestjs-dynamic-query-builder\n\nSkill para orientar setup, uso e troubleshooting da biblioteca @multitechbr/nestjs-dynamic-query-builder em APIs NestJS.",
-  "url": "https://gitlab.com/api/v4/projects/79980353/repository/tree?path=skills%2Fnestjs-dynamic-query-builder&ref=master",
+  "content": "# nestjs-rest-query\n\nSkill para orientar setup, uso e troubleshooting da biblioteca `nestjs-rest-query` em APIs NestJS com TypeORM ou Drizzle.",
+  "url": "https://github.com/naldomadeira/nestjs-rest-query/tree/main/skills/nestjs-rest-query",
   "extension": "directory",
   "packageType": "directory",
   "source": {
-    "type": "gitlab-directory",
-    "projectId": "79980353",
-    "path": "skills/nestjs-dynamic-query-builder",
-    "ref": "master",
-    "host": "https://gitlab.com"
+    "type": "github-directory",
+    "owner": "naldomadeira",
+    "repo": "nestjs-rest-query",
+    "path": "skills/nestjs-rest-query",
+    "ref": "main",
+    "host": "https://github.com"
   }
 }

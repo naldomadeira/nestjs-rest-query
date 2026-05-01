@@ -77,14 +77,15 @@ Declares which relations can be loaded via `includes=relation1,relation2`.
 })
 ```
 
-- Relations are loaded via `leftJoinAndSelect`
-- Nested relations use dot notation: `'items.company'`
-- Relations are NOT loaded unless the client requests them via `includes=`
-- Do NOT use TypeORM `eager: true` on entities — use `includes` instead
+- TypeORM: relations are loaded via `leftJoinAndSelect`.
+- Drizzle: relations are loaded via the joins declared in your `DrizzleSource.relations`.
+- Nested relations use dot notation: `'items.company'`.
+- Relations are NOT loaded unless the client requests them via `includes=`.
+- Do NOT use TypeORM `eager: true` on entities — use `includes` instead.
 
 ### search
 
-Optional native text search introduced in `4.0.0`.
+Native text search across one or more whitelisted fields.
 
 ```typescript
 @ApiDynamicQuery({
