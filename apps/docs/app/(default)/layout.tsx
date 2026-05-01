@@ -1,11 +1,19 @@
 import '../global.css';
 import { Analytics as VercelAnalytics } from '@vercel/analytics/react';
 import { RootProvider } from 'fumadocs-ui/provider/next';
+import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { ThemeProvider } from '@/providers/theme';
 import { mono, sans } from '../../lib/fonts';
-import { defaultLocale } from '../../lib/i18n';
+import { defaultLocale, getDictionary } from '../../lib/i18n';
 import { i18nUI } from '../../lib/i18n-ui';
+import { metadataBase } from '../../lib/seo';
+
+export const metadata: Metadata = {
+  metadataBase,
+  title: getDictionary(defaultLocale).meta.title,
+  description: getDictionary(defaultLocale).meta.description,
+};
 
 type LayoutProps = {
   readonly children: ReactNode;
@@ -20,7 +28,10 @@ const Layout = ({ children }: LayoutProps) => (
     <head />
     <body className="flex flex-col min-h-screen" suppressHydrationWarning>
       <ThemeProvider>
-        <RootProvider i18n={i18nUI.provider(defaultLocale)}>
+        <RootProvider
+          i18n={i18nUI.provider(defaultLocale)}
+          search={{ options: { type: 'static' } }}
+        >
           {children}
         </RootProvider>
       </ThemeProvider>

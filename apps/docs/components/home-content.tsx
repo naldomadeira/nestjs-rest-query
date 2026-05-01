@@ -1,6 +1,5 @@
-import Image from 'next/image';
 import Link from 'next/link';
-import { resolveDocsAssetPath } from '../lib/asset-path';
+import { ArrowRight, CheckCircle2, CircleDashed } from 'lucide-react';
 import { defaultLocale, getDictionary, type Locale } from '../lib/i18n';
 
 type HomeContentProps = {
@@ -10,83 +9,194 @@ type HomeContentProps = {
 const localePrefix = (locale: Locale) =>
   locale === defaultLocale ? '' : `/${locale}`;
 
+const statusTone: Record<string, string> = {
+  Stable: 'text-emerald-600 dark:text-emerald-400',
+  Estável: 'text-emerald-600 dark:text-emerald-400',
+  Roadmap: 'text-amber-600 dark:text-amber-400',
+};
+
 export const HomeContent = ({ locale }: HomeContentProps) => {
   const t = getDictionary(locale);
   const prefix = localePrefix(locale);
+  const docsHref = `${prefix}/docs`;
+  const prerequisitesHref = `${prefix}/docs/getting-started/prerequisites`;
 
   return (
-    <div className="mx-auto mt-[var(--fd-nav-height)] max-w-5xl px-4 py-12">
+    <main className="mx-auto mt-[var(--fd-nav-height)] w-full max-w-5xl px-4 pb-24 pt-16 sm:px-6 lg:pt-24">
       {/* Hero */}
-      <div className="flex flex-col items-center text-center gap-6 mb-14">
-        <div className="flex items-center gap-2.5">
-          <Image
-            src={resolveDocsAssetPath('/logomark.svg')}
-            alt={t.meta.title}
-            width={40}
-            height={40}
-            className="dark:invert"
-          />
-          <code className="text-sm text-muted-foreground">{t.meta.title}</code>
-        </div>
-
-        <h1 className="text-5xl font-bold tracking-tight leading-tight">
-          {t.meta.title}
+      <section className="flex flex-col gap-6 border-b border-border/60 pb-16">
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+          {t.home.hero.eyebrow}
+        </p>
+        <h1 className="text-balance text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl">
+          {t.home.hero.title}
         </h1>
-
-        <p className="text-lg text-muted-foreground max-w-xl">
+        <p className="max-w-2xl text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg">
           {t.home.hero.subtitle}
         </p>
-
-        <div className="flex items-center gap-3">
+        <div className="mt-2 flex flex-wrap items-center gap-3">
           <Link
-            href={`${prefix}/docs/getting-started/prerequisites`}
-            className="inline-flex items-center px-5 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors"
+            href={prerequisitesHref}
+            className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            {t.home.hero.ctaPrimary} →
+            {t.home.hero.ctaPrimary}
+            <ArrowRight className="size-4" aria-hidden />
           </Link>
           <Link
-            href={`${prefix}/docs`}
-            className="inline-flex items-center px-5 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-muted transition-colors"
+            href={docsHref}
+            className="inline-flex h-10 items-center gap-2 rounded-md border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"
           >
             {t.home.hero.ctaSecondary}
           </Link>
         </div>
-      </div>
+      </section>
 
-      {/* Preview — light/dark variants */}
-      <div className="rounded-xl overflow-hidden border border-border shadow-md mb-16">
-        <Image
-          src={resolveDocsAssetPath('/patterns.png')}
-          alt={t.home.hero.previewAlt}
-          width={1200}
-          height={630}
-          className="w-full h-auto dark:hidden"
-          priority
-        />
-        <Image
-          src={resolveDocsAssetPath('/patters-dark.png')}
-          alt={t.home.hero.previewAlt}
-          width={1200}
-          height={630}
-          className="w-full h-auto hidden dark:block"
-          priority
-        />
-      </div>
+      {/* Before / After */}
+      <section className="border-b border-border/60 py-16">
+        <div className="max-w-2xl">
+          <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            {t.home.beforeAfter.title}
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
+            {t.home.beforeAfter.description}
+          </p>
+        </div>
 
-      {/* Features grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        {t.home.features.map((f) => (
-          <div
-            key={f.title}
-            className="rounded-lg border border-border p-5 bg-card hover:bg-muted/50 transition-colors"
+        <div className="mt-8 grid gap-4 lg:grid-cols-2">
+          <CodePane
+            label={t.home.beforeAfter.beforeLabel}
+            tone="muted"
+            code={t.home.beforeAfter.beforeCode}
+          />
+          <CodePane
+            label={t.home.beforeAfter.afterLabel}
+            tone="primary"
+            code={t.home.beforeAfter.afterCode}
+          />
+        </div>
+      </section>
+
+      {/* Compatibility */}
+      <section className="border-b border-border/60 py-16">
+        <div className="max-w-2xl">
+          <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            {t.home.compatibility.title}
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
+            {t.home.compatibility.description}
+          </p>
+        </div>
+
+        <div className="mt-8 overflow-hidden rounded-lg border border-border">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-muted/40 text-xs uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  {t.home.compatibility.headers.name}
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  {t.home.compatibility.headers.status}
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  {t.home.compatibility.headers.note}
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {t.home.compatibility.rows.map((row) => {
+                const tone = statusTone[row.status] ?? 'text-muted-foreground';
+                const Icon =
+                  row.status === 'Roadmap' ? CircleDashed : CheckCircle2;
+                return (
+                  <tr key={row.name} className="bg-background">
+                    <td className="px-4 py-3 font-medium">{row.name}</td>
+                    <td className={`px-4 py-3 ${tone}`}>
+                      <span className="inline-flex items-center gap-2">
+                        <Icon className="size-4" aria-hidden />
+                        {row.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {row.note}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Quickstart */}
+      <section className="py-16">
+        <div className="max-w-2xl">
+          <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            {t.home.quickstart.title}
+          </h2>
+        </div>
+
+        <ol className="mt-8 grid gap-6 lg:grid-cols-3">
+          {t.home.quickstart.steps.map((step, index) => (
+            <li
+              key={step.title}
+              className="flex flex-col gap-3 rounded-lg border border-border bg-background p-5"
+            >
+              <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                <span className="inline-flex size-5 items-center justify-center rounded-full border border-border text-[11px] font-semibold text-foreground">
+                  {index + 1}
+                </span>
+                {step.title}
+              </div>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {step.body}
+              </p>
+              <pre className="mt-auto overflow-x-auto rounded-md bg-muted/60 p-3 text-[12.5px] leading-relaxed text-foreground">
+                <code>{step.code}</code>
+              </pre>
+            </li>
+          ))}
+        </ol>
+
+        <div className="mt-10 flex">
+          <Link
+            href={prerequisitesHref}
+            className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            <h3 className="font-semibold mb-1 text-sm">{f.title}</h3>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              {f.description}
-            </p>
-          </div>
-        ))}
+            {t.home.quickstart.cta}
+            <ArrowRight className="size-4" aria-hidden />
+          </Link>
+        </div>
+      </section>
+    </main>
+  );
+};
+
+type CodePaneProps = {
+  readonly label: string;
+  readonly code: string;
+  readonly tone: 'muted' | 'primary';
+};
+
+const CodePane = ({ label, code, tone }: CodePaneProps) => {
+  const labelTone =
+    tone === 'primary'
+      ? 'text-primary'
+      : 'text-muted-foreground';
+  const ringTone =
+    tone === 'primary'
+      ? 'border-primary/40 bg-primary/[0.03]'
+      : 'border-border bg-muted/30';
+
+  return (
+    <div className={`flex flex-col rounded-lg border ${ringTone}`}>
+      <div
+        className={`flex items-center justify-between border-b border-border/60 px-4 py-2 text-xs font-medium uppercase tracking-wider ${labelTone}`}
+      >
+        <span>{label}</span>
       </div>
+      <pre className="overflow-x-auto p-4 text-[12.5px] leading-relaxed">
+        <code>{code}</code>
+      </pre>
     </div>
   );
 };

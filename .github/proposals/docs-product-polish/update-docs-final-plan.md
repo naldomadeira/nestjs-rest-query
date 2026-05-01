@@ -1,5 +1,7 @@
 # Update Docs Final Implementation Plan
 
+> **Status:** Executado em `docs/product-polish-final` (2026-05-01). Veja `## Execution Log` no final deste arquivo para o resumo do que foi feito e o que mudou em relação ao plano original.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Consolidar o polish das docs em uma unica branch/PR, corrigindo fatos, UX, i18n, navegacao, SEO e search sem seguir mais a estrategia antiga de multiplos PRs.
@@ -874,6 +876,57 @@ This replaces the previous multi-PR plan in `.github/proposals/docs-product-poli
 - Nao abandonar `output: 'export'`.
 - Nao criar outro sistema de i18n paralelo ao Fumadocs.
 - Nao fazer redesign de marca completo.
+
+## Execution Log
+
+Branch: `docs/product-polish-final` (criada a partir de `docs/step-2b-routes`).
+
+### Task 1 — Branch base
+- Branch nova criada. PR antiga (#25) será fechada quando a PR consolidada for aberta (registrado no corpo da nova PR).
+
+### Task 2 — Conteúdo factual
+- `prerequisites.mdx` (EN/PT) reescrito: descrição menciona TypeORM ou Drizzle, `## Supported adapters` com subseções `### TypeORM` e `### Drizzle`, callout de roadmap apenas para Prisma. Tabela de peer deps inclui `drizzle-orm@^0.45.0` (one-of-the-adapters).
+- Headings dos adapters padronizados: EN usa `## Install`, `## Module setup`, `## Usage`; PT usa `## Instalação`, `## Configuração do módulo`, `## Uso`. Não traduzimos identificadores de API.
+- Sweep `rg` para `exclusivo.*typeorm|drizzle.*roadmap|...`: única ocorrência remanescente é a frase legítima “TypeORM and Drizzle are stable. Prisma is on the roadmap…” na home — falso-positivo do regex.
+
+### Task 3 — Assets
+- `apps/docs/public/patters-dark.png` → `patterns-dark.png` (rename via `git mv`).
+- Removidos `patterns-old.png` e `patters-dark-old.png` (não havia referências).
+- `home-content.tsx` atualizado para o novo path (a imagem foi removida na refatoração da home — ver Task 4).
+- `ADR-001-rewrites-vs-export.md` marcado como **Superado**.
+
+### Task 4 — Home como produto
+- Dicionário expandido (`dictionary-shape.ts`): `home` agora tem `hero{eyebrow,title,subtitle,...}`, `beforeAfter`, `compatibility{headers,rows}`, `quickstart{steps,cta}`. Removidas as `features` antigas. Adicionada chave `footer`.
+- Copy EN/PT atualizada com a tese “Turn REST query strings into safe database queries.” / “Transforme query strings REST em queries seguras.”.
+- `home-content.tsx` reescrito: hero direto sem card decorativo, before/after lado a lado com código real (extraído de `apps/examples/02-app-with-postgres/src/companies/companies.controller.ts`), tabela de compatibilidade com ícones `lucide-react`, quickstart com 3 passos. Removida dependência de `next/image` e da imagem `patterns*.png` na home (o asset segue no repo para outros usos).
+
+### Task 5 — Nav, Skills, Footer
+- `docs-shell.tsx`: link “Skills” removido do nav primário; resta `Docs` + ícone GitHub.
+- `home-shell.tsx` já não tinha Skills no nav; passou a renderizar `<SiteFooter locale={locale} />`.
+- Bridge no sidebar: `meta.json` (EN/PT) acrescenta `"skills"` no final; criados `content/en/docs/skills.mdx` e `content/pt-BR/docs/skills.mdx` com Card apontando para `/skills`.
+- Novo `components/site-footer.tsx` (Docs · Skills · GitHub · License · ©) — respeita locale via prefix.
+
+### Task 6 — SEO, sitemap, robots, search
+- Novo `lib/seo.ts` com `metadataBase`, `localePrefix`, `docsPath`, `homePath`, `absoluteUrl`. `metadataBase` aponta para `https://naldomadeira.github.io/nestjs-rest-query/` (respeita `NEXT_PUBLIC_BASE_PATH`).
+- Layouts raiz (`app/(default)/layout.tsx` e `app/[lang]/layout.tsx`) exportam `metadata`/`generateMetadata` com `metadataBase`, título e descrição por dicionário.
+- `generateMetadata` das páginas docs (default e `[lang]`) retorna `alternates.canonical` + `alternates.languages` com `en`, `pt-BR` e `x-default = en`. Mesma `alternates` foi adicionada na página `/skills`.
+- Novos `app/sitemap.ts` (force-static) — enumera home EN, home PT, `/skills` e todas as páginas de `source.getPages('en' | 'pt-BR')`. Como `parser: 'dir'` faz `page.slugs` começar com `'docs'`, o helper `stripDocsPrefix` evita o duplo `/docs/docs/...`.
+- Novo `app/robots.ts` (force-static) com sitemap absoluto.
+- Search Fumadocs nativo via `app/api/search/route.ts` usando `createFromSource(source, { localeMap: { en: 'english', 'pt-BR': 'portuguese' } })` + `staticGET`. `RootProvider` em ambos os layouts agora passa `search={{ options: { type: 'static' } }}`. O resultado (`out/api/search`, ~1.3 MB) é compatível com `output: 'export'`. Sem `localeMap`, Orama falha com `LANGUAGE_NOT_SUPPORTED` para `pt-BR`.
+- `<html lang="...">` validado: páginas reais EN e PT-BR coerentes; apenas as páginas 404 não têm `lang` (esperado para Next.js error fallback estático).
+
+### Task 7 — Validação final
+- `pnpm --filter docs build` (Turbopack) verde.
+- Routes esperadas presentes em `apps/docs/out/`: `/`, `/docs/`, `/docs/getting-started/prerequisites/`, `/pt-BR/`, `/pt-BR/docs/getting-started/prerequisites/`, `/sitemap.xml`, `/robots.txt`, `/skills/`, `/api/search`.
+- Smoke visual local pendente para o usuário (servidor estático: `pnpm --filter docs dev` em http://localhost:9001).
+- PR antiga: a fechar via `gh pr close 25` no momento de abrir a PR consolidada.
+
+### Decisões e desvios em relação ao plano
+
+- **Search:** o plano sugeria `createI18nSearchAPI`, mas `createFromSource(source)` cobre i18n automaticamente (ele lê `i18n` do `source` e segmenta o índice por locale) e expõe `staticGET` — solução mais enxuta. Mantém o objetivo: search EN não mistura PT e vice-versa.
+- **Footer:** plugado apenas no `HomeShell` (home + skills); o `DocsShell` mantém o chrome do Fumadocs sem footer adicional para evitar duplicação visual.
+- **Dicionário:** removidas as antigas `home.features` em vez de manter junto com a nova estrutura, para reduzir copy obsoleta.
+- **CLAUDE.md:** acrescentada uma seção curta `## Docs app (apps/docs)` cobrindo a estrutura de pastas, i18n e os pontos novos (sitemap/robots/search) — assistentes futuros precisam saber que o conteúdo MDX vive em `content/<locale>/docs/...` e que o slug do source carrega o prefixo `docs`.
 
 ## Definition Of Done
 

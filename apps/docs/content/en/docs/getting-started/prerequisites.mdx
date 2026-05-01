@@ -1,11 +1,11 @@
 ---
 title: NestJS Prerequisite
-description: Requirements for using nestjs-rest-query in a NestJS application with TypeORM.
+description: Requirements for using nestjs-rest-query in a NestJS application with TypeORM or Drizzle.
 ---
 
 Before installing the library, confirm that your NestJS project already meets the requirements below.
 
-This library was designed for NestJS applications that use TypeORM and have decorators enabled. If that is your scenario, the setup is usually simple.
+This library was designed for NestJS applications that use TypeORM or Drizzle and have decorators enabled. If that is your scenario, the setup is usually simple.
 
 ## NestJS application
 
@@ -23,31 +23,44 @@ This library was designed for NestJS applications that use TypeORM and have deco
 
 These packages must be present in your project — they are **not** included in the library.
 
-| Package            | Minimum version | Required |
-| ------------------ | --------------- | -------- |
-| `@nestjs/common`   | `^11.0.0`       | Yes      |
-| `@nestjs/core`     | `^11.0.0`       | Yes      |
-| `typeorm`          | `^0.3.26`       | Yes      |
-| `reflect-metadata` | `^0.2.0`        | Yes      |
-| `@nestjs/swagger`  | `^11.0.0`       | Optional |
+| Package            | Minimum version | Required             |
+| ------------------ | --------------- | -------------------- |
+| `@nestjs/common`   | `^11.0.0`       | Yes                  |
+| `@nestjs/core`     | `^11.0.0`       | Yes                  |
+| `reflect-metadata` | `^0.2.0`        | Yes                  |
+| `typeorm`          | `^0.3.26`       | One of the adapters  |
+| `drizzle-orm`      | `^0.45.0`       | One of the adapters  |
+| `@nestjs/swagger`  | `^11.0.0`       | Optional             |
 
 If your project is not using NestJS yet, start by creating the application with `nest new`. The library depends on the framework ecosystem for decorators, metadata, and dependency injection.
 
 `@nestjs/swagger` is only required if you want to generate OpenAPI documentation with `@ApiDynamicQuery` and test filters through the Swagger UI. See the [Swagger](/docs/swagger) section for details.
 
-## TypeORM
+## Supported adapters
 
-The library is built on top of TypeORM's `QueryBuilder`. All filter, sorts, fields, includes, and pagination logic is applied to a `SelectQueryBuilder` generated from your `Repository`.
+### TypeORM
+
+TypeORM support is stable and uses a `SelectQueryBuilder` generated from your `Repository`. All filter, sort, field, include, and pagination logic is applied on top of that builder.
 
 This means:
 
-- You need to have TypeORM configured with at least one database (PostgreSQL, MySQL, SQLite, etc.)
-- Your entities must use TypeORM decorators (`@Entity`, `@Column`, `@ManyToOne`, etc.)
-- `QueryBuilderService` operates exclusively on TypeORM repositories — there is no support for raw query or other abstraction layers
+- You need TypeORM configured with at least one database (PostgreSQL, MySQL, SQLite, etc.).
+- Your entities must use TypeORM decorators (`@Entity`, `@Column`, `@ManyToOne`, etc.).
+- The TypeORM adapter operates on TypeORM repositories — there is no support for raw query or other abstraction layers.
+
+### Drizzle
+
+Drizzle support is stable and is opted in via `DrizzleAdapter`. The adapter uses your Drizzle database instance plus an explicit relations map when relations are needed.
+
+This means:
+
+- You need Drizzle configured with a supported driver (PostgreSQL, MySQL, SQLite, etc.).
+- Your schema must be declared with Drizzle (`pgTable`, `mysqlTable`, etc.).
+- When using `includes`, you must declare the relations map so the adapter can resolve them safely.
 
 <Callout type="info">
-  🔭 **Roadmap — Prisma and Drizzle**
+  **Roadmap — Prisma**
 
-Current support is exclusive to TypeORM. In the future, we intend to bring the same experience to **Prisma** and **Drizzle** — keeping the same decorators API and the same whitelist-based security contract, only swapping the query engine underneath.
+Prisma support is planned for a future version. The goal is to keep the same decorators API and whitelist-based security contract while swapping the query engine underneath.
 
 </Callout>

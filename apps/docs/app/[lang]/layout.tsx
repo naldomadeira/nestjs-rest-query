@@ -1,12 +1,36 @@
 import '../global.css';
 import { Analytics as VercelAnalytics } from '@vercel/analytics/react';
 import { RootProvider } from 'fumadocs-ui/provider/next';
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { ThemeProvider } from '@/providers/theme';
 import { mono, sans } from '../../lib/fonts';
-import { defaultLocale, isLocale, nonDefaultLocales } from '../../lib/i18n';
+import {
+  defaultLocale,
+  getDictionary,
+  isLocale,
+  nonDefaultLocales,
+} from '../../lib/i18n';
 import { i18nUI } from '../../lib/i18n-ui';
+import { metadataBase } from '../../lib/seo';
+
+export async function generateMetadata({
+  params,
+}: {
+  readonly params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const { lang } = await params;
+  if (!isLocale(lang)) {
+    return { metadataBase };
+  }
+  const dict = getDictionary(lang);
+  return {
+    metadataBase,
+    title: dict.meta.title,
+    description: dict.meta.description,
+  };
+}
 
 type LayoutProps = {
   readonly params: Promise<{ lang: string }>;
@@ -36,7 +60,12 @@ const Layout = async ({ params, children }: LayoutProps) => {
       <head />
       <body className="flex flex-col min-h-screen" suppressHydrationWarning>
         <ThemeProvider>
-          <RootProvider i18n={i18nUI.provider(lang)}>{children}</RootProvider>
+          <RootProvider
+            i18n={i18nUI.provider(lang)}
+            search={{ options: { type: 'static' } }}
+          >
+            {children}
+          </RootProvider>
         </ThemeProvider>
       </body>
     </html>

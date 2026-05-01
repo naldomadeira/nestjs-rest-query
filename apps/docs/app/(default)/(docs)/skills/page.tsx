@@ -10,6 +10,14 @@ const t = getDictionary(defaultLocale);
 export const metadata: Metadata = {
   title: t.skills.title,
   description: t.skills.description,
+  alternates: {
+    canonical: '/skills',
+    languages: {
+      en: '/skills',
+      'pt-BR': '/skills',
+      'x-default': '/skills',
+    },
+  },
 };
 
 export default function SkillsPage() {

@@ -5,7 +5,7 @@ description: Usar nestjs-rest-query com TypeORM — o adapter padrão.
 
 TypeORM é o adapter padrão. Se você já está usando TypeORM e `@nestjs/typeorm`, tudo funciona sem configuração adicional.
 
-## Install
+## Instalação
 
 ```bash
 pnpm add typeorm
@@ -15,7 +15,7 @@ npm install typeorm
 
 Se você ainda não tiver TypeORM instalado, a biblioteca o puxará automaticamente (é uma peer dependency).
 
-## Module setup
+## Configuração do módulo
 
 ```typescript title="app.module.ts"
 import { Module } from '@nestjs/common';
@@ -42,7 +42,7 @@ DynamicQueryBuilderModule.forRoot({
 });
 ```
 
-## Controller
+## Uso
 
 ```typescript title="users.controller.ts"
 import { Controller, Get, Query } from '@nestjs/common';

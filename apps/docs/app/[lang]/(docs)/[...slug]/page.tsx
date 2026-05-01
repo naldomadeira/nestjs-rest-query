@@ -9,6 +9,7 @@ import { notFound } from 'next/navigation';
 import Mermaid from '../../../../components/mermaid';
 import ThemedImage from '../../../../components/themed-image';
 import { defaultLocale, isLocale } from '../../../../lib/i18n';
+import { docsPath } from '../../../../lib/seo';
 import { source } from '../../../../lib/source';
 
 type PageProps = {
@@ -65,9 +66,21 @@ export const generateMetadata = async (props: {
     notFound();
   }
 
+  const slug = params.slug ?? [];
+  const enPath = docsPath(slug, 'en');
+  const ptPath = docsPath(slug, 'pt-BR');
+
   return {
     title: page.data.title,
     description: page.data.description,
+    alternates: {
+      canonical: docsPath(slug, params.lang),
+      languages: {
+        en: enPath,
+        'pt-BR': ptPath,
+        'x-default': enPath,
+      },
+    },
   };
 };
 

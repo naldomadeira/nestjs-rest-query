@@ -1,10 +1,14 @@
 # ADR-001 — `next.config.ts` rewrites × `output: 'export'`
 
-> **Status:** Aberto. Decisão a tomar **antes** do step-6 (que mexe em sitemap e SEO) ou de qualquer mudança de deploy.
+> **Status:** Superado.
 > **Owner:** Opus.
-> **Bloqueia:** nada hoje. Vira bloqueador para step-6 se rewrites importarem em SEO.
+> **Bloqueia:** nada.
 
-## Contexto
+O `next.config.ts` atual não declara `rewrites`; portanto o warning original não é mais uma decisão arquitetural pendente. Manter `output: 'export'`.
+
+---
+
+## Contexto histórico
 
 `pnpm --filter docs build` emite hoje:
 

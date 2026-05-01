@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { SiGithub } from '@icons-pack/react-simple-icons';
 import { resolveDocsAssetPath } from '../lib/asset-path';
 import { defaultLocale, getDictionary, type Locale } from '../lib/i18n';
+import { SiteFooter } from './site-footer';
 
 const GITHUB_URL = 'https://github.com/naldomadeira/nestjs-rest-query';
 
@@ -49,6 +50,7 @@ export const HomeShell = ({ locale, children }: HomeShellProps) => {
       ]}
     >
       {children}
+      <SiteFooter locale={locale} />
     </HomeLayout>
   );
 };

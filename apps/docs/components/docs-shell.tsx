@@ -39,7 +39,6 @@ export const DocsShell = ({ locale, children }: DocsShellProps) => {
 
   const navLinks = [
     { text: t.nav.docs, url: `${prefix}/docs` },
-    { text: t.nav.skills, url: '/skills' },
     {
       type: 'icon' as const,
       text: t.nav.github,
