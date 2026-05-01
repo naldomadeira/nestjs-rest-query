@@ -14,6 +14,7 @@ concurrency: ${{ github.workflow }}-${{ github.ref }}
 jobs:
   release:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,22 +30,10 @@ jobs:
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
-      - name: Configure npm auth explicitly
-        run: |
-          cat <<EOF > "$NPM_CONFIG_USERCONFIG"
-          //registry.npmjs.org/:_authToken=${NPM_TOKEN}
-          EOF
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Verify npm auth
-        run: npm whoami
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Use latest npm for trusted publishing
+        run: npm install -g npm@latest
 
       - run: pnpm install --frozen-lockfile
-
-      - run: pnpm build
 
       - uses: changesets/action@v1
         with:
@@ -54,5 +43,3 @@ jobs:
           title: 'chore: release'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: 'true'
