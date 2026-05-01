@@ -18,6 +18,15 @@ export const metadata: Metadata = {
       'x-default': '/skills',
     },
   },
+  openGraph: {
+    title: t.skills.title,
+    description: t.skills.description,
+    url: '/skills',
+  },
+  twitter: {
+    title: t.skills.title,
+    description: t.skills.description,
+  },
 };
 
 export default function SkillsPage() {

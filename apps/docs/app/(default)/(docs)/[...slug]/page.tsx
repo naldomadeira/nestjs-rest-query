@@ -77,6 +77,15 @@ export const generateMetadata = async (props: {
         'x-default': enPath,
       },
     },
+    openGraph: {
+      title: page.data.title,
+      description: page.data.description,
+      url: docsPath(slug, defaultLocale),
+    },
+    twitter: {
+      title: page.data.title,
+      description: page.data.description,
+    },
   };
 };
 
