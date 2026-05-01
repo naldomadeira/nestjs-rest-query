@@ -70,7 +70,11 @@ const POST_TITLES = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function makeEmail(firstName: string, companySlug: string, idx: number): string {
+function makeEmail(
+  firstName: string,
+  companySlug: string,
+  idx: number
+): string {
   return `${firstName.toLowerCase()}.${idx}@${companySlug}.com`;
 }
 
@@ -88,7 +92,9 @@ async function main(): Promise<void> {
   console.log(`╔══════════════════════════════════════╗`);
   console.log(`║   SEED — 03-app-with-drizzle         ║`);
   console.log(`╠══════════════════════════════════════╣`);
-  console.log(`║  Companies:       ${String(COMPANY_NAMES.length).padEnd(20)}║`);
+  console.log(
+    `║  Companies:       ${String(COMPANY_NAMES.length).padEnd(20)}║`
+  );
   console.log(`║  Users / company: ${String(USERS_PER_COMPANY).padEnd(20)}║`);
   console.log(`║  Posts / user:    ${String(POSTS_PER_USER).padEnd(20)}║`);
   console.log(`║  Reset:           ${String(RESET).padEnd(20)}║`);
@@ -157,7 +163,7 @@ async function main(): Promise<void> {
       };
       postIdx++;
       return value;
-    }),
+    })
   );
   if (postValues.length > 0) {
     const insertedPosts = await db.insert(posts).values(postValues).returning();

@@ -78,7 +78,21 @@ The Drizzle adapter has explicit, runtime-enforced constraints. None of these af
 
    This rules out a sort pattern that has no well-defined SQL semantics under the two-phase pagination strategy. Workaround: use the `customize` hook to add ordering of relation arrays in your application layer after the adapter has produced its rows.
 
-3. **Result shape is one-level table-grouped.** `cardinality: 'one'` relations appear as scalar objects (or `null`). `cardinality: 'many'` relations appear as arrays (deduplicated by `relation.primaryKey`, possibly empty). No deep nesting of relations-of-relations. If you want TypeORM-style nested object graphs, remap rows in your controller layer (one-liner with `data.map`) or wait for a future `DrizzleRelationalAdapter` (out of scope for 2.0.0).
+3. **Result shape is flat — TypeORM-compatible.** Root columns are at the top level; relations are nested as keys at the same level: object for `cardinality: 'one'` (or `null` if the LEFT JOIN found no match) and array for `cardinality: 'many'` (deduplicated by `relation.primaryKey`, possibly empty). No deep nesting of relations-of-relations — for that, wait for a future `DrizzleRelationalAdapter` based on `db.query.<table>.findMany({ with })`.
+
+   ```json
+   {
+     "id": "u_1",
+     "name": "Ana",
+     "email": "ana@acme.com",
+     "company": { "id": "c_1", "name": "Acme" },
+     "posts": [{ "id": "p_1", "title": "Hello" }]
+   }
+   ```
+
+   `rules.alias` does not affect the response shape (it remains useful for logging and error messages).
+
+   Caveat: if a root column has the same name as a relation key, the relation overwrites the column. Avoid at schema design time.
 
 ### New
 
