@@ -1,5 +1,5 @@
 {
-  "title": "Guia de Uso",
+  "title": "Usage Guide",
   "icon": "BookOpenCheck",
   "defaultOpen": false,
   "pages": ["index", "endpoint-whitelist-rules"]

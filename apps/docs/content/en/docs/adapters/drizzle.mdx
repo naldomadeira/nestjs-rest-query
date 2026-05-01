@@ -1,13 +1,13 @@
 ---
 title: Drizzle Adapter
-description: Usar nestjs-rest-query com Drizzle ORM — type-safe, moderno, com controle fino sobre relações.
+description: Use nestjs-rest-query with Drizzle ORM - type-safe, modern, and with fine-grained control over relations.
 ---
 
-O Drizzle adapter permite usar `nestjs-rest-query` com Drizzle ORM. Drizzle oferece tipagem estrita, geração de schema type-safe, e um estilo funcional que complementa bem os decorators do NestJS.
+The Drizzle adapter lets you use `nestjs-rest-query` with Drizzle ORM. Drizzle offers strict typing, type-safe schema generation, and a functional style that pairs well with NestJS decorators.
 
 ## Install
 
-Instale Drizzle e o driver de banco:
+Install Drizzle and the database driver:
 
 ```bash
 pnpm add drizzle-orm postgres
@@ -15,15 +15,15 @@ pnpm add drizzle-orm postgres
 # ou com sqlite: drizzle-orm better-sqlite3
 ```
 
-Então instale `nestjs-rest-query`:
+Then install `nestjs-rest-query`:
 
 ```bash
 pnpm add nestjs-rest-query
 ```
 
 <Callout type="info">
-  A partir da versão 2.0.0, `typeorm` é uma **peer dependency opcional**. Se
-  você usar apenas Drizzle, não precisa instalar TypeORM.
+  Starting with version 2.0.0, `typeorm` is an **optional peer dependency**. If
+  you use only Drizzle, you do not need to install TypeORM.
 </Callout>
 
 ## Module setup
@@ -44,17 +44,17 @@ import { DrizzleAdapter } from 'nestjs-rest-query/drizzle';
 export class AppModule {}
 ```
 
-## Definindo DrizzleSource
+## Defining `DrizzleSource`
 
-Cada endpoint Drizzle passa um objeto `DrizzleSource` ao `queryBuilderService.execute()`. Este objeto descreve:
+Each Drizzle endpoint passes a `DrizzleSource` object to `queryBuilderService.execute()`. This object describes:
 
-- **`db`** — a instância Drizzle (`db` do seu cliente PostgreSQL, MySQL, etc.)
-- **`table`** — a tabela raiz (ex: `users`)
-- **`primaryKey`** — a coluna PK da tabela raiz (ex: `users.id`)
-- **`relations`** (opcional) — mapa de relações para JOINs
-- **`columnMap`** (opcional) — mapeamento explícito de colunas não-triviais
+- **`db`** - the Drizzle instance (`db` from your PostgreSQL, MySQL, etc. client)
+- **`table`** - the root table (for example, `users`)
+- **`primaryKey`** - the root table PK column (for example, `users.id`)
+- **`relations`** (optional) - relation map for JOINs
+- **`columnMap`** (optional) - explicit mapping for non-trivial columns
 
-Exemplo de schema:
+Schema example:
 
 ```typescript title="db/schema.ts"
 import {
@@ -97,7 +97,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
 }));
 ```
 
-Agora, no seu controller:
+Now, in your controller:
 
 ```typescript title="users.controller.ts"
 import { Controller, Get, Query } from '@nestjs/common';
@@ -157,23 +157,23 @@ export class UsersController {
 }
 ```
 
-## Relations map é obrigatório para caminhos com pontos
+## The relations map is required for dotted paths
 
-Diferente de TypeORM (que auto-descobre relações via `@OneToOne`, `@OneToMany`), **Drizzle não descobrirá relações automaticamente**. Se sua query string inclui um dotted path (ex: `?filters[company.name][eq]=Acme`), você **deve** registrar a relação no mapa `relations`.
+Unlike TypeORM, which auto-discovers relations via `@OneToOne` and `@OneToMany`, **Drizzle will not discover relations automatically**. If your query string includes a dotted path (for example, `?filters[company.name][eq]=Acme`), you **must** register the relation in the `relations` map.
 
-Se você tentar usar um caminho não registrado:
+If you try to use an unregistered path:
 
 ```http
 GET /users?filters[company.name][eq]=Acme
 ```
 
-E `relations` não contém `company`, o adapter lançará:
+And `relations` does not contain `company`, the adapter will throw:
 
 ```
 DrizzleAdapter: no relation registered for "company". Add it to DrizzleSource.relations.
 ```
 
-O mapa `relations` é keyed por `joinPath` (ex: `"company"`, `"company.owner"`):
+The `relations` map is keyed by `joinPath` (for example, `"company"`, `"company.owner"`):
 
 ```typescript
 relations: {
@@ -190,22 +190,22 @@ relations: {
 }
 ```
 
-## Field paths em query strings
+## Field paths in query strings
 
-Field paths na query string devem corresponder a:
+Field paths in the query string must correspond to:
 
-1. **Colunas diretas na tabela raiz** — ex: `name` → `users.name`
-2. **Colunas em relações registradas** — ex: `company.name` → `companies.name` (se `relations.company` está registrado)
-3. **Mapeadas via `columnMap`** — ex: se `columnMap['company.name'] = companies.name`, o caminho `company.name` é resolvido
+1. **Direct columns on the root table** - for example, `name` → `users.name`
+2. **Columns on registered relations** - for example, `company.name` → `companies.name` (if `relations.company` is registered)
+3. **Mapped via `columnMap`** - for example, if `columnMap['company.name'] = companies.name`, the `company.name` path is resolved
 
-Se uma coluna não for encontrada:
+If a column is not found:
 
 ```
 DrizzleAdapter: column "name" not found on relation "company".
 Map it explicitly via DrizzleSource.columnMap["company.name"].
 ```
 
-Use `columnMap` para colunas não-triviais ou quando a estrutura de schema dificulta a descoberta automática:
+Use `columnMap` for non-trivial columns or when the schema structure makes automatic discovery difficult:
 
 ```typescript
 columnMap: {
@@ -214,9 +214,9 @@ columnMap: {
 }
 ```
 
-## `cardinality: 'many'` requer `primaryKey`
+## `cardinality: 'many'` requires `primaryKey`
 
-Quando você declara uma relação 1:N (`cardinality: 'many'`), **você DEVE fornecer a coluna PK da tabela relacionada**. Isso é necessário para o adapter deduplicar linhas durante a agregação.
+When you declare a 1:N relation (`cardinality: 'many'`), **you MUST provide the related table PK column**. This is required for the adapter to deduplicate rows during aggregation.
 
 ```typescript
 relations: {
@@ -229,40 +229,40 @@ relations: {
 }
 ```
 
-Se você esquecer:
+If you forget:
 
 ```
 DrizzleAdapter: relation "posts" has cardinality 'many' but no primaryKey. 'many' relations require relations["posts"].primaryKey for deduplication. If this is a 1:1 relation, change cardinality to 'one' (or omit it).
 ```
 
-Isso é verificado em **tempo de compilação** (o TypeScript discriminated union evita sintaxe inválida) e **em tempo de execução** (quando `createQueryBuilder` é chamado).
+This is checked at **compile time** (the TypeScript discriminated union prevents invalid syntax) and at **runtime** (when `createQueryBuilder` is called).
 
-## ORDER BY através de relação 'many' NÃO é suportado
+## ORDER BY through a 'many' relation is NOT supported
 
-Se você tentar ordenar por uma coluna de uma relação 1:N:
+If you try to sort by a column from a 1:N relation:
 
 ```http
 GET /users?sorts=-posts.createdAt
 ```
 
-O adapter lançará:
+The adapter will throw:
 
 ```
 DrizzleAdapter: ORDER BY a column from 'many' relation "posts" is not supported. Sort by root or 'one' relation columns. To order presented relation arrays, use the customize hook to add per-relation ORDER BY in your application layer.
 ```
 
-**Por quê?** Quando você JOIN 1:N, cada usuário aparece várias vezes na result set. Fazer ORDER BY colapsando essas linhas com DISTINCT deixa o significado da ordenação indefinido — qual `createdAt` você está ordenando, o primeiro post? O último?
+**Why?** When you JOIN 1:N, each user appears multiple times in the result set. Doing ORDER BY while collapsing those rows with DISTINCT makes the sort meaning undefined - which `createdAt` are you sorting, the first post or the last one?
 
-**Workaround:** use o hook `customize` para aplicar ordenação de relações após o pipeline do adapter, na camada de aplicação:
+**Workaround:** use the `customize` hook to apply relation ordering after the adapter pipeline, in the application layer:
 
 ```typescript
 return this.qb.execute(drizzleSource, query, rules, (qb) => {
-  // qb é o query builder do Drizzle — você pode fazer operações customizadas
-  // Após o adapter rodar, você pode transformar os dados na aplicação
+  // qb is the Drizzle query builder - you can run custom operations
+  // After the adapter runs, you can transform the data in the application
 });
 ```
 
-Ou, na camada de controller, após receber `data`, ordene os arrays de relação:
+Or, in the controller layer, after receiving `data`, sort the relation arrays:
 
 ```typescript
 const result = await this.qb.execute(...);
@@ -273,9 +273,9 @@ result.data = result.data.map(row => ({
 return result;
 ```
 
-## Forma do resultado — flat, compatível com TypeORM
+## Result shape - flat, TypeORM-compatible
 
-`DrizzleAdapter` retorna linhas no mesmo formato flat que `TypeOrmAdapter`. Colunas da raiz ficam no nível superior; relações são chaves no mesmo nível (objeto para `'one'`, array para `'many'`).
+`DrizzleAdapter` returns rows in the same flat shape as `TypeOrmAdapter`. Root columns stay at the top level; relations are keys at the same level (object for `'one'`, array for `'many'`).
 
 ```http
 GET /users?filters[email][ilike]=%@acme.com&includes=company,posts&page=1&perPage=2
@@ -321,38 +321,38 @@ GET /users?filters[email][ilike]=%@acme.com&includes=company,posts&page=1&perPag
 }
 ```
 
-**Notas:**
+**Notes:**
 
-- Colunas da raiz vão direto pro topo do objeto. Não há chave wrapper (`root`/`user`/etc).
-- Relações 1:N (como `posts`) aparecem como arrays, deduplicated por `posts.id`.
-- Relações 1:1 (como `company`) aparecem como objetos escalares (ou `null` se o LEFT JOIN não achou match).
-- Não há aninhamento profundo (sem `company.owner` dentro de `company`). Se precisar disso, aguarde o `DrizzleRelationalAdapter` futuro baseado em `db.query.<table>.findMany({ with })`.
-- `rules.alias` continua útil para logging e mensagens de erro, mas não afeta o shape da resposta.
-- **Atenção**: se uma coluna da tabela raiz tem o mesmo nome de uma chave de relação, a relação sobrescreve a coluna no objeto. Evite no design do schema.
+- Root columns go directly to the top of the object. There is no wrapper key (`root`/`user`/etc.).
+- 1:N relations (like `posts`) appear as arrays, deduplicated by `posts.id`.
+- 1:1 relations (like `company`) appear as scalar objects (or `null` if the LEFT JOIN finds no match).
+- There is no deep nesting (no `company.owner` inside `company`). If you need that, wait for the future `DrizzleRelationalAdapter` based on `db.query.<table>.findMany({ with })`.
+- `rules.alias` is still useful for logging and error messages, but it does not affect the response shape.
+- **Warning**: if a root-table column has the same name as a relation key, the relation overwrites the column in the object. Avoid that in the schema design.
 
-## Paginação em duas fases (transparente)
+## Two-phase pagination (transparent)
 
-Quando uma relação `'many'` está presente, o adapter ativa a **paginação em duas fases**:
+When a `'many'` relation is present, the adapter enables **two-phase pagination**:
 
-1. **Fase 1:** SELECT DISTINCT root.id WHERE ... ORDER BY ... LIMIT/OFFSET
-   - Encontra IDs de usuários que combinam, respeitando página/limite
-2. **Fase 2:** SELECT root._, relations._ WHERE root.id IN (...) ORDER BY ...
-   - Busca todos os dados e relações para esses usuários
-3. **Fase 3:** Agregação no cliente — agrupa por root.id, arrays para 'many', escalares para 'one'
+1. **Phase 1:** SELECT DISTINCT root.id WHERE ... ORDER BY ... LIMIT/OFFSET
+   - Finds matching user IDs, respecting page/limit
+2. **Phase 2:** SELECT root._, relations._ WHERE root.id IN (...) ORDER BY ...
+   - Fetches all data and relations for those users
+3. **Phase 3:** Client-side aggregation - groups by root.id, arrays for 'many', scalars for 'one'
 
-**Resultado:**
+**Result:**
 
-- `data.length <= perPage` sempre (nunca inflado por 1:N JOINs)
-- `total` = contagem distinta de usuários (não linhas de resultado)
-- `lastPage` é correto
+- `data.length <= perPage` always (never inflated by 1:N JOINs)
+- `total` = distinct user count (not result rows)
+- `lastPage` is correct
 
-**Trade-off:** 3 queries por request em vez de 1. Custo de agregação em memória ≈ `perPage × Σ(cardinalidade de cada relação 'many')`.
+**Trade-off:** 3 queries per request instead of 1. In-memory aggregation cost ≈ `perPage × Σ(cardinality of each 'many' relation)`.
 
-**Recomendação:** para endpoints esperando muitos children per parent, mantenha `perPage` modesto (≤50). Ou considere um endpoint separado para enumerar children.
+**Recommendation:** for endpoints expecting many children per parent, keep `perPage` modest (≤50). Or consider a separate endpoint to enumerate children.
 
-## Customize hook para casos avançados
+## Customize hook for advanced cases
 
-Às vezes você quer aplicar operações Drizzle que o adapter não expõe:
+Sometimes you want to apply Drizzle operations that the adapter does not expose:
 
 ```typescript
 return this.qb.execute(drizzleSource, query, rules, (qb) => {
@@ -361,7 +361,7 @@ return this.qb.execute(drizzleSource, query, rules, (qb) => {
 });
 ```
 
-Exemplo: ordenar arrays de relação após agregação (conforme mencionado na seção ORDER BY):
+Example: sort relation arrays after aggregation (as mentioned in the ORDER BY section):
 
 ```typescript
 const result = await this.qb.execute(drizzleSource, query, rules);
@@ -374,8 +374,8 @@ result.data = result.data.map((row) => ({
 return result;
 ```
 
-## Próximos passos
+## Next steps
 
-- **Migrando de uma versão anterior?** Veja o [guia de migração 1.x → 2.x](https://github.com/naldomadeira/nestjs-rest-query/blob/main/MIGRATION.md) para detalhes sobre peer dependencies opcionais, mudanças no shape do resultado e mensagens de erro do adapter.
-- Para um guia completo de parâmetros, operadores e whitelist, consulte [Guia de Uso](/docs/usage).
-- Se você quer implementar seu próprio adapter, veja [Escrevendo seu próprio](/docs/adapters/writing-your-own).
+- **Migrating from a previous version?** See the [1.x → 2.x migration guide](https://github.com/naldomadeira/nestjs-rest-query/blob/main/MIGRATION.md) for details on optional peer dependencies, response shape changes, and adapter error messages.
+- For a complete guide to parameters, operators, and the whitelist, see [Usage Guide](/docs/usage).
+- If you want to implement your own adapter, see [Writing your own](/docs/adapters/writing-your-own).

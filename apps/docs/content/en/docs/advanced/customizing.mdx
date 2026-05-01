@@ -1,35 +1,35 @@
 ---
-title: Customizando a Query
-description: Como usar o parâmetro customize do execute() para adicionar condições extras, e como implementar busca textual.
+title: Customizing the Query
+description: How to use the `customize` parameter of `execute()` to add extra conditions, and how to implement text search.
 ---
 
-O método `execute()` aceita um quarto parâmetro opcional: um callback que recebe o `SelectQueryBuilder` já com filtros, sorts, includes e fields aplicados, permitindo adicionar cláusulas extras antes da execução.
+The `execute()` method accepts a fourth optional parameter: a callback that receives the `SelectQueryBuilder` with filters, sorts, includes, and fields already applied, allowing you to add extra clauses before execution.
 
 <Callout type="info">
-  Regra prática: nos parâmetros públicos da biblioteca (`filters`, `sorts`,
-  `fields`, `includes`, `search`) use nomes de propriedades da entidade. No
-  `customize`, quando você escrever SQL manual em string, pode usar os nomes
-  físicos de coluna do banco.
+  Rule of thumb: in the library's public parameters (`filters`, `sorts`,
+  `fields`, `includes`, `search`), use entity property names. In `customize`,
+  when you write manual SQL as a string, you can use the database's physical
+  column names.
 </Callout>
 
 ```typescript
 execute(repo, query, rules, customize?: (qb: SelectQueryBuilder<T>) => void)
 ```
 
-## Quando usar
+## When to use it
 
-| Caso de uso                                                                    | Abordagem                        |
-| ------------------------------------------------------------------------------ | -------------------------------- |
-| Condições internas não expostas ao cliente (soft delete, tenant, status ativo) | `customize`                      |
-| Busca textual fora do padrão da lib                                            | `customize`                      |
-| Filtrar pelo usuário autenticado (`userId = :id`)                              | `customize`                      |
-| JOINs manuais que a lib não cobre                                              | `customize`                      |
-| Filtros que o cliente deve controlar                                           | `@ApiDynamicQuery` com `filters` |
-| Carregamento de relações                                                       | `includes` no `RulesConfig`      |
+| Use case                                                                           | Approach                          |
+| ---------------------------------------------------------------------------------- | --------------------------------- |
+| Internal conditions not exposed to the client (soft delete, tenant, active status) | `customize`                       |
+| Text search outside the library default                                            | `customize`                       |
+| Filtering by the authenticated user (`userId = :id`)                               | `customize`                       |
+| Manual JOINs the library does not cover                                            | `customize`                       |
+| Filters the client should control                                                  | `@ApiDynamicQuery` with `filters` |
+| Relation loading                                                                   | `includes` in `RulesConfig`       |
 
-## Exemplo básico
+## Basic example
 
-Forçar uma condição que nunca deve ser exposta como filtro público:
+Force a condition that should never be exposed as a public filter:
 
 ```typescript
 @Get()
@@ -52,9 +52,9 @@ async findAll(
 }
 ```
 
-## Busca textual (search)
+## Text search (`search`)
 
-A biblioteca agora possui `search` nativo. Basta declarar os campos pesquisáveis em `RulesConfig.search` e enviar `?search=termo`:
+The library now has native `search`. Declare the searchable fields in `RulesConfig.search` and send `?search=term`:
 
 ```typescript
 @Get()
@@ -71,38 +71,38 @@ async findAll(
 }
 ```
 
-**Uso:** `GET /users?search=john`
+**Usage:** `GET /users?search=john`
 
-Os campos em `search` são combinados com `OR`, usando busca textual case-insensitive. Isso também funciona para relações aninhadas como `company.name` e `items.company.cnpj` — a lib reaproveita joins de `includes` quando existirem e cria joins simples quando necessário.
+The fields in `search` are combined with `OR`, using case-insensitive text search. This also works for nested relations such as `company.name` and `items.company.cnpj` - the library reuses `includes` joins when they exist and creates simple joins when needed.
 
 <Callout type="info">
-  `search` é pensado para uma caixa de busca rápida. O cliente envia apenas o
-  termo; o backend decide quais campos podem ser pesquisados.
+  `search` is designed for a quick search box. The client sends only the term;
+  the backend decides which fields can be searched.
 </Callout>
 
-### Quando ainda usar `customize` para busca
+### When to still use `customize` for search
 
-Use `customize` quando a busca precisar fugir do comportamento padrão da lib, por exemplo:
+Use `customize` when search needs to deviate from the library's default behavior, for example:
 
-- pesos diferentes por campo
-- `AND` entre grupos de termos
-- busca full-text específica do banco
-- regras condicionais por tenant, role ou contexto de autenticação
+- different weights per field
+- `AND` between term groups
+- database-specific full-text search
+- conditional rules by tenant, role, or authentication context
 
-### Quando usar `search` em vez de `filter`
+### When to use `search` instead of `filter`
 
-Use `filter` quando o cliente precisa controlar qual campo filtrar e qual operador usar. Use `search` quando o frontend só precisa de uma caixa de busca rápida e o backend decide quais campos são pesquisáveis:
+Use `filter` when the client needs to control which field to filter and which operator to use. Use `search` when the frontend only needs a quick search box and the backend decides which fields are searchable:
 
-|                              | `filter[name][like]=john` | `search=john`                 |
-| ---------------------------- | ------------------------- | ----------------------------- |
-| Controle do campo            | cliente                   | backend                       |
-| Whitelist da lib             | sim                       | sim, via `RulesConfig.search` |
-| Múltiplos campos simultâneos | não diretamente           | sim (OR)                      |
-| Performance                  | índice por campo          | pode requerer índice composto |
+|                                | `filter[name][like]=john` | `search=john`                 |
+| ------------------------------ | ------------------------- | ----------------------------- |
+| Field control                  | client                    | backend                       |
+| Library whitelist              | yes                       | yes, via `RulesConfig.search` |
+| Multiple fields simultaneously | not directly              | yes (OR)                      |
+| Performance                    | field index               | may require a composite index |
 
-## Usando `buildQuery` para controle total
+## Using `buildQuery` for full control
 
-Prefira `buildQuery()` quando precisar de controle completo sobre a execução (ex: `getManyAndCount`, joins complexos):
+Prefer `buildQuery()` when you need full control over execution (for example, `getManyAndCount`, complex JOINs):
 
 ```typescript
 const qb = this.queryBuilderService.buildQuery(repo, query, rules);
@@ -114,4 +114,4 @@ qb.innerJoin('root.company', 'company').andWhere('company.id = :companyId', {
 const [data, total] = await qb.getManyAndCount();
 ```
 
-`buildQuery()` retorna o `SelectQueryBuilder` sem executar a query — todos os filtros, sorts, includes e fields já estão aplicados.
+`buildQuery()` returns the `SelectQueryBuilder` without executing the query - all filters, sorts, includes, and fields are already applied.

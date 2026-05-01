@@ -1,17 +1,17 @@
 ---
-title: Primeiro endpoint
-description: O caminho mais curto para colocar o nestjs-rest-query em funcionamento.
+title: First endpoint
+description: The shortest path to getting nestjs-rest-query working.
 ---
 
-Se você quer validar a biblioteca rapidamente, este é o caminho mais curto:
+If you want to validate the library quickly, this is the shortest path:
 
-1. instalar o pacote
-2. configurar os pré-requisitos do NestJS
-3. decorar um endpoint com `@ApiDynamicQuery`
-4. injetar `@QueryRules()`
-5. chamar `queryBuilderService.execute()`
+1. install the package
+2. configure the NestJS prerequisites
+3. decorate an endpoint with `@ApiDynamicQuery`
+4. inject `@QueryRules()`
+5. call `queryBuilderService.execute()`
 
-## Exemplo mínimo
+## Minimal example
 
 ```typescript title="users.controller.ts"
 import { Controller, Get, Query } from '@nestjs/common';
@@ -70,13 +70,13 @@ export class UsersService {
 }
 ```
 
-## Exemplo de uso
+## Usage example
 
 ```http
 GET /users?filter[name][like]=ana&page=1&perPage=10
 ```
 
-Resposta esperada:
+Expected response:
 
 ```json
 {
@@ -95,22 +95,22 @@ Resposta esperada:
 }
 ```
 
-## Ciclo de vida da requisição
+## Request lifecycle
 
 ```mermaid
 sequenceDiagram
   autonumber
-  participant Client as Cliente HTTP
+  participant Client as HTTP Client
   participant Ctrl as Controller
   participant Svc as Service
   participant DQB as QueryBuilderService
   participant ORM as TypeORM
 
   Client->>Ctrl: GET /users?filter[name][like]=Ana&page=1&perPage=10
-  Note over Ctrl: @ApiDynamicQuery recebe e verifica os parametros de query<br/>definidos no whitelist do endpoint
+  Note over Ctrl: @ApiDynamicQuery receives and checks the query parameters<br/>defined in the endpoint whitelist
   Ctrl->>Svc: findAll(query, rules)
   Svc->>DQB: execute(userRepository, query, rules)
-  Note over DQB: valida campos e operadores<br/>contra o RulesConfig do endpoint
+  Note over DQB: validates fields and operators<br/>against the endpoint RulesConfig
   DQB->>ORM: SelectQueryBuilder<br/>.where("name LIKE :name")<br/>.take(10).skip(0)
   ORM-->>DQB: [User[], total: 1]
   DQB-->>Svc: { data: [...], page: 1, perPage: 10, total: 1, lastPage: 1 }
@@ -118,4 +118,4 @@ sequenceDiagram
   Ctrl-->>Client: 200 OK — QueryResult
 ```
 
-Se funcionou, siga para o [Guia de Uso](/docs/usage) para ver todos os parâmetros, operadores e opções de whitelist.
+If it worked, continue to the [Usage Guide](/docs/usage) to see all parameters, operators, and whitelist options.

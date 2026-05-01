@@ -1,18 +1,18 @@
 ---
-title: Integrando com Swagger UI
-description: Como usar @ApiDynamicQuery para gerar documentação OpenAPI automática e testar filtros dinâmicos pelo Swagger UI.
+title: Integrating with Swagger UI
+description: How to use @ApiDynamicQuery to generate automatic OpenAPI documentation and test dynamic filters through Swagger UI.
 ---
 
-`@ApiDynamicQuery` é o decorator principal para endpoints que precisam de documentação OpenAPI. Ele faz duas coisas ao mesmo tempo: define a whitelist de segurança do endpoint e gera os `@ApiQuery` automaticamente para todos os parâmetros suportados pela biblioteca — filtros, sorts, fields, includes, page e perPage.
+`@ApiDynamicQuery` is the main decorator for endpoints that need OpenAPI documentation. It does two things at the same time: defines the endpoint security whitelist and automatically generates `@ApiQuery` for all parameters supported by the library — filters, sorts, fields, includes, page, and perPage.
 
-## Pré-requisitos
+## Prerequisites
 
-Para que a integração funcione, você precisa de:
+For the integration to work, you need:
 
-- `@nestjs/swagger` instalado e configurado no projeto
-- `SwaggerModule` inicializado no `bootstrap` com `DocumentBuilder`
-- `query parser` configurado como `extended` no Express (necessário para filtros aninhados)
-- `dqbSwaggerRequestInterceptor` registrado nas opções do `SwaggerModule.setup` (necessário para testar filtros pela UI)
+- `@nestjs/swagger` installed and configured in the project
+- `SwaggerModule` initialized in `bootstrap` with `DocumentBuilder`
+- `query parser` configured as `extended` in Express (required for nested filters)
+- `dqbSwaggerRequestInterceptor` registered in the `SwaggerModule.setup` options (required for testing filters in the UI)
 
 ```bash
 npm install @nestjs/swagger
@@ -57,9 +57,9 @@ async function bootstrap() {
 bootstrap();
 ```
 
-## Usando `@ApiDynamicQuery` no controller
+## Using `@ApiDynamicQuery` in the controller
 
-Decore o método com `@ApiDynamicQuery` passando a whitelist. O decorator cuida do resto — gera os parâmetros OpenAPI e disponibiliza as regras para `@QueryRules()` em runtime.
+Decorate the method with `@ApiDynamicQuery` by passing the whitelist. The decorator handles the rest — it generates the OpenAPI parameters and exposes the rules to `@QueryRules()` at runtime.
 
 ```typescript title="users.controller.ts"
 import { Controller, Get, Query } from '@nestjs/common';
@@ -90,32 +90,32 @@ export class UsersController {
 }
 ```
 
-Com isso, o Swagger UI exibe automaticamente todos os parâmetros suportados para aquele endpoint — cada campo de filtro com seus operadores, sorts disponíveis, fields, includes, page e perPage.
+With this, Swagger UI automatically displays all supported parameters for that endpoint — each filter field with its operators, available sorts, fields, includes, page, and perPage.
 
-## Resultado esperado
+## Expected result
 
-### Parâmetros gerados
+### Generated parameters
 
 <ThemedImage
   srcLight="/swagger-lib-light.png"
   srcDark="/swagger-lib-dark.png"
-  alt="Swagger UI com parâmetros dinâmicos"
+  alt="Swagger UI with dynamic parameters"
 />
 
-### Resposta da query
+### Query response
 
 <ThemedImage
   srcLight="/swagger-lib-response-light.png"
   srcDark="/swagger-lib-response-dark.png"
-  alt="Swagger UI com resposta da query"
+  alt="Swagger UI with query response"
 />
 
-## Por que o `requestInterceptor` é necessário
+## Why `requestInterceptor` is required
 
-O Swagger UI monta a URL dos parâmetros de forma diferente do formato esperado pela biblioteca. O `dqbSwaggerRequestInterceptor` intercepta a requisição antes de ela sair e reconstrói os filtros no formato `filter[field][op]=value`, que o `qs` (query parser do Express) consegue expandir para objeto aninhado.
+Swagger UI builds the parameter URL differently from the format expected by the library. `dqbSwaggerRequestInterceptor` intercepts the request before it leaves and rebuilds the filters in the `filter[field][op]=value` format, which `qs` (Express's query parser) can expand into a nested object.
 
-Sem ele, os filtros chegam mal formatados ao controller e são ignorados. Para consumo via Postman, frontend ou qualquer cliente HTTP que monte a URL manualmente, o interceptor não é necessário.
+Without it, filters reach the controller malformed and are ignored. For usage through Postman, frontend, or any HTTP client that builds the URL manually, the interceptor is not required.
 
 ---
 
-Se você não usa Swagger no projeto, substitua `@ApiDynamicQuery` por `@DynamicQuery` — o comportamento da whitelist e do `@QueryRules()` é idêntico, sem gerar nenhum decorator OpenAPI.
+If you do not use Swagger in the project, replace `@ApiDynamicQuery` with `@DynamicQuery` — the whitelist and `@QueryRules()` behavior is identical, without generating any OpenAPI decorator.

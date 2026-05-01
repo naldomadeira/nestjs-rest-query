@@ -1,9 +1,9 @@
 ---
-title: Escrevendo seu próprio Adapter
-description: Suporte customizado para Prisma, Kysely, raw SQL, ou qualquer outro ORM.
+title: Writing your own Adapter
+description: Custom support for Prisma, Kysely, raw SQL, or any other ORM.
 ---
 
-O `nestjs-rest-query` é agnóstico a ORM. Se você quer suportar Prisma, Kysely, raw SQL, ou qualquer outro banco/ORM, você pode implementar a interface `RestQueryAdapter`.
+`nestjs-rest-query` is ORM-agnostic. If you want to support Prisma, Kysely, raw SQL, or any other database/ORM, you can implement the `RestQueryAdapter` interface.
 
 ## Interface RestQueryAdapter
 
@@ -123,21 +123,21 @@ export interface RestQueryAdapter<TQB = any, TSource = any> {
 }
 ```
 
-## Responsabilidades do Adapter
+## Adapter responsibilities
 
-Seu adapter recebe **parâmetros já normalizados e coerced**:
+Your adapter receives **already normalized and coerced parameters**:
 
-- **Coerção de valores** — a biblioteca já converteu `"18"` em `18`, `"2024-01-01,2024-12-31"` em `[Date, Date]`, etc. Seu adapter recebe valores no tipo correto.
-- **Validação de whitelist** — campos não autorizados foram rejeitados antes de chegar ao seu adapter.
-- **Parsing de operadores** — você recebe um `QueryOperator` válido, nunca uma string arbitrária.
+- **Value coercion** - the library has already converted `"18"` into `18`, `"2024-01-01,2024-12-31"` into `[Date, Date]`, etc. Your adapter receives values in the correct type.
+- **Whitelist validation** - unauthorized fields were rejected before reaching your adapter.
+- **Operator parsing** - you receive a valid `QueryOperator`, never an arbitrary string.
 
-Seu adapter precisa apenas:
+Your adapter only needs to:
 
-1. Traduzir cada operação para a sintaxe nativa do seu ORM.
-2. Garantir que caminhos com pontos (ex: `company.name`) resultem em JOINs corretos (sua implementação é livre).
-3. Retornar dados na forma esperada pela aplicação (ex: paginação retorna `{ data, total }`).
+1. Translate each operation into your ORM's native syntax.
+2. Ensure dotted paths (for example, `company.name`) produce correct JOINs (the implementation is up to you).
+3. Return data in the shape expected by the application (for example, pagination returns `{ data, total }`).
 
-## Exemplo — Prisma Adapter (pseudo-código)
+## Example - Prisma Adapter (pseudo-code)
 
 ```typescript
 import { RestQueryAdapter } from 'nestjs-rest-query';
@@ -241,9 +241,9 @@ export class PrismaAdapter
 }
 ```
 
-## Padrão Source
+## Source pattern
 
-O `TSource` genérico é seu contrato. Defina-o como se encaixe melhor:
+The generic `TSource` is your contract. Define it however it fits best:
 
 ```typescript
 interface PrismaSource {
@@ -263,7 +263,7 @@ interface RawSqlSource {
 }
 ```
 
-Seu adapter sabe como usar o `TSource`; o consumer passa-o:
+Your adapter knows how to use `TSource`; the consumer passes it:
 
 ```typescript
 @Get()
@@ -279,7 +279,7 @@ list(@Query() query: QueryInput, @QueryRules() rules: RulesConfig) {
 }
 ```
 
-## Registrando seu Adapter
+## Registering your Adapter
 
 ```typescript
 import { Module } from '@nestjs/common';
@@ -296,28 +296,28 @@ import { PrismaAdapter } from './adapters/prisma.adapter';
 export class AppModule {}
 ```
 
-## Checklist de implementação
+## Implementation checklist
 
-- [ ] Implementar todos os 7 métodos da interface
-- [ ] Coerção de valor — seu adapter assume valores já tipados
-- [ ] Operadores — traduzir `QueryOperator` para a sintaxe do seu ORM
-- [ ] Paginação — retornar `{ data, total }` com linhas e contagem
-- [ ] Caminhos com pontos — garantir JOINs automáticos (ou erro claro se não suportado)
-- [ ] Teste manual — executar um request com filtro, sort, include, search, pagination
-- [ ] Considere contribuir de volta — se for uma ORM popular (Prisma, Kysely), abra uma issue para discussão!
+- [ ] Implement all 7 interface methods
+- [ ] Value coercion - your adapter assumes already typed values
+- [ ] Operators - translate `QueryOperator` to your ORM's syntax
+- [ ] Pagination - return `{ data, total }` with rows and count
+- [ ] Dotted paths - ensure automatic JOINs (or a clear error if unsupported)
+- [ ] Manual test - run a request with filter, sort, include, search, and pagination
+- [ ] Consider contributing back - if it is a popular ORM (Prisma, Kysely), open an issue for discussion!
 
-## Contribuindo um Adapter
+## Contributing an adapter
 
-Se você implementar um adapter para uma ORM popular (Prisma, Kysely, etc.), considere contribuir:
+If you implement an adapter for a popular ORM (Prisma, Kysely, etc.), consider contributing:
 
-1. Abra uma [Discussion](https://github.com/naldomadeira/nestjs-rest-query/discussions) descrevendo a ORM e seu interesse.
-2. Siga a estrutura de `src/infra/adapters/` (see TypeORM e Drizzle como referência).
-3. Adicione testes unitários em `tests/adapters/`.
-4. Envie um PR vinculado à discussion.
+1. Open a [Discussion](https://github.com/naldomadeira/nestjs-rest-query/discussions) describing the ORM and your interest.
+2. Follow the structure in `src/infra/adapters/` (see TypeORM and Drizzle for reference).
+3. Add unit tests in `tests/adapters/`.
+4. Send a PR linked to the discussion.
 
-Cada adapter aprovado será mantido no core e exportado como subpath (ex: `nestjs-rest-query/prisma`).
+Each approved adapter will be maintained in the core and exported as a subpath (for example, `nestjs-rest-query/prisma`).
 
-## Recursos
+## Resources
 
 - [TypeORM Adapter source](https://github.com/naldomadeira/nestjs-rest-query/blob/main/src/infra/adapters/typeorm.adapter.ts)
 - [Drizzle Adapter source](https://github.com/naldomadeira/nestjs-rest-query/blob/main/src/infra/adapters/drizzle.adapter.ts)

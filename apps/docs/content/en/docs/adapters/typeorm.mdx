@@ -1,9 +1,9 @@
 ---
 title: TypeORM Adapter
-description: Usar nestjs-rest-query com TypeORM — o adapter padrão.
+description: Use nestjs-rest-query with TypeORM - the default adapter.
 ---
 
-TypeORM é o adapter padrão. Se você já está usando TypeORM e `@nestjs/typeorm`, tudo funciona sem configuração adicional.
+TypeORM is the default adapter. If you already use TypeORM and `@nestjs/typeorm`, everything works without extra configuration.
 
 ## Install
 
@@ -13,7 +13,7 @@ pnpm add typeorm
 npm install typeorm
 ```
 
-Se você ainda não tiver TypeORM instalado, a biblioteca o puxará automaticamente (é uma peer dependency).
+If you do not have TypeORM installed yet, the library will pull it automatically (it is a peer dependency).
 
 ## Module setup
 
@@ -31,7 +31,7 @@ import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
 export class AppModule {}
 ```
 
-Nenhuma configuração de adapter é necessária — TypeORM é o padrão. Se você quer ser explícito:
+No adapter configuration is required - TypeORM is the default. If you want to be explicit:
 
 ```typescript
 import { TypeOrmAdapter } from 'nestjs-rest-query/typeorm';
@@ -81,7 +81,7 @@ export class UsersController {
 }
 ```
 
-## Resultado
+## Result
 
 ```json
 {
@@ -100,8 +100,8 @@ export class UsersController {
 }
 ```
 
-## Próximos passos
+## Next steps
 
-Se você quer mudar para Drizzle, veja o [Drizzle Adapter](/docs/adapters/drizzle).
+If you want to switch to Drizzle, see the [Drizzle Adapter](/docs/adapters/drizzle).
 
-Para um guia completo de parâmetros e operadores, consulte [Guia de Uso](/docs/usage).
+For a complete guide to parameters and operators, see the [Usage Guide](/docs/usage).

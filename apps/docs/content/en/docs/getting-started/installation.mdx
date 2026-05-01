@@ -1,9 +1,9 @@
 ---
-title: Instalação
-description: Como instalar e configurar o nestjs-rest-query no seu projeto.
+title: Installation
+description: How to install and configure nestjs-rest-query in your project.
 ---
 
-## Instalar o pacote
+## Install the package
 
 ```bash tab="pnpm"
 pnpm add nestjs-rest-query
@@ -17,19 +17,19 @@ npm install nestjs-rest-query
 yarn add nestjs-rest-query
 ```
 
-## Configurar o bootstrap
+## Configure bootstrap
 
-Três ajustes são necessários no `main.ts` para que a biblioteca funcione corretamente.
+Three adjustments are required in `main.ts` for the library to work correctly.
 
-### 1. Query parser estendido
+### 1. Extended query parser
 
 ```typescript
 app.set('query parser', 'extended');
 ```
 
-O Express 5 alterou o parser de query padrão de `qs` (extended) para `simple`. A biblioteca espera que parâmetros como `?filter[name][eq]=foo` sejam expandidos em objetos aninhados pelo framework antes de chegar ao controller — isso só acontece com o parser `extended`.
+Express 5 changed the default query parser from `qs` (extended) to `simple`. The library expects parameters like `?filter[name][eq]=foo` to be expanded into nested objects by the framework before reaching the controller — that only happens with the `extended` parser.
 
-### 2. ValidationPipe com conversão implícita
+### 2. ValidationPipe with implicit conversion
 
 ```typescript
 app.useGlobalPipes(
@@ -42,9 +42,9 @@ app.useGlobalPipes(
 );
 ```
 
-O DTO usa `string` para campos como `page` e `perPage`. O `enableImplicitConversion: true` instrui o `class-transformer` a converter esses valores para os tipos esperados automaticamente, sem a necessidade de decorators adicionais no DTO.
+The DTO uses `string` for fields like `page` and `perPage`. `enableImplicitConversion: true` instructs `class-transformer` to convert those values to the expected types automatically, without requiring additional decorators in the DTO.
 
-### 3. Interceptor do Swagger (opcional)
+### 3. Swagger interceptor (optional)
 
 ```typescript
 import { dqbSwaggerRequestInterceptor } from 'nestjs-rest-query';
@@ -56,16 +56,16 @@ SwaggerModule.setup('/', app, document, {
 });
 ```
 
-O Swagger UI serializa filtros como múltiplos query params (`filter[name][eq]=foo`). Sem o interceptor, o browser envia esses parâmetros de forma que o Express pode não preservar a notação de colchetes corretamente. O `dqbSwaggerRequestInterceptor` reescreve a URL antes de disparar a requisição, garantindo que os filtros cheguem ao controller no formato esperado.
+Swagger UI serializes filters as multiple query params (`filter[name][eq]=foo`). Without the interceptor, the browser sends those parameters in a way that Express may not preserve the bracket notation correctly. `dqbSwaggerRequestInterceptor` rewrites the URL before sending the request, ensuring the filters reach the controller in the expected format.
 
 <Callout type="info">
-  Este interceptor só é necessário para testar filtros pela interface do Swagger
-  UI. Clientes externos (Postman, aplicações frontend, etc.) constroem a URL
-  diretamente e não precisam dele. A seção [Swagger](/docs/swagger) explica o
-  cenário completo.
+  This interceptor is only necessary to test filters through the Swagger UI.
+  External clients (Postman, frontend applications, etc.) build the URL directly
+  and do not need it. The [Swagger](/docs/swagger) section explains the full
+  scenario.
 </Callout>
 
-### Exemplo completo
+### Full example
 
 ```typescript title="main.ts"
 import { NestFactory } from '@nestjs/core';
@@ -106,9 +106,9 @@ async function bootstrap() {
 bootstrap();
 ```
 
-## Registrar o módulo
+## Register the module
 
-Importe `DynamicQueryBuilderModule` no `AppModule` raiz com `forRoot`. Todas as opções são **opcionais** — sem configuração, a biblioteca usa os valores padrão:
+Import `DynamicQueryBuilderModule` in the root `AppModule` with `forRoot`. All options are **optional** — without configuration, the library uses the default values:
 
 ```typescript title="app.module.ts"
 import { Module } from '@nestjs/common';
@@ -124,28 +124,28 @@ import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
 export class AppModule {}
 ```
 
-O módulo é `@Global`, portanto não é necessário importá-lo em módulos de funcionalidade — o `QueryBuilderService` fica disponível em toda a aplicação automaticamente.
+The module is `@Global`, so you do not need to import it in feature modules — `QueryBuilderService` becomes available across the entire application automatically.
 
-## Opções de configuração
+## Configuration options
 
-`forRoot` aceita um objeto `QueryBuilderConfig`. Todas as propriedades são opcionais.
+`forRoot` accepts a `QueryBuilderConfig` object. All properties are optional.
 
 ### `pagination`
 
-Controla o comportamento padrão de paginação.
+Controls the default pagination behavior.
 
-| Opção            | Tipo     | Padrão | Descrição                                                                           |
-| ---------------- | -------- | ------ | ----------------------------------------------------------------------------------- |
-| `defaultPerPage` | `number` | `10`   | Quantidade de itens por página quando `perPage` não é informado na requisição.      |
-| `maxPerPage`     | `number` | `100`  | Limite máximo de itens por página, ignorando valores maiores enviados pelo cliente. |
+| Option           | Type     | Default | Description                                                                  |
+| ---------------- | -------- | ------- | ---------------------------------------------------------------------------- |
+| `defaultPerPage` | `number` | `10`    | Number of items per page when `perPage` is not provided in the request.      |
+| `maxPerPage`     | `number` | `100`   | Maximum number of items per page, ignoring larger values sent by the client. |
 
 ### `operators`
 
-Restringe os operadores de filtro permitidos globalmente na aplicação.
+Restricts the allowed filter operators globally in the application.
 
-| Opção     | Tipo              | Padrão           | Descrição                                                                                         |
-| --------- | ----------------- | ---------------- | ------------------------------------------------------------------------------------------------- |
-| `allowed` | `QueryOperator[]` | todos permitidos | Lista de operadores aceitos. `undefined` = todos. `[]` (lista vazia) = nenhum operador permitido. |
+| Option    | Type              | Default     | Description                                                                              |
+| --------- | ----------------- | ----------- | ---------------------------------------------------------------------------------------- |
+| `allowed` | `QueryOperator[]` | all allowed | List of accepted operators. `undefined` = all. `[]` (empty list) = no operators allowed. |
 
 ```typescript
 DynamicQueryBuilderModule.forRoot({
@@ -157,13 +157,13 @@ DynamicQueryBuilderModule.forRoot({
 
 ### `logging`
 
-Habilita e configura os logs internos de construção de queries.
+Enables and configures internal query-building logs.
 
-| Opção     | Tipo                                     | Padrão        | Descrição                                                                                      |
-| --------- | ---------------------------------------- | ------------- | ---------------------------------------------------------------------------------------------- |
-| `enabled` | `boolean`                                | `false`       | Habilita logs internos.                                                                        |
-| `level`   | `'error' \| 'warn' \| 'info' \| 'debug'` | `'info'`      | Nível mínimo de log emitido.                                                                   |
-| `logger`  | `LoggerLike`                             | NestJS Logger | Logger customizado. Qualquer objeto com `error/warn/log/debug` funciona (winston, pino, etc.). |
+| Option    | Type                                     | Default       | Description                                                                        |
+| --------- | ---------------------------------------- | ------------- | ---------------------------------------------------------------------------------- |
+| `enabled` | `boolean`                                | `false`       | Enables internal logs.                                                             |
+| `level`   | `'error' \| 'warn' \| 'info' \| 'debug'` | `'info'`      | Minimum emitted log level.                                                         |
+| `logger`  | `LoggerLike`                             | NestJS Logger | Custom logger. Any object with `error/warn/log/debug` works (winston, pino, etc.). |
 
 ```typescript
 DynamicQueryBuilderModule.forRoot({
@@ -174,8 +174,8 @@ DynamicQueryBuilderModule.forRoot({
 });
 ```
 
-## Próximos passos
+## Next steps
 
-Com o módulo registrado, injete o `QueryBuilderService` em qualquer provider e comece a construir queries dinâmicas a partir dos parâmetros de requisição HTTP.
+With the module registered, inject `QueryBuilderService` into any provider and start building dynamic queries from HTTP request parameters.
 
-Se quiser sair do zero com um endpoint real, siga para [Primeiro endpoint](/docs/getting-started/first-endpoint). Para entender a integração com OpenAPI, veja [Swagger](/docs/swagger).
+If you want to start from zero with a real endpoint, continue to [First endpoint](/docs/getting-started/first-endpoint). To understand the OpenAPI integration, see [Swagger](/docs/swagger).

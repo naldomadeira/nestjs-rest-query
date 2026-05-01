@@ -1,29 +1,29 @@
 ---
-title: Introdução
-description: O que é o nestjs-rest-query e por que utilizá-lo.
+title: Introduction
+description: What nestjs-rest-query is and why to use it.
 ---
 
-**`nestjs-rest-query`** é uma biblioteca para NestJS que constrói instâncias de `SelectQueryBuilder` do TypeORM de forma dinâmica a partir de parâmetros de query HTTP — filtros, ordenações, paginação, seleção de campos e carregamento de relações — tudo controlado por uma whitelist de segurança por endpoint.
+**`nestjs-rest-query`** is a NestJS library that builds TypeORM `SelectQueryBuilder` instances dynamically from HTTP query parameters — filters, sorts, pagination, field selection, and relation loading — all controlled by a per-endpoint security whitelist.
 
-## Fluxo principal
+## Main flow
 
 ```mermaid
 flowchart TD
-  subgraph IN["Requisição HTTP"]
+  subgraph IN["HTTP Request"]
     Q["GET /users\n?filter[status][eq]=active\n&sort=name,-createdAt\n&fields=id,name,status\n&page=1&perPage=20"]
   end
 
-  subgraph CTRL["Controller (por endpoint)"]
+  subgraph CTRL["Controller (per endpoint)"]
     D["@ApiDynamicQuery / @DynamicQuery\ndefine: filters · sorts · fields · includes"]
   end
 
   subgraph LIB["nestjs-rest-query"]
-    W["Whitelist de segurança\nvalida campos e operadores permitidos"]
+    W["Security whitelist\nvalidates allowed fields and operators"]
     H["applyFilters · applySorts · applyFields\napplyIncludes · applyPagination"]
     W --> H
   end
 
-  subgraph OUT["Resposta"]
+  subgraph OUT["Response"]
     R["{ data[], page, perPage, total, lastPage }"]
   end
 
@@ -32,24 +32,24 @@ flowchart TD
   LIB --> OUT
 ```
 
-Cada endpoint declara sua própria whitelist via `@ApiDynamicQuery` (com OpenAPI) ou `@DynamicQuery` (sem). Em runtime, `QueryBuilderService` valida os parâmetros recebidos contra essa whitelist, aplica cada handler e devolve o resultado já paginado.
+Each endpoint declares its own whitelist via `@ApiDynamicQuery` (with OpenAPI) or `@DynamicQuery` (without it). At runtime, `QueryBuilderService` validates the received parameters against that whitelist, applies each handler, and returns the already paginated result.
 
-## Funcionalidades
+## Features
 
-- **Filtros dinâmicos** — filtre por qualquer campo permitido usando operadores como `eq`, `like`, `in`, `between`, `isNull` e mais
-- **Ordenação** — ordenação multi-coluna com `ASC` / `DESC`, controlada por endpoint
-- **Paginação** — baseada em página ou limit/offset, com `page`, `perPage`, `total` e `lastPage` no topo da resposta
-- **Seleção de campos** — retorne apenas as colunas que o cliente precisa
-- **Carregamento de relações** — carregue relações TypeORM declaradas na sua whitelist
-- **Whitelist de segurança** — os decorators `@ApiDynamicQuery` / `@DynamicQuery` definem exatamente quais campos e operadores cada endpoint permite
-- **Integração com Swagger** — `@ApiDynamicQuery` gera automaticamente decorators `@ApiQuery` para todos os parâmetros de query suportados
-- **Totalmente tipado** — escrito em TypeScript, com definições de tipos completas
+- **Dynamic filters** — filter by any allowed field using operators like `eq`, `like`, `in`, `between`, `isNull`, and more
+- **Sorts** — multi-column sorting with `ASC` / `DESC`, controlled per endpoint
+- **Pagination** — page-based or limit/offset, with `page`, `perPage`, `total`, and `lastPage` at the top of the response
+- **Field selection** — return only the columns the client needs
+- **Relation loading** — load TypeORM relations declared in your whitelist
+- **Security whitelist** — the `@ApiDynamicQuery` / `@DynamicQuery` decorators define exactly which fields and operators each endpoint allows
+- **Swagger integration** — `@ApiDynamicQuery` automatically generates `@ApiQuery` decorators for all supported query parameters
+- **Fully typed** — written in TypeScript, with complete type definitions
 
-## Como funciona
+## How it works
 
-1. Decore o método do seu controller com `@ApiDynamicQuery(rules)` (ou `@DynamicQuery(rules)`)
-2. Adicione `@QueryRules()` como decorator de parâmetro para receber as regras em tempo de execução
-3. Chame `queryBuilderService.execute(repo, query, rules)` — a biblioteca aplica filtros, ordenações, paginação e relações, retornando os resultados com os dados de paginação no topo da resposta
+1. Decorate your controller method with `@ApiDynamicQuery(rules)` (or `@DynamicQuery(rules)`)
+2. Add `@QueryRules()` as a parameter decorator to receive the rules at runtime
+3. Call `queryBuilderService.execute(repo, query, rules)` — the library applies filters, sorts, pagination, and relations, returning the results with pagination data at the top of the response
 
 ```typescript
 @Get()
@@ -66,15 +66,15 @@ findAll(
 }
 ```
 
-## Começar
+## Get started
 
 <Cards>
   <Card
-    title="Pré-requisito NestJS"
+    title="NestJS Prerequisite"
     href="/docs/getting-started/prerequisites"
   />
-  <Card title="Instalação" href="/docs/getting-started/installation" />
-  <Card title="Primeiro endpoint" href="/docs/getting-started/first-endpoint" />
+  <Card title="Installation" href="/docs/getting-started/installation" />
+  <Card title="First endpoint" href="/docs/getting-started/first-endpoint" />
   <Card title="Swagger" href="/docs/swagger" />
-  <Card title="Customizando a Query" href="/docs/advanced/customizing" />
+  <Card title="Customizing the Query" href="/docs/advanced/customizing" />
 </Cards>

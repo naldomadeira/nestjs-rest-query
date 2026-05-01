@@ -1,65 +1,65 @@
 ---
-title: Regras de permissões do endpoint
-description: Referência completa dos parâmetros de query suportados — filtros, operadores, sorts, fields, includes e paginação.
+title: Endpoint whitelist rules
+description: Complete reference for supported query parameters — filters, operators, sorts, fields, includes, and pagination.
 ---
 
-## Filtros e operadores
+## Filters and operators
 
-Formato: `filter[campo][operador]=valor`
+Format: `filter[field][operator]=value`
 
-O campo deve estar listado em `filters` do `RulesConfig` do endpoint — campos não autorizados são silenciosamente ignorados.
+The field must be listed in the endpoint `RulesConfig.filters` — unauthorized fields are silently ignored.
 
-### Operadores disponíveis
+### Available operators
 
-| Operador   | Descrição                                        |
+| Operator   | Description                                      |
 | ---------- | ------------------------------------------------ |
-| `eq`       | Igual                                            |
-| `ne`       | Diferente                                        |
-| `gt`       | Maior que                                        |
-| `gte`      | Maior ou igual                                   |
-| `lt`       | Menor que                                        |
-| `lte`      | Menor ou igual                                   |
-| `like`     | Contém (case-sensitive, wildcards automáticos)   |
-| `ilike`    | Contém (case-insensitive, portável entre bancos) |
-| `notLike`  | Não contém (case-sensitive)                      |
-| `notIlike` | Não contém (case-insensitive)                    |
-| `in`       | Dentro de uma lista (CSV)                        |
-| `notIn`    | Fora de uma lista (CSV)                          |
-| `between`  | Entre dois valores (`val1,val2`)                 |
-| `isNull`   | Nulo (`true`) ou não nulo (`false`)              |
+| `eq`       | Equal                                            |
+| `ne`       | Not equal                                        |
+| `gt`       | Greater than                                     |
+| `gte`      | Greater than or equal                            |
+| `lt`       | Less than                                        |
+| `lte`      | Less than or equal                               |
+| `like`     | Contains (case-sensitive, automatic wildcards)   |
+| `ilike`    | Contains (case-insensitive, portable across DBs) |
+| `notLike`  | Does not contain (case-sensitive)                |
+| `notIlike` | Does not contain (case-insensitive)              |
+| `in`       | In a list (CSV)                                  |
+| `notIn`    | Not in a list (CSV)                              |
+| `between`  | Between two values (`val1,val2`)                 |
+| `isNull`   | Null (`true`) or not null (`false`)              |
 
-### Operadores com comportamento especial
+### Operators with special behavior
 
-**`in` e `notIn`** — o valor é uma lista CSV. Cada item é tratado como elemento separado:
+**`in` and `notIn`** — the value is a CSV list. Each item is treated as a separate element:
 
 ```
 filter[status][in]=active,pending
 filter[status][notIn]=deleted,banned
 ```
 
-**`between`** — dois valores separados por vírgula, aplicados como `BETWEEN val1 AND val2`:
+**`between`** — two comma-separated values, applied as `BETWEEN val1 AND val2`:
 
 ```
 filter[createdAt][between]=2024-01-01,2024-12-31
 filter[price][between]=10,99
 ```
 
-**`isNull`** — `true` gera `IS NULL`, `false` gera `IS NOT NULL`. Não há operador separado `isNotNull`:
+**`isNull`** — `true` generates `IS NULL`, `false` generates `IS NOT NULL`. There is no separate `isNotNull` operator:
 
 ```
 filter[deletedAt][isNull]=true
 filter[photoUrl][isNull]=false
 ```
 
-**`ilike`** — usa `LOWER()` para garantir portabilidade entre PostgreSQL, MySQL e SQLite. Para PostgreSQL com grandes volumes, considere criar um índice funcional `LOWER(campo)` para melhor desempenho:
+**`ilike`** — uses `LOWER()` to ensure portability across PostgreSQL, MySQL, and SQLite. For PostgreSQL with large volumes, consider creating a functional index on `LOWER(field)` for better performance:
 
 ```
 filter[name][ilike]=joao
 ```
 
-### Restringindo operadores globalmente
+### Restricting operators globally
 
-Por padrão todos os operadores são permitidos. Para restringir, configure `operators.allowed` no `forRoot`:
+By default all operators are allowed. To restrict them, configure `operators.allowed` in `forRoot`:
 
 ```typescript
 DynamicQueryBuilderModule.forRoot({
@@ -69,59 +69,59 @@ DynamicQueryBuilderModule.forRoot({
 });
 ```
 
-Operadores fora da lista lançam `BadRequestException`.
+Operators outside the list throw `BadRequestException`.
 
 ---
 
 ## Sorts
 
-Formato: `sort=campo,-outro` (prefixo `-` para desc, sem prefixo para asc)
+Format: `sort=field,-other` (`-` prefix for desc, no prefix for asc)
 
-O campo deve estar listado em `sorts` do `RulesConfig`.
+The field must be listed in `RulesConfig.sorts`.
 
 <Callout type="warn">
-  **Atenção:** quando `fields` está definido no `RulesConfig`, os campos de
-  `sort` também precisam estar em `fields`. Se um campo estiver em `sorts` mas
-  ausente de `fields`, o TypeORM gera erro porque o campo não foi selecionado na
-  query. Mantenha `sorts` e `fields` em sincronia, ou omita `fields` se não
-  precisar restringir a seleção de colunas.
+  **Warning:** when `fields` is defined in `RulesConfig`, `sort` fields must
+  also be present in `fields`. If a field is in `sorts` but missing from
+  `fields`, TypeORM throws an error because the field was not selected in the
+  query. Keep `sorts` and `fields` in sync, or omit `fields` if you do not need
+  to restrict column selection.
 </Callout>
 
 ---
 
 ## Fields
 
-Formato: `fields=id,name,email`
+Format: `fields=id,name,email`
 
-Restringe as colunas retornadas pela query (`SELECT`). Quando omitido, todas as colunas da entidade são retornadas.
+Restricts the columns returned by the query (`SELECT`). When omitted, all entity columns are returned.
 
-O campo deve estar listado em `fields` do `RulesConfig`. Campos não autorizados são ignorados.
+The field must be listed in `RulesConfig.fields`. Unauthorized fields are ignored.
 
 <Callout type="warn">
-  Definir `fields` no `RulesConfig` afeta também os sorts — veja o aviso acima.
+  Defining `fields` in `RulesConfig` also affects sorts — see the warning above.
 </Callout>
 
 ---
 
 ## Includes
 
-Formato: `includes=company,roles`
+Format: `includes=company,roles`
 
-Carrega relações TypeORM via `leftJoinAndSelect`. Cada relação precisa estar listada em `includes` do `RulesConfig` — relações não autorizadas são ignoradas.
+Loads TypeORM relations via `leftJoinAndSelect`. Each relation must be listed in `RulesConfig.includes` — unauthorized relations are ignored.
 
-Não há eager load implícito: includes só são aplicados quando o parâmetro `includes` estiver presente na query string.
+There is no implicit eager load: includes are only applied when the `includes` parameter is present in the query string.
 
 ---
 
-## Paginação
+## Pagination
 
-| Parâmetro  | Tipo             | Padrão | Descrição                                               |
-| ---------- | ---------------- | ------ | ------------------------------------------------------- |
-| `page`     | número           | `1`    | Página atual                                            |
-| `perPage`  | número           | `10`   | Itens por página (máximo: `100`)                        |
-| `paginate` | `true` / `false` | `true` | `false` desativa paginação e retorna todos os registros |
+| Parameter  | Type             | Default | Description                                         |
+| ---------- | ---------------- | ------- | --------------------------------------------------- |
+| `page`     | number           | `1`     | Current page                                        |
+| `perPage`  | number           | `10`    | Items per page (maximum: `100`)                     |
+| `paginate` | `true` / `false` | `true`  | `false` disables pagination and returns all records |
 
-Os defaults e o máximo de `perPage` são configuráveis via `forRoot`:
+The defaults and maximum `perPage` are configurable through `forRoot`:
 
 ```typescript
 DynamicQueryBuilderModule.forRoot({
@@ -132,7 +132,7 @@ DynamicQueryBuilderModule.forRoot({
 });
 ```
 
-### Resposta com paginação ativa
+### Response with active pagination
 
 ```json
 {
@@ -144,7 +144,7 @@ DynamicQueryBuilderModule.forRoot({
 }
 ```
 
-### Resposta com `paginate=false`
+### Response with `paginate=false`
 
 ```json
 {
