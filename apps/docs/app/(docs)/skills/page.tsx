@@ -2,12 +2,14 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Download, ExternalLink, Sparkles } from 'lucide-react';
 
+import { defaultLocale, getDictionary } from '@/lib/i18n';
 import { skills } from '@/lib/skills';
 
+const t = getDictionary(defaultLocale);
+
 export const metadata: Metadata = {
-  title: 'Skills',
-  description:
-    'Skills for AI coding agents (Claude Code, Cursor, etc.) that help install, configure, and troubleshoot nestjs-rest-query.',
+  title: t.skills.title,
+  description: t.skills.description,
 };
 
 export default function SkillsPage() {
@@ -16,23 +18,19 @@ export default function SkillsPage() {
       <header className="mb-10 flex flex-col gap-3">
         <div className="inline-flex items-center gap-2 self-start rounded-full border border-fd-border bg-fd-muted/40 px-3 py-1 text-xs font-medium text-fd-muted-foreground">
           <Sparkles className="size-3.5" />
-          For AI coding agents
+          {t.skills.badge}
         </div>
         <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
-          Skills
+          {t.skills.title}
         </h1>
         <p className="max-w-2xl text-fd-muted-foreground">
-          Drop-in capability bundles that teach AI coding agents (Claude Code,
-          Cursor, Copilot) how to install, configure, and troubleshoot{' '}
-          <code>nestjs-rest-query</code>. Download the zip and follow your
-          agent's instructions for adding skills, or browse the source on
-          GitHub.
+          {t.skills.description}
         </p>
       </header>
 
       {skills.length === 0 ? (
         <div className="rounded-lg border border-fd-border bg-fd-muted/40 p-6 text-center text-fd-muted-foreground">
-          No skills available yet.
+          {t.skills.empty}
         </div>
       ) : (
         <ul className="grid gap-5 md:grid-cols-2">
@@ -83,7 +81,7 @@ export default function SkillsPage() {
                   className="inline-flex items-center gap-1.5 rounded-md bg-fd-primary px-3 py-1.5 text-sm font-medium text-fd-primary-foreground transition-opacity hover:opacity-90"
                 >
                   <Download className="size-4" />
-                  Download .zip
+                  {t.skills.download}
                 </a>
                 <Link
                   href={skill.githubUrl}
@@ -92,7 +90,7 @@ export default function SkillsPage() {
                   className="inline-flex items-center gap-1.5 rounded-md border border-fd-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-fd-muted/40"
                 >
                   <ExternalLink className="size-4" />
-                  View on GitHub
+                  {t.skills.viewOnGitHub}
                 </Link>
               </div>
             </li>
@@ -101,20 +99,11 @@ export default function SkillsPage() {
       )}
 
       <section className="mt-12 rounded-xl border border-fd-border bg-fd-muted/30 p-6">
-        <h2 className="mb-2 text-lg font-semibold">How to use a skill</h2>
+        <h2 className="mb-2 text-lg font-semibold">{t.skills.howToUseTitle}</h2>
         <ol className="list-decimal space-y-1 pl-5 text-sm text-fd-muted-foreground">
-          <li>
-            Download the <code>.zip</code> for the skill you want.
-          </li>
-          <li>
-            Unzip it into the location your agent reads from (Claude Code:{' '}
-            <code>~/.claude/skills/</code> or <code>.claude/skills/</code> in
-            your project).
-          </li>
-          <li>
-            The skill's <code>SKILL.md</code> describes when the agent should
-            activate it — no further configuration needed.
-          </li>
+          {t.skills.howToUseSteps.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
         </ol>
       </section>
     </main>
