@@ -10,7 +10,11 @@ export function localePrefix(locale: Locale) {
 }
 
 export function docsPath(slugs: readonly string[] = [], locale: Locale) {
-  const suffix = slugs.length > 0 ? `/${slugs.join('/')}` : '';
+  // Both Fumadocs source slugs and Next.js [...slug] params can include the
+  // leading "docs" segment for this content tree. Strip it so the URL is
+  // built once, here, instead of accidentally producing "/docs/docs/...".
+  const stripped = slugs[0] === 'docs' ? slugs.slice(1) : slugs;
+  const suffix = stripped.length > 0 ? `/${stripped.join('/')}` : '';
   return `${localePrefix(locale)}/docs${suffix}`;
 }
 

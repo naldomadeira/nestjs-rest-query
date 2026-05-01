@@ -9,10 +9,25 @@ import { defaultLocale, getDictionary } from '../../lib/i18n';
 import { i18nUI } from '../../lib/i18n-ui';
 import { metadataBase } from '../../lib/seo';
 
+const dict = getDictionary(defaultLocale);
+
 export const metadata: Metadata = {
   metadataBase,
-  title: getDictionary(defaultLocale).meta.title,
-  description: getDictionary(defaultLocale).meta.description,
+  title: dict.meta.title,
+  description: dict.meta.description,
+  openGraph: {
+    type: 'website',
+    siteName: dict.meta.title,
+    title: dict.meta.title,
+    description: dict.meta.description,
+    images: ['/opengraph-image.jpg'],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: dict.meta.title,
+    description: dict.meta.description,
+    images: ['/opengraph-image.jpg'],
+  },
 };
 
 type LayoutProps = {

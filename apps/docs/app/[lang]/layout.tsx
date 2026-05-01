@@ -29,6 +29,20 @@ export async function generateMetadata({
     metadataBase,
     title: dict.meta.title,
     description: dict.meta.description,
+    openGraph: {
+      type: 'website',
+      siteName: dict.meta.title,
+      title: dict.meta.title,
+      description: dict.meta.description,
+      locale: lang,
+      images: ['/opengraph-image.jpg'],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: dict.meta.title,
+      description: dict.meta.description,
+      images: ['/opengraph-image.jpg'],
+    },
   };
 }
 
