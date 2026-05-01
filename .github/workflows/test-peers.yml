@@ -1,0 +1,73 @@
+name: Test Peers
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  typeorm:
+    name: TypeORM ${{ matrix.typeorm }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        typeorm: ['0.3.26', '0.3.30', 'latest']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm add -D typeorm@${{ matrix.typeorm }}
+      - run: pnpm test
+
+  drizzle:
+    name: Drizzle ${{ matrix.drizzle }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        drizzle: ['0.45.0', '0.45.x', 'latest']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm add -D drizzle-orm@${{ matrix.drizzle }}
+      - run: pnpm test
+
+  nestjs:
+    name: NestJS ${{ matrix.nestjs }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        nestjs: ['11.0.0', 'latest']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: |
+          pnpm add -D \
+            @nestjs/common@${{ matrix.nestjs }} \
+            @nestjs/core@${{ matrix.nestjs }} \
+            @nestjs/platform-express@${{ matrix.nestjs }} \
+            @nestjs/testing@${{ matrix.nestjs }}
+      - run: pnpm test
