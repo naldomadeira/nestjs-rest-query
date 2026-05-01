@@ -18,12 +18,15 @@ export default function SkillsPage() {
           <Sparkles className="size-3.5" />
           For AI coding agents
         </div>
-        <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Skills</h1>
+        <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
+          Skills
+        </h1>
         <p className="max-w-2xl text-fd-muted-foreground">
-          Drop-in capability bundles that teach AI coding agents (Claude Code, Cursor, Copilot)
-          how to install, configure, and troubleshoot <code>nestjs-rest-query</code>. Download
-          the zip and follow your agent's instructions for adding skills, or browse the source
-          on GitHub.
+          Drop-in capability bundles that teach AI coding agents (Claude Code,
+          Cursor, Copilot) how to install, configure, and troubleshoot{' '}
+          <code>nestjs-rest-query</code>. Download the zip and follow your
+          agent's instructions for adding skills, or browse the source on
+          GitHub.
         </p>
       </header>
 
@@ -40,7 +43,9 @@ export default function SkillsPage() {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 flex-col">
-                  <h2 className="truncate text-lg font-semibold">{skill.name}</h2>
+                  <h2 className="truncate text-lg font-semibold">
+                    {skill.name}
+                  </h2>
                   {skill.version ? (
                     <span className="text-xs font-mono text-fd-muted-foreground">
                       v{skill.version}
@@ -98,15 +103,17 @@ export default function SkillsPage() {
       <section className="mt-12 rounded-xl border border-fd-border bg-fd-muted/30 p-6">
         <h2 className="mb-2 text-lg font-semibold">How to use a skill</h2>
         <ol className="list-decimal space-y-1 pl-5 text-sm text-fd-muted-foreground">
-          <li>Download the <code>.zip</code> for the skill you want.</li>
           <li>
-            Unzip it into the location your agent reads from
-            (Claude Code: <code>~/.claude/skills/</code> or <code>.claude/skills/</code> in
+            Download the <code>.zip</code> for the skill you want.
+          </li>
+          <li>
+            Unzip it into the location your agent reads from (Claude Code:{' '}
+            <code>~/.claude/skills/</code> or <code>.claude/skills/</code> in
             your project).
           </li>
           <li>
-            The skill's <code>SKILL.md</code> describes when the agent should activate it —
-            no further configuration needed.
+            The skill's <code>SKILL.md</code> describes when the agent should
+            activate it — no further configuration needed.
           </li>
         </ol>
       </section>

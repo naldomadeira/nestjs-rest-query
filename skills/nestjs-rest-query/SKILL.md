@@ -56,7 +56,7 @@ async function bootstrap() {
     new ValidationPipe({
       transform: true,
       transformOptions: { enableImplicitConversion: true },
-    }),
+    })
   );
 
   await app.listen(3000);
@@ -138,7 +138,7 @@ export class UsersController {
   })
   async findAll(
     @Query() query: DynamicQueryDto,
-    @QueryRules() rules: RulesConfig,
+    @QueryRules() rules: RulesConfig
   ) {
     return this.usersService.findAll(query, rules);
   }
@@ -162,7 +162,7 @@ import { User } from './entities/user.entity';
 export class UsersService {
   constructor(
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
-    private readonly queryBuilderService: QueryBuilderService,
+    private readonly queryBuilderService: QueryBuilderService
   ) {}
 
   async findAll(query: QueryInput, rules: RulesConfig) {
@@ -192,7 +192,11 @@ export class UsersService {
     db,
     table: users,
     relations: {
-      company: { type: 'one', table: companies, on: { localKey: 'companyId', foreignKey: 'id' } },
+      company: {
+        type: 'one',
+        table: companies,
+        on: { localKey: 'companyId', foreignKey: 'id' },
+      },
     },
   };
 
@@ -208,26 +212,26 @@ The decorator/controller layer is **identical** for both ORMs. The only differen
 
 ## Decorators
 
-| Decorator                  | Purpose                                  | When to use                |
-| -------------------------- | ---------------------------------------- | -------------------------- |
-| `@ApiDynamicQuery(rules)`  | Sets whitelist + generates Swagger docs  | Endpoints with Swagger     |
-| `@DynamicQuery(rules)`     | Sets whitelist only                      | Endpoints without Swagger  |
-| `@QueryRules()`            | Injects the whitelist into the handler   | Always pair with the above |
+| Decorator                 | Purpose                                 | When to use                |
+| ------------------------- | --------------------------------------- | -------------------------- |
+| `@ApiDynamicQuery(rules)` | Sets whitelist + generates Swagger docs | Endpoints with Swagger     |
+| `@DynamicQuery(rules)`    | Sets whitelist only                     | Endpoints without Swagger  |
+| `@QueryRules()`           | Injects the whitelist into the handler  | Always pair with the above |
 
 ---
 
 ## Query parameters
 
-| Parameter  | Format                          | Example                       |
-| ---------- | ------------------------------- | ----------------------------- |
-| `filter`   | `filter[field][operator]=value` | `filter[status][eq]=active`   |
-| `sorts`    | CSV, `-` prefix = DESC          | `sorts=-createdAt,name`       |
-| `fields`   | CSV of columns                  | `fields=id,name,email`        |
-| `includes` | CSV of relations                | `includes=company,roles`      |
-| `search`   | Free text                       | `search=john`                 |
-| `page`     | Number (default: 1)             | `page=2`                      |
-| `perPage`  | Number (default: 10)            | `perPage=25`                  |
-| `paginate` | Boolean (default: true)         | `paginate=false`              |
+| Parameter  | Format                          | Example                     |
+| ---------- | ------------------------------- | --------------------------- |
+| `filter`   | `filter[field][operator]=value` | `filter[status][eq]=active` |
+| `sorts`    | CSV, `-` prefix = DESC          | `sorts=-createdAt,name`     |
+| `fields`   | CSV of columns                  | `fields=id,name,email`      |
+| `includes` | CSV of relations                | `includes=company,roles`    |
+| `search`   | Free text                       | `search=john`               |
+| `page`     | Number (default: 1)             | `page=2`                    |
+| `perPage`  | Number (default: 10)            | `perPage=25`                |
+| `paginate` | Boolean (default: true)         | `paginate=false`            |
 
 ### Filter operators
 

@@ -4,12 +4,12 @@
 
 ```typescript
 interface RulesConfig {
-  filters?: string[];    // Fields allowed in filter[field][op]=value
-  sorts?: string[];      // Fields allowed in sort parameter
-  fields?: string[];     // Columns to SELECT (also restricts sort fields)
-  includes?: string[];   // Relations allowed in includes parameter
-  search?: string[];     // Optional text search fields for ?search=
-  alias?: string;        // QueryBuilder alias (default: 'root')
+  filters?: string[]; // Fields allowed in filter[field][op]=value
+  sorts?: string[]; // Fields allowed in sort parameter
+  fields?: string[]; // Columns to SELECT (also restricts sort fields)
+  includes?: string[]; // Relations allowed in includes parameter
+  search?: string[]; // Optional text search fields for ?search=
+  alias?: string; // QueryBuilder alias (default: 'root')
 }
 ```
 
@@ -65,7 +65,7 @@ Declares which columns are SELECTed. Also restricts sort fields.
 
 **Critical:** When `fields` is defined, ALL sort fields MUST also be in `fields`. A sort field not in `fields` causes a TypeORM error because the column was not selected.
 
-**If `fields` is not set:** All entity columns are selected (SELECT *).
+**If `fields` is not set:** All entity columns are selected (SELECT \*).
 
 ### includes
 

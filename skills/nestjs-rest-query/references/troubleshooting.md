@@ -7,6 +7,7 @@
 **Cause:** Missing extended query parser in `main.ts`.
 
 **Fix:**
+
 ```typescript
 app.set('query parser', 'extended');
 ```
@@ -20,12 +21,13 @@ Without this, Express uses the simple query parser which does not expand bracket
 **Cause:** Missing `enableImplicitConversion` in ValidationPipe.
 
 **Fix:**
+
 ```typescript
 app.useGlobalPipes(
   new ValidationPipe({
     transform: true,
     transformOptions: { enableImplicitConversion: true },
-  }),
+  })
 );
 ```
 
@@ -70,12 +72,15 @@ Use entity property names from the TypeORM repository/entity class. In most proj
 **Cause:** Relation not in `includes` whitelist, or client not sending `includes=` parameter.
 
 **Fix:**
+
 1. Add relation to `includes` in decorator:
+
 ```typescript
 @ApiDynamicQuery({
   includes: ['company', 'roles'],
 })
 ```
+
 2. Client must request: `GET /endpoint?includes=company`
 
 Relations are NOT loaded by default — the client must explicitly request them.
@@ -102,6 +107,7 @@ Relations are NOT loaded by default — the client must explicitly request them.
 **Cause:** Endpoint does not declare `search` in `RulesConfig`, or the fields were configured with raw database column names instead of entity property names.
 
 **Fix:**
+
 ```typescript
 @ApiDynamicQuery({
   search: ['name', 'email', 'company.name'],
@@ -109,6 +115,7 @@ Relations are NOT loaded by default — the client must explicitly request them.
 ```
 
 **Important:**
+
 - `search` is optional — only add it to endpoints that need quick text search
 - Use entity field paths (`createdAt`, `firstName`, `overallStatus`)
 - Nested search is supported with dot notation (`company.name`, `items.company.cnpj`)
@@ -120,6 +127,7 @@ Relations are NOT loaded by default — the client must explicitly request them.
 **Cause:** Missing `dqbSwaggerRequestInterceptor` in Swagger setup.
 
 **Fix:**
+
 ```typescript
 import { dqbSwaggerRequestInterceptor } from 'nestjs-rest-query';
 
@@ -139,11 +147,10 @@ This is only needed for Swagger UI browser testing. HTTP clients work without it
 **Cause:** `DynamicQueryBuilderModule.forRoot()` not registered in `AppModule`.
 
 **Fix:** Add to AppModule imports:
+
 ```typescript
 @Module({
-  imports: [
-    DynamicQueryBuilderModule.forRoot(),
-  ],
+  imports: [DynamicQueryBuilderModule.forRoot()],
 })
 export class AppModule {}
 ```
@@ -157,12 +164,13 @@ The module is `@Global()` — register only once in AppModule.
 **Cause:** Global operator restriction via `forRoot` configuration.
 
 **Fix:** Check your `operators.allowed` config:
+
 ```typescript
 DynamicQueryBuilderModule.forRoot({
   operators: {
     allowed: ['eq', 'ne', 'like', 'ilike', 'in', 'between'], // is operator listed?
   },
-})
+});
 ```
 
 If `operators.allowed` is not set (undefined), all 14 operators are available.

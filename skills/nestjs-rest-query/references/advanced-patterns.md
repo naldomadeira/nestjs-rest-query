@@ -29,6 +29,7 @@ Understanding when `customize` runs is critical:
 ```
 
 This means inside `customize` you can:
+
 - Read/modify all joins the library already created
 - Add WHERE clauses that stack with library filters (AND)
 - Add your own joins for relations NOT in the includes whitelist
@@ -129,6 +130,7 @@ async findAll(
 Usage: `GET /access-requests?search=naldo`
 
 **Important notes:**
+
 - `search` is optional — only configure it for endpoints that need it
 - Use entity property names in `camelCase` when your entities follow that pattern
 - Nested fields use dot notation such as `user.firstName` and `items.company.name`
@@ -172,7 +174,7 @@ Force a default date range when the client does not send date filters.
     // Manual SQL can still reference the physical DB column name.
     qb.andWhere('root.created_at >= :since', { since: thirtyDaysAgo });
   }
-}
+};
 ```
 
 ---
@@ -196,7 +198,7 @@ Add computed columns or subquery conditions.
       .getQuery();
     return `(${sub}) >= 3`;
   });
-}
+};
 ```
 
 ---
@@ -272,6 +274,7 @@ async findAll(query: QueryInput, rules: RulesConfig) {
 ```
 
 **When to use `buildQuery()` vs `customize`:**
+
 - `customize` — for adding WHERE, joins, ORDER BY while keeping the library's pagination
 - `buildQuery()` — when you need to control execution (custom aggregation, raw queries, manual pagination)
 

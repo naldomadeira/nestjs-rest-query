@@ -12,7 +12,14 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -88,14 +95,18 @@ function listSkills() {
 function buildSkill({ id, path }) {
   const skillMd = readFileSync(join(path, 'SKILL.md'), 'utf8');
   const frontmatter = parseFrontmatter(skillMd);
-  const registry = readJsonSafe(join(path, 'skills-registry.remote.json')) ?? {};
+  const registry =
+    readJsonSafe(join(path, 'skills-registry.remote.json')) ?? {};
 
   const zipName = `${id}.zip`;
   const zipPath = join(PUBLIC_OUT, zipName);
 
   // Pack from the parent of the skill so the zip extracts as `<id>/...`.
   rmSync(zipPath, { force: true });
-  execFileSync('zip', ['-rq', zipPath, id], { cwd: SKILLS_DIR, stdio: 'inherit' });
+  execFileSync('zip', ['-rq', zipPath, id], {
+    cwd: SKILLS_DIR,
+    stdio: 'inherit',
+  });
 
   return {
     id,
@@ -126,7 +137,11 @@ function main() {
 
   writeFileSync(
     MANIFEST_OUT,
-    JSON.stringify({ generatedAt: new Date().toISOString(), skills: built }, null, 2) + '\n',
+    JSON.stringify(
+      { generatedAt: new Date().toISOString(), skills: built },
+      null,
+      2
+    ) + '\n'
   );
   console.log(`[skills] wrote ${built.length} skill(s) to manifest`);
 }
