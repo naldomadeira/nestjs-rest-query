@@ -22,18 +22,24 @@ export const SiteFooter = ({ locale }: SiteFooterProps) => {
             {t.footer.tagline}
           </span>
         </div>
-        <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
-          <Link href={`${prefix}/docs`} className="hover:text-foreground">
+        <nav className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+          <Link
+            href={`${prefix}/docs`}
+            className="-mx-2 inline-flex h-11 min-w-11 items-center justify-center rounded-md px-2 hover:text-foreground"
+          >
             {t.footer.docs}
           </Link>
-          <Link href="/skills" className="hover:text-foreground">
+          <Link
+            href="/skills"
+            className="-mx-2 inline-flex h-11 min-w-11 items-center justify-center rounded-md px-2 hover:text-foreground"
+          >
             {t.footer.skills}
           </Link>
           <Link
             href={GITHUB_URL}
             target="_blank"
             rel="noreferrer"
-            className="hover:text-foreground"
+            className="-mx-2 inline-flex h-11 min-w-11 items-center justify-center rounded-md px-2 hover:text-foreground"
           >
             {t.footer.github}
           </Link>
@@ -41,11 +47,11 @@ export const SiteFooter = ({ locale }: SiteFooterProps) => {
             href={LICENSE_URL}
             target="_blank"
             rel="noreferrer"
-            className="hover:text-foreground"
+            className="-mx-2 inline-flex h-11 min-w-11 items-center justify-center rounded-md px-2 hover:text-foreground"
           >
             {t.footer.license}
           </Link>
-          <span className="text-xs">© {year}</span>
+          <span className="px-2 text-xs">© {year}</span>
         </nav>
       </div>
     </footer>

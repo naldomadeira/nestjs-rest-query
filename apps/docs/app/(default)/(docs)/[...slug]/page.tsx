@@ -3,6 +3,7 @@ import {
   DocsDescription,
   DocsPage,
   DocsTitle,
+  EditOnGitHub,
 } from 'fumadocs-ui/layouts/docs/page';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
@@ -25,11 +26,18 @@ const Page = async (props: PageProps) => {
   }
 
   const MDX = page.data.body;
+  const githubUrl = `https://github.com/naldomadeira/nestjs-rest-query/blob/main/apps/docs/content/${page.path}`;
 
   return (
-    <DocsPage full={page.data.full} toc={page.data.toc}>
+    <DocsPage
+      full={page.data.full}
+      toc={page.data.toc}
+      breadcrumb={{ enabled: true, includePage: true }}
+      tableOfContent={{ style: 'clerk' }}
+    >
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
+      <EditOnGitHub href={githubUrl} />
       <div className="prose dark:prose-invert max-w-none">
         <MDX
           components={{
@@ -42,6 +50,8 @@ const Page = async (props: PageProps) => {
     </DocsPage>
   );
 };
+
+export const dynamicParams = false;
 
 export const generateStaticParams = async () =>
   source

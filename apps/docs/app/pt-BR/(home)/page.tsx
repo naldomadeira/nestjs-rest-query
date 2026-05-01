@@ -1,15 +1,16 @@
 import type { Metadata } from 'next';
 import { HomeContent } from '../../../components/home-content';
-import { defaultLocale, getDictionary } from '../../../lib/i18n';
+import { getDictionary } from '../../../lib/i18n';
 import { homePath } from '../../../lib/seo';
 
-const dict = getDictionary(defaultLocale);
+const LOCALE = 'pt-BR' as const;
+const dict = getDictionary(LOCALE);
 
 export const metadata: Metadata = {
   title: dict.meta.title,
   description: dict.meta.description,
   alternates: {
-    canonical: homePath(defaultLocale),
+    canonical: homePath(LOCALE),
     languages: {
       en: homePath('en'),
       'pt-BR': homePath('pt-BR'),
@@ -19,10 +20,11 @@ export const metadata: Metadata = {
   openGraph: {
     title: dict.meta.title,
     description: dict.meta.description,
-    url: homePath(defaultLocale),
+    url: homePath(LOCALE),
+    locale: LOCALE,
   },
 };
 
-const HomePage = () => <HomeContent locale={defaultLocale} />;
+const HomePage = () => <HomeContent locale={LOCALE} />;
 
 export default HomePage;

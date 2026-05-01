@@ -3,34 +3,42 @@ import {
   DocsDescription,
   DocsPage,
   DocsTitle,
+  EditOnGitHub,
 } from 'fumadocs-ui/layouts/docs/page';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Mermaid from '../../../../components/mermaid';
 import ThemedImage from '../../../../components/themed-image';
-import { defaultLocale, isLocale } from '../../../../lib/i18n';
 import { docsPath } from '../../../../lib/seo';
 import { source } from '../../../../lib/source';
 
+const LOCALE = 'pt-BR' as const;
+
 type PageProps = {
-  params: Promise<{ lang: string; slug: string[] }>;
+  params: Promise<{ slug: string[] }>;
 };
 
 const Page = async (props: PageProps) => {
   const params = await props.params;
-  if (!isLocale(params.lang)) notFound();
-  const page = source.getPage(params.slug, params.lang);
+  const page = source.getPage(params.slug, LOCALE);
 
   if (!page) {
     notFound();
   }
 
   const MDX = page.data.body;
+  const githubUrl = `https://github.com/naldomadeira/nestjs-rest-query/blob/main/apps/docs/content/${page.path}`;
 
   return (
-    <DocsPage full={page.data.full} toc={page.data.toc}>
+    <DocsPage
+      full={page.data.full}
+      toc={page.data.toc}
+      breadcrumb={{ enabled: true, includePage: true }}
+      tableOfContent={{ style: 'clerk' }}
+    >
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
+      <EditOnGitHub href={githubUrl} />
       <div className="prose dark:prose-invert max-w-none">
         <MDX
           components={{
@@ -44,23 +52,22 @@ const Page = async (props: PageProps) => {
   );
 };
 
-export const generateStaticParams = async () => {
-  // hideLocale: 'default-locale' means default locale routes are served by
-  // the (default) tree (no /<lang> prefix). Only non-default locales get
-  // generated under [lang]/.
-  const params = source.generateParams('slug', 'lang') as Array<{
-    slug: string[];
-    lang: string;
-  }>;
-  return params.filter((p) => p.lang !== defaultLocale);
-};
+export const dynamicParams = false;
+
+export const generateStaticParams = async () =>
+  source
+    .getPages(LOCALE)
+    .map((page) => page.slugs)
+    .filter(
+      (slugs): slugs is string[] => Array.isArray(slugs) && slugs.length > 0
+    )
+    .map((slug) => ({ slug }));
 
 export const generateMetadata = async (props: {
-  params: Promise<{ lang: string; slug: string[] }>;
+  params: Promise<{ slug: string[] }>;
 }): Promise<Metadata> => {
   const params = await props.params;
-  if (!isLocale(params.lang)) notFound();
-  const page = source.getPage(params.slug, params.lang);
+  const page = source.getPage(params.slug, LOCALE);
 
   if (!page) {
     notFound();
@@ -74,7 +81,7 @@ export const generateMetadata = async (props: {
     title: page.data.title,
     description: page.data.description,
     alternates: {
-      canonical: docsPath(slug, params.lang),
+      canonical: docsPath(slug, LOCALE),
       languages: {
         en: enPath,
         'pt-BR': ptPath,
@@ -84,8 +91,8 @@ export const generateMetadata = async (props: {
     openGraph: {
       title: page.data.title,
       description: page.data.description,
-      url: docsPath(slug, params.lang),
-      locale: params.lang,
+      url: docsPath(slug, LOCALE),
+      locale: LOCALE,
     },
     twitter: {
       title: page.data.title,
