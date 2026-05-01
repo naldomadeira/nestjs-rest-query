@@ -1,0 +1,6 @@
+{
+  "title": "Advanced",
+  "icon": "Settings",
+  "defaultOpen": false,
+  "pages": ["customizing"]
+}

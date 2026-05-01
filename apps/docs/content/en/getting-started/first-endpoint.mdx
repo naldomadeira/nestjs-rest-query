@@ -1,0 +1,121 @@
+---
+title: First endpoint
+description: The shortest path to getting nestjs-rest-query working.
+---
+
+If you want to validate the library quickly, this is the shortest path:
+
+1. install the package
+2. configure the NestJS prerequisites
+3. decorate an endpoint with `@ApiDynamicQuery`
+4. inject `@QueryRules()`
+5. call `queryBuilderService.execute()`
+
+## Minimal example
+
+```typescript title="users.controller.ts"
+import { Controller, Get, Query } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import {
+  ApiDynamicQuery,
+  DynamicQueryDto,
+  QueryRules,
+  RulesConfig,
+} from 'nestjs-rest-query';
+import { UsersService } from './users.service';
+
+@ApiTags('users')
+@Controller('users')
+export class UsersController {
+  constructor(private readonly usersService: UsersService) {}
+
+  @Get()
+  @ApiDynamicQuery({
+    filters: ['name', 'email', 'status'],
+    sorts: ['name', 'createdAt'],
+    fields: ['id', 'name', 'email', 'status', 'createdAt'],
+  })
+  findAll(@Query() query: DynamicQueryDto, @QueryRules() rules: RulesConfig) {
+    return this.usersService.findAll(query, rules);
+  }
+}
+```
+
+```typescript title="users.service.ts"
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import {
+  DynamicQueryDto,
+  QueryBuilderService,
+  QueryResult,
+  RulesConfig,
+} from 'nestjs-rest-query';
+import { User } from './user.entity';
+
+@Injectable()
+export class UsersService {
+  constructor(
+    @InjectRepository(User)
+    private readonly usersRepo: Repository<User>,
+    private readonly queryBuilderService: QueryBuilderService
+  ) {}
+
+  findAll(
+    query: DynamicQueryDto,
+    rules: RulesConfig
+  ): Promise<QueryResult<User>> {
+    return this.queryBuilderService.execute(this.usersRepo, query, rules);
+  }
+}
+```
+
+## Usage example
+
+```http
+GET /users?filter[name][like]=ana&page=1&perPage=10
+```
+
+Expected response:
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "name": "Ana Lima",
+      "email": "ana@email.com",
+      "status": "active"
+    }
+  ],
+  "page": 1,
+  "perPage": 10,
+  "total": 1,
+  "lastPage": 1
+}
+```
+
+## Request lifecycle
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Client as HTTP Client
+  participant Ctrl as Controller
+  participant Svc as Service
+  participant DQB as QueryBuilderService
+  participant ORM as TypeORM
+
+  Client->>Ctrl: GET /users?filter[name][like]=Ana&page=1&perPage=10
+  Note over Ctrl: @ApiDynamicQuery receives and checks the query parameters<br/>defined in the endpoint whitelist
+  Ctrl->>Svc: findAll(query, rules)
+  Svc->>DQB: execute(userRepository, query, rules)
+  Note over DQB: validates fields and operators<br/>against the endpoint RulesConfig
+  DQB->>ORM: SelectQueryBuilder<br/>.where("name LIKE :name")<br/>.take(10).skip(0)
+  ORM-->>DQB: [User[], total: 1]
+  DQB-->>Svc: { data: [...], page: 1, perPage: 10, total: 1, lastPage: 1 }
+  Svc-->>Ctrl: QueryResult
+  Ctrl-->>Client: 200 OK — QueryResult
+```
+
+If it worked, continue to the [Usage Guide](/docs/usage) to see all parameters, operators, and whitelist options.

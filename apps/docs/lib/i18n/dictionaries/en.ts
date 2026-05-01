@@ -1,5 +1,34 @@
 import type { Dictionary } from '../dictionary-shape';
 
+const beforeCode = `@Get()
+async listCompanies(@Query() query: ListCompaniesQuery) {
+  const qb = this.companies.createQueryBuilder('company');
+
+  if (query.name) qb.andWhere('company.name ILIKE :n', { n: \`%\${query.name}%\` });
+  if (query.cnpj) qb.andWhere('company.cnpj = :c', { c: query.cnpj });
+  if (query.createdFrom) qb.andWhere('company.createdAt >= :f', { f: query.createdFrom });
+
+  if (query.sort === 'name') qb.orderBy('company.name', query.dir ?? 'ASC');
+  if (query.sort === 'createdAt') qb.orderBy('company.createdAt', query.dir ?? 'DESC');
+
+  const page = Number(query.page ?? 1);
+  const perPage = Math.min(Number(query.perPage ?? 20), 100);
+  qb.skip((page - 1) * perPage).take(perPage);
+
+  const [data, total] = await qb.getManyAndCount();
+  return { data, page, perPage, total, lastPage: Math.ceil(total / perPage) };
+}`;
+
+const afterCode = `@Get()
+@ApiDynamicQuery<Company>({
+  filters: ['name', 'cnpj', 'createdAt'],
+  sorts: ['name', 'createdAt'],
+  fields: ['id', 'name', 'cnpj', 'createdAt'],
+})
+findAll(@Query() query: QueryInput, @QueryRules() rules: RulesConfig) {
+  return this.qb.execute(this.companies, query, rules);
+}`;
+
 export const en: Dictionary = {
   meta: {
     title: 'nestjs-rest-query',
@@ -13,44 +42,79 @@ export const en: Dictionary = {
   },
   home: {
     hero: {
+      eyebrow: 'NestJS · TypeORM · Drizzle',
+      title: 'Turn REST query strings into safe database queries.',
       subtitle:
-        'Dynamic filters, sorting, and pagination from HTTP query parameters. For TypeORM and Drizzle, in NestJS — with a per-endpoint security whitelist.',
+        'nestjs-rest-query gives NestJS endpoints dynamic filters, sorting, pagination, field selection, and relation loading with a per-endpoint whitelist for TypeORM and Drizzle.',
       ctaPrimary: 'Get started',
-      ctaSecondary: 'Documentation',
+      ctaSecondary: 'Read the docs',
       previewAlt: 'nestjs-rest-query — overview',
     },
-    features: [
-      {
-        title: 'Dynamic filters',
-        description:
-          'Filter on any allowed field with operators like eq, like, in, between, and isNull.',
-      },
-      {
-        title: 'Multi-column sorting',
-        description:
-          'Sort by multiple fields with ASC/DESC, controlled per endpoint.',
-      },
-      {
-        title: 'Automatic pagination',
-        description:
-          'Page-based or limit/offset pagination with full metadata in the response.',
-      },
-      {
-        title: 'Field selection',
-        description:
-          'Return only the columns the client needs, reducing payload size.',
-      },
-      {
-        title: 'Relation loading',
-        description:
-          'Load whitelisted relations on demand, in TypeORM or Drizzle.',
-      },
-      {
-        title: 'Security whitelist',
-        description:
-          'Each endpoint declares exactly which fields and operators are allowed.',
-      },
-    ],
+    beforeAfter: {
+      title: 'From handwritten query plumbing to a single decorator',
+      description:
+        'Every endpoint declares the fields, sorts, and operators it accepts. The library parses the query string, validates against the whitelist, and runs the query through TypeORM or Drizzle.',
+      beforeLabel: 'Before — handwritten',
+      afterLabel: 'After — nestjs-rest-query',
+      beforeCode,
+      afterCode,
+    },
+    compatibility: {
+      title: 'Adapter compatibility',
+      description:
+        'TypeORM and Drizzle are stable. Prisma is on the roadmap and will use the same decorators and whitelist contract.',
+      headers: { name: 'Adapter', status: 'Status', note: 'Notes' },
+      rows: [
+        {
+          name: 'TypeORM',
+          status: 'Stable',
+          note: 'Default adapter, built on SelectQueryBuilder.',
+        },
+        {
+          name: 'Drizzle',
+          status: 'Stable',
+          note: 'Opt-in via DrizzleAdapter, with explicit relations map.',
+        },
+        {
+          name: 'Prisma',
+          status: 'Roadmap',
+          note: 'Planned. Same decorators, swapped engine.',
+        },
+      ],
+    },
+    quickstart: {
+      title: 'Quickstart',
+      steps: [
+        {
+          title: 'Install',
+          body: 'Add the package to your NestJS app.',
+          code: 'pnpm add nestjs-rest-query',
+        },
+        {
+          title: 'Register the module',
+          body: 'Import DynamicQueryBuilderModule once, in your AppModule.',
+          code: `import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
+
+@Module({
+  imports: [DynamicQueryBuilderModule.forRoot()],
+})
+export class AppModule {}`,
+        },
+        {
+          title: 'Declare the whitelist',
+          body: 'Each endpoint declares which fields, sorts, and includes clients may use.',
+          code: `@Get()
+@ApiDynamicQuery<Company>({
+  filters: ['name', 'cnpj', 'createdAt'],
+  sorts: ['name', 'createdAt'],
+})
+findAll(@Query() q: QueryInput, @QueryRules() rules: RulesConfig) {
+  return this.qb.execute(this.companies, q, rules);
+}`,
+        },
+      ],
+      cta: 'Read the prerequisites',
+    },
   },
   skills: {
     badge: 'For AI coding agents',
@@ -66,5 +130,12 @@ export const en: Dictionary = {
       'Unzip it into the location your agent reads from (Claude Code: ~/.claude/skills/ or .claude/skills/ in your project).',
       "The skill's SKILL.md describes when the agent should activate it — no further configuration needed.",
     ],
+  },
+  footer: {
+    docs: 'Docs',
+    skills: 'Skills',
+    github: 'GitHub',
+    license: 'MIT License',
+    tagline: 'A focused NestJS query layer for TypeORM and Drizzle.',
   },
 };

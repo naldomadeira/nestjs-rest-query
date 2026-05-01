@@ -9,7 +9,11 @@
 export const locales = ['en', 'pt-BR'] as const;
 export type Locale = (typeof locales)[number];
 
-export const defaultLocale: Locale = 'pt-BR';
+export const defaultLocale: Locale = 'en';
+
+export const nonDefaultLocales = locales.filter(
+  (l): l is Locale => l !== defaultLocale
+);
 
 export function isLocale(value: string): value is Locale {
   return (locales as readonly string[]).includes(value);

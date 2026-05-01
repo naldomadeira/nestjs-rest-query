@@ -1,0 +1,153 @@
+---
+title: Endpoint whitelist rules
+description: Complete reference for supported query parameters — filters, operators, sorts, fields, includes, and pagination.
+---
+
+## Filters and operators
+
+Format: `filter[field][operator]=value`
+
+The field must be listed in the endpoint `RulesConfig.filters` — unauthorized fields are silently ignored.
+
+### Available operators
+
+| Operator   | Description                                      |
+| ---------- | ------------------------------------------------ |
+| `eq`       | Equal                                            |
+| `ne`       | Not equal                                        |
+| `gt`       | Greater than                                     |
+| `gte`      | Greater than or equal                            |
+| `lt`       | Less than                                        |
+| `lte`      | Less than or equal                               |
+| `like`     | Contains (case-sensitive, automatic wildcards)   |
+| `ilike`    | Contains (case-insensitive, portable across DBs) |
+| `notLike`  | Does not contain (case-sensitive)                |
+| `notIlike` | Does not contain (case-insensitive)              |
+| `in`       | In a list (CSV)                                  |
+| `notIn`    | Not in a list (CSV)                              |
+| `between`  | Between two values (`val1,val2`)                 |
+| `isNull`   | Null (`true`) or not null (`false`)              |
+
+### Operators with special behavior
+
+**`in` and `notIn`** — the value is a CSV list. Each item is treated as a separate element:
+
+```
+filter[status][in]=active,pending
+filter[status][notIn]=deleted,banned
+```
+
+**`between`** — two comma-separated values, applied as `BETWEEN val1 AND val2`:
+
+```
+filter[createdAt][between]=2024-01-01,2024-12-31
+filter[price][between]=10,99
+```
+
+**`isNull`** — `true` generates `IS NULL`, `false` generates `IS NOT NULL`. There is no separate `isNotNull` operator:
+
+```
+filter[deletedAt][isNull]=true
+filter[photoUrl][isNull]=false
+```
+
+**`ilike`** — uses `LOWER()` to ensure portability across PostgreSQL, MySQL, and SQLite. For PostgreSQL with large volumes, consider creating a functional index on `LOWER(field)` for better performance:
+
+```
+filter[name][ilike]=joao
+```
+
+### Restricting operators globally
+
+By default all operators are allowed. To restrict them, configure `operators.allowed` in `forRoot`:
+
+```typescript
+DynamicQueryBuilderModule.forRoot({
+  operators: {
+    allowed: ['eq', 'ne', 'like', 'in'],
+  },
+});
+```
+
+Operators outside the list throw `BadRequestException`.
+
+---
+
+## Sorts
+
+Format: `sort=field,-other` (`-` prefix for desc, no prefix for asc)
+
+The field must be listed in `RulesConfig.sorts`.
+
+<Callout type="warn">
+  **Warning:** when `fields` is defined in `RulesConfig`, `sort` fields must
+  also be present in `fields`. If a field is in `sorts` but missing from
+  `fields`, TypeORM throws an error because the field was not selected in the
+  query. Keep `sorts` and `fields` in sync, or omit `fields` if you do not need
+  to restrict column selection.
+</Callout>
+
+---
+
+## Fields
+
+Format: `fields=id,name,email`
+
+Restricts the columns returned by the query (`SELECT`). When omitted, all entity columns are returned.
+
+The field must be listed in `RulesConfig.fields`. Unauthorized fields are ignored.
+
+<Callout type="warn">
+  Defining `fields` in `RulesConfig` also affects sorts — see the warning above.
+</Callout>
+
+---
+
+## Includes
+
+Format: `includes=company,roles`
+
+Loads TypeORM relations via `leftJoinAndSelect`. Each relation must be listed in `RulesConfig.includes` — unauthorized relations are ignored.
+
+There is no implicit eager load: includes are only applied when the `includes` parameter is present in the query string.
+
+---
+
+## Pagination
+
+| Parameter  | Type             | Default | Description                                         |
+| ---------- | ---------------- | ------- | --------------------------------------------------- |
+| `page`     | number           | `1`     | Current page                                        |
+| `perPage`  | number           | `10`    | Items per page (maximum: `100`)                     |
+| `paginate` | `true` / `false` | `true`  | `false` disables pagination and returns all records |
+
+The defaults and maximum `perPage` are configurable through `forRoot`:
+
+```typescript
+DynamicQueryBuilderModule.forRoot({
+  pagination: {
+    defaultPerPage: 20,
+    maxPerPage: 200,
+  },
+});
+```
+
+### Response with active pagination
+
+```json
+{
+  "data": [...],
+  "page": 1,
+  "perPage": 10,
+  "total": 42,
+  "lastPage": 5
+}
+```
+
+### Response with `paginate=false`
+
+```json
+{
+  "data": [...]
+}
+```

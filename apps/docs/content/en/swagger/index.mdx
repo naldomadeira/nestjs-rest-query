@@ -1,0 +1,121 @@
+---
+title: Integrating with Swagger UI
+description: How to use @ApiDynamicQuery to generate automatic OpenAPI documentation and test dynamic filters through Swagger UI.
+---
+
+`@ApiDynamicQuery` is the main decorator for endpoints that need OpenAPI documentation. It does two things at the same time: defines the endpoint security whitelist and automatically generates `@ApiQuery` for all parameters supported by the library — filters, sorts, fields, includes, page, and perPage.
+
+## Prerequisites
+
+For the integration to work, you need:
+
+- `@nestjs/swagger` installed and configured in the project
+- `SwaggerModule` initialized in `bootstrap` with `DocumentBuilder`
+- `query parser` configured as `extended` in Express (required for nested filters)
+- `dqbSwaggerRequestInterceptor` registered in the `SwaggerModule.setup` options (required for testing filters in the UI)
+
+```bash
+npm install @nestjs/swagger
+```
+
+```typescript title="main.ts"
+import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ValidationPipe } from '@nestjs/common';
+import { AppModule } from './app.module';
+import { dqbSwaggerRequestInterceptor } from 'nestjs-rest-query';
+
+async function bootstrap() {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Necessário para que filter[field][op]=value seja interpretado como objeto aninhado
+  app.set('query parser', 'extended');
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+    })
+  );
+
+  const document = SwaggerModule.createDocument(
+    app,
+    new DocumentBuilder().setTitle('Minha API').setVersion('1.0').build()
+  );
+
+  SwaggerModule.setup('/', app, document, {
+    swaggerOptions: {
+      // Necessário para testar filtros aninhados diretamente pelo Swagger UI
+      requestInterceptor: dqbSwaggerRequestInterceptor,
+    },
+  });
+
+  await app.listen(process.env.PORT ?? 3000);
+}
+
+bootstrap();
+```
+
+## Using `@ApiDynamicQuery` in the controller
+
+Decorate the method with `@ApiDynamicQuery` by passing the whitelist. The decorator handles the rest — it generates the OpenAPI parameters and exposes the rules to `@QueryRules()` at runtime.
+
+```typescript title="users.controller.ts"
+import { Controller, Get, Query } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import {
+  ApiDynamicQuery,
+  DynamicQueryDto,
+  QueryRules,
+  RulesConfig,
+} from 'nestjs-rest-query';
+import { UsersService } from './users.service';
+
+@ApiTags('users')
+@Controller('users')
+export class UsersController {
+  constructor(private readonly usersService: UsersService) {}
+
+  @Get()
+  @ApiDynamicQuery({
+    filters: ['name', 'email', 'status', 'createdAt'],
+    sorts: ['name', 'createdAt'],
+    fields: ['id', 'name', 'email', 'status', 'createdAt'],
+    includes: ['company'],
+  })
+  findAll(@Query() query: DynamicQueryDto, @QueryRules() rules: RulesConfig) {
+    return this.usersService.findAll(query, rules);
+  }
+}
+```
+
+With this, Swagger UI automatically displays all supported parameters for that endpoint — each filter field with its operators, available sorts, fields, includes, page, and perPage.
+
+## Expected result
+
+### Generated parameters
+
+<ThemedImage
+  srcLight="/swagger-lib-light.png"
+  srcDark="/swagger-lib-dark.png"
+  alt="Swagger UI with dynamic parameters"
+/>
+
+### Query response
+
+<ThemedImage
+  srcLight="/swagger-lib-response-light.png"
+  srcDark="/swagger-lib-response-dark.png"
+  alt="Swagger UI with query response"
+/>
+
+## Why `requestInterceptor` is required
+
+Swagger UI builds the parameter URL differently from the format expected by the library. `dqbSwaggerRequestInterceptor` intercepts the request before it leaves and rebuilds the filters in the `filter[field][op]=value` format, which `qs` (Express's query parser) can expand into a nested object.
+
+Without it, filters reach the controller malformed and are ignored. For usage through Postman, frontend, or any HTTP client that builds the URL manually, the interceptor is not required.
+
+---
+
+If you do not use Swagger in the project, replace `@ApiDynamicQuery` with `@DynamicQuery` — the whitelist and `@QueryRules()` behavior is identical, without generating any OpenAPI decorator.

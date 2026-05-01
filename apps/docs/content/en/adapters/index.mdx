@@ -1,0 +1,35 @@
+---
+title: Adapters
+description: Choose the ORM that fits your project - nestjs-rest-query works with TypeORM, Drizzle, and custom adapters.
+---
+
+`nestjs-rest-query` separates **query parameter parsing logic** from the **ORM-specific implementation**. This is done through adapters - each adapter translates normalized queries into native ORM calls.
+
+## The Adapter pattern
+
+When you decorate an endpoint with `@ApiDynamicQuery` or `@DynamicQuery`, the library:
+
+1. **Validates** the query string against `RulesConfig` (the security whitelist)
+2. **Normalizes** the parameters: filters, sorts, fields, includes
+3. **Delegates to the adapter** - which turns that normalized input into native SQL/query
+
+The adapter is registered once via `DynamicQueryBuilderModule.forRoot({ adapter })`. From that point on, the same `RulesConfig` works identically in any supported ORM.
+
+## When to use each adapter
+
+| ORM         | When to use                                                                                                                 | Status                                           |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| **TypeORM** | You already use TypeORM and `@nestjs/typeorm`. It is the default - no extra setup required.                                 | ✅ Stable                                        |
+| **Drizzle** | You prefer strict typing, type-safe schema generation, or want a more modern ORM. Requires a `relations` map configuration. | ✅ Stable                                        |
+| **Prisma**  | The community is asking for it. Planned for a future version.                                                               | 🚧 Coming soon                                   |
+| **Custom**  | You want to support Kysely, raw SQL, or any other ORM. Implement the `RestQueryAdapter` interface.                          | 📖 [Learn more](/docs/adapters/writing-your-own) |
+
+## Get started
+
+Choose your ORM:
+
+<Cards>
+  <Card title="TypeORM (default)" href="/docs/adapters/typeorm" />
+  <Card title="Drizzle" href="/docs/adapters/drizzle" />
+  <Card title="Writing your own" href="/docs/adapters/writing-your-own" />
+</Cards>
