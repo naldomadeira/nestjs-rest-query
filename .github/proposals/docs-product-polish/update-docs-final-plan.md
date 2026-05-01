@@ -948,6 +948,37 @@ Branch: `docs/product-polish-final` (criada a partir de `docs/step-2b-routes`).
 - **Dicionário:** removidas as antigas `home.features` em vez de manter junto com a nova estrutura, para reduzir copy obsoleta.
 - **CLAUDE.md:** acrescentada uma seção curta `## Docs app (apps/docs)` cobrindo a estrutura de pastas, i18n e os pontos novos (sitemap/robots/search) — assistentes futuros precisam saber que o conteúdo MDX vive em `content/<locale>/docs/...` e que o slug do source carrega o prefixo `docs`.
 
+### Round de revisão de código (post-merge to branch, pré-merge to main)
+
+Dois bugs reportados no review do commit consolidado, ambos corrigidos no commit `17f5775`:
+
+- **Canonical/alternate com `/docs/docs/` duplicado** — `params.slug` do Next no grupo `[...slug]` carrega o prefixo `'docs'`. Centralizamos a normalização em `lib/seo.ts` `docsPath()` (mesmo helper que o sitemap usa).
+- **`og:image` apontando para `localhost:3000`** — `app/opengraph-image.jpg` como file convention não herda `metadataBase` porque não há `app/layout.tsx` raiz (só layouts em grupo). Movido para `apps/docs/public/opengraph-image.jpg`, referenciado explicitamente em `metadata.openGraph.images` e `metadata.twitter.images` nos dois layouts; favicons (`icon.png`/`apple-icon.png`) ficaram em `app/` para preservar o rewriting de `basePath`.
+
+Em seguida, `2fee37d` adicionou `openGraph` e `twitter` por página em `generateMetadata` das páginas de docs e na metadata estática de `/skills` (sem isso o preview social usava o título global em todas as rotas). `b69e54a` aplicou `prettier --write` nos quatro arquivos que o `format:check` do CI havia barrado.
+
+### Round de QA UX/A11y (`22aadea`)
+
+Auditoria QA flagou 5 issues críticos/P1 e 4 polish items. Todos endereçados em uma rodada:
+
+- **P0 — `/docs` Runtime Error em `pnpm dev`.** Causa: o tree dual `(default)` + `[lang]` deixava `/docs` ambíguo (matchava tanto `(default)/(docs)/[...slug]` com `slug=['docs']` quanto `[lang]/(home)/page` com `lang='docs'`). O dev server falhava porque `'docs'` não estava em `generateStaticParams` do `[lang]`. Fumadocs i18n canônico assume `createI18nMiddleware` para resolver isso, mas middleware não roda em `output: 'export'` — então a saída é renomear `app/[lang]/` → literal `app/pt-BR/` e remover toda a lógica de validação de locale dinâmico (layouts e pages do tree pt-BR ficaram drasticamente menores).
+- **P0 — Scroll horizontal mobile.** `min-w-0` adicionado nos grids `before/after` e `quickstart`, e nos `CodePane`/cards individuais; `overflow-x-clip` na `<main>` da home como rede de segurança. `<pre>` continua com `overflow-x-auto` interno, mas agora não força o viewport.
+- **P1 — Touch targets ≥ 44px.** Todos os CTAs principais saíram de `h-10` (40px) → `h-11` (44px). `SiteFooter` ganhou `h-11 min-w-11` com padding negativo para manter o visual mas crescer o hit area.
+- **P1 — Font ≥ 13.5px no mobile.** `<pre>` da home subiu de 12.5px → 13.5px; descrições e step body para 16px (`text-base`).
+- **P2 — `hreflang` na home.** Faltava: as homes EN/PT agora exportam `metadata.alternates.languages` (`en` / `pt-BR` / `x-default`).
+- **P2 — Breadcrumb e Edit on GitHub.** `<DocsPage breadcrumb={{ enabled: true, includePage: true }}>` em ambos os trees, e `<EditOnGitHub href={...}>` nativo do Fumadocs apontando para `apps/docs/content/${page.path}` (o `page.path` já contém o segmento de locale, então não duplicar). TOC trocada para `style: 'clerk'`.
+
+Falsos positivos do QA (a saída estática já estava correta):
+
+- Page titles únicos por rota — `<title>` já é específico em todas as páginas geradas (`Introduction`, `NestJS Prerequisite`, `Skills`, etc.).
+- `og:title` / `og:description` por página — corrigido em `2fee37d` antes do round QA.
+
+Pendentes deixados explícitos:
+
+- Touch targets dos links do nav primário (`Docs`, `GitHub`) vêm direto do `<HomeLayout>` do Fumadocs e exigiriam override de CSS interno — não atacados.
+- Smoke manual do search (`Cmd+K`).
+- Smoke visual completo desktop/mobile pelo usuário.
+
 ## Definition Of Done
 
 - Uma branch final contem todo o trabalho.
