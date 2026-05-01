@@ -1,5 +1,6 @@
 import defaultMdxComponents from 'fumadocs-ui/mdx';
 import {
+  DocsBody,
   DocsDescription,
   DocsPage,
   DocsTitle,
@@ -39,7 +40,7 @@ const Page = async (props: PageProps) => {
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
       <EditOnGitHub href={githubUrl} />
-      <div className="prose dark:prose-invert max-w-none">
+      <DocsBody>
         <MDX
           components={{
             ...defaultMdxComponents,
@@ -47,7 +48,7 @@ const Page = async (props: PageProps) => {
             ThemedImage,
           }}
         />
-      </div>
+      </DocsBody>
     </DocsPage>
   );
 };

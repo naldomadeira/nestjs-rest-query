@@ -1,5 +1,4 @@
 import { DocsLayout } from 'fumadocs-ui/layouts/docs';
-import { HomeLayout } from 'fumadocs-ui/layouts/home';
 import type { CSSProperties, ReactNode } from 'react';
 import Image from 'next/image';
 import { SiGithub } from '@icons-pack/react-simple-icons';
@@ -37,33 +36,25 @@ export const DocsShell = ({ locale, children }: DocsShellProps) => {
     </div>
   );
 
-  const navLinks = [
-    { text: t.nav.docs, url: `${prefix}/docs` },
-    {
-      type: 'icon' as const,
-      text: t.nav.github,
-      label: t.nav.github,
-      url: GITHUB_URL,
-      icon: <SiGithub className="size-4" />,
-      external: true,
-    },
-  ];
-
   return (
-    <HomeLayout
+    <DocsLayout
       i18n
+      tree={source.pageTree[locale]}
       nav={{ title: navTitle, url: prefix || '/' }}
-      links={navLinks}
+      links={[
+        {
+          type: 'icon' as const,
+          text: t.nav.github,
+          label: t.nav.github,
+          url: GITHUB_URL,
+          icon: <SiGithub className="size-4" />,
+          external: true,
+        },
+      ]}
+      sidebar={{ tabs: false, collapsible: true }}
+      containerProps={{ style: docsLayoutStyle }}
     >
-      <DocsLayout
-        i18n
-        tree={source.pageTree[locale]}
-        nav={{ enabled: false }}
-        sidebar={{ tabs: false, collapsible: true }}
-        containerProps={{ style: docsLayoutStyle }}
-      >
-        {children}
-      </DocsLayout>
-    </HomeLayout>
+      {children}
+    </DocsLayout>
   );
 };

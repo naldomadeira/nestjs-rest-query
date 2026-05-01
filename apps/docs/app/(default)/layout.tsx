@@ -1,8 +1,8 @@
 import '../global.css';
 import { Analytics as VercelAnalytics } from '@vercel/analytics/react';
-import { RootProvider } from 'fumadocs-ui/provider/next';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { I18nRoot } from '@/components/i18n-root';
 import { ThemeProvider } from '@/providers/theme';
 import { mono, sans } from '../../lib/fonts';
 import { defaultLocale, getDictionary } from '../../lib/i18n';
@@ -43,12 +43,13 @@ const Layout = ({ children }: LayoutProps) => (
     <head />
     <body className="flex flex-col min-h-screen" suppressHydrationWarning>
       <ThemeProvider>
-        <RootProvider
+        <I18nRoot
+          locale={defaultLocale}
           i18n={i18nUI.provider(defaultLocale)}
           search={{ options: { type: 'static' } }}
         >
           {children}
-        </RootProvider>
+        </I18nRoot>
       </ThemeProvider>
     </body>
   </html>

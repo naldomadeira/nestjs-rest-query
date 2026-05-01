@@ -81,15 +81,18 @@ const Mermaid = ({ chart }: MermaidProps) => {
     );
   }
 
-  // Mermaid injects inline `style="max-width: Xpx;"` on the SVG element.
-  // That inline style takes precedence over Tailwind classes, keeping the SVG
-  // at its original small size even inside the fullscreen container.
-  // Strip that constraint so the SVG can scale to fill available space.
-  const fullscreenSvg = svg.replace(/max-width:\s*[\d.]+px;?\s*/g, '');
+  // Mermaid injects inline `style="max-width: Xpx;"` and a fixed `width` /
+  // `height` attribute on the SVG. The inline style wins over Tailwind, and
+  // the fixed width/height freeze the diagram below the viewport on mobile,
+  // making it appear collapsed. Strip those so the SVG scales fluidly.
+  const normalizedSvg = svg
+    .replace(/max-width:\s*[\d.]+px;?\s*/g, '')
+    .replace(/\swidth="[^"]+"/, ' width="100%"')
+    .replace(/\sheight="[^"]+"/, '');
 
   return (
     <>
-      <div className="relative my-6 overflow-auto rounded-lg border bg-fd-card p-4 [&_svg]:mx-auto [&_svg]:h-auto [&_svg]:max-w-full">
+      <div className="relative my-6 overflow-x-auto rounded-lg border bg-fd-card p-4 [&_svg]:mx-auto [&_svg]:!h-auto [&_svg]:!max-w-full [&_svg]:!w-full">
         <button
           onClick={() => setFullscreen(true)}
           aria-label="Expandir diagrama"
@@ -98,7 +101,7 @@ const Mermaid = ({ chart }: MermaidProps) => {
         >
           <Maximize2 size={14} />
         </button>
-        <div dangerouslySetInnerHTML={{ __html: svg }} />
+        <div dangerouslySetInnerHTML={{ __html: normalizedSvg }} />
       </div>
 
       {fullscreen && (
@@ -127,7 +130,7 @@ const Mermaid = ({ chart }: MermaidProps) => {
             {/* SVG area — scrollable, fills remaining height */}
             <div
               className="overflow-auto p-8 [&_svg]:!w-full [&_svg]:!max-w-none [&_svg]:!h-auto [&_svg]:mx-auto"
-              dangerouslySetInnerHTML={{ __html: fullscreenSvg }}
+              dangerouslySetInnerHTML={{ __html: normalizedSvg }}
             />
           </div>
         </div>
