@@ -31,7 +31,8 @@ jobs:
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
-      - run: corepack enable
+      - name: Use npm >= 11.5.1 for trusted publishing
+        run: npm install -g npm@latest && npm --version
 
       - run: pnpm install --frozen-lockfile
 
