@@ -179,9 +179,7 @@ type CodePaneProps = {
 
 const CodePane = ({ label, code, tone }: CodePaneProps) => {
   const labelTone =
-    tone === 'primary'
-      ? 'text-primary'
-      : 'text-muted-foreground';
+    tone === 'primary' ? 'text-primary' : 'text-muted-foreground';
   const ringTone =
     tone === 'primary'
       ? 'border-primary/40 bg-primary/[0.03]'

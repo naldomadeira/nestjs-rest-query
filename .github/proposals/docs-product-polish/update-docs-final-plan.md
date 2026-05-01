@@ -110,6 +110,7 @@ rtk git switch docs/product-polish-final
 ## Task 1: Congelar A Base Da Branch
 
 **Files:**
+
 - Modify: nenhum arquivo de app.
 
 - [ ] **Step 1: Confirmar worktree limpo**
@@ -150,6 +151,7 @@ Se a ferramenta de GitHub nao estiver disponivel no momento da execucao, deixar 
 **References:** `step-3-factual-corrections.md`, `PLAN.md`.
 
 **Files:**
+
 - Modify: `apps/docs/content/en/docs/getting-started/prerequisites.mdx`
 - Modify: `apps/docs/content/pt-BR/docs/getting-started/prerequisites.mdx`
 - Modify: `apps/docs/content/en/docs/adapters/drizzle.mdx`
@@ -189,6 +191,7 @@ Drizzle support is stable and uses a configured adapter plus an explicit relatio
   **Roadmap — Prisma**
 
 Prisma support is planned for a future version. The goal is to keep the same decorators API and whitelist-based security contract while swapping the query engine underneath.
+
 </Callout>
 ```
 
@@ -215,6 +218,7 @@ O suporte a Drizzle e estavel e usa um adapter configurado, alem de um mapa expl
   **Roadmap — Prisma**
 
 O suporte a Prisma esta planejado para uma versao futura. A meta e manter a mesma API de decorators e o mesmo contrato de seguranca por whitelist, trocando apenas o motor de query por baixo.
+
 </Callout>
 ```
 
@@ -224,7 +228,9 @@ Nos arquivos EN, manter headings em ingles:
 
 ```mdx
 ## Install
+
 ## Module setup
+
 ## Usage
 ```
 
@@ -232,7 +238,9 @@ Nos arquivos PT-BR, usar headings em portugues:
 
 ```mdx
 ## Instalacao
+
 ## Configuracao do modulo
+
 ## Uso
 ```
 
@@ -255,6 +263,7 @@ Expected: nenhum resultado.
 **References:** `step-3-factual-corrections.md`, `ADR-001-rewrites-vs-export.md`.
 
 **Files:**
+
 - Modify: `apps/docs/components/home-content.tsx`
 - Rename: `apps/docs/public/patters-dark.png` -> `apps/docs/public/patterns-dark.png`
 - Delete: `apps/docs/public/patterns-old.png`
@@ -326,6 +335,7 @@ O `next.config.ts` atual nao declara `rewrites`; portanto o warning original nao
 **References:** `step-4-home.md`, `frontend-design`.
 
 **Files:**
+
 - Modify: `apps/docs/components/home-content.tsx`
 - Modify: `apps/docs/components/home-shell.tsx`
 - Modify: `apps/docs/lib/i18n/dictionary-shape.ts`
@@ -363,7 +373,7 @@ home: {
     ctaPrimary: string;
     ctaSecondary: string;
     previewAlt: string;
-  };
+  }
   beforeAfter: {
     title: string;
     description: string;
@@ -371,7 +381,7 @@ home: {
     afterLabel: string;
     beforeCode: string;
     afterCode: string;
-  };
+  }
   compatibility: {
     title: string;
     rows: ReadonlyArray<{
@@ -379,7 +389,7 @@ home: {
       status: string;
       note: string;
     }>;
-  };
+  }
   quickstart: {
     title: string;
     steps: ReadonlyArray<{
@@ -387,8 +397,8 @@ home: {
       body: string;
       code: string;
     }>;
-  };
-};
+  }
+}
 ```
 
 - [ ] **Step 3: Atualizar copy EN**
@@ -479,6 +489,7 @@ Expected:
 **References:** `step-5-nav.md`.
 
 **Files:**
+
 - Modify: `apps/docs/components/docs-shell.tsx`
 - Modify: `apps/docs/components/home-shell.tsx`
 - Modify: `apps/docs/lib/i18n/dictionary-shape.ts`
@@ -597,6 +608,7 @@ Expected: links PT usam prefix quando necessario; `/skills` permanece global e v
 **References:** `step-6-seo-search.md`, Context7 Fumadocs.
 
 **Files:**
+
 - Create: `apps/docs/lib/seo.ts`
 - Modify: `apps/docs/app/(default)/(docs)/[...slug]/page.tsx`
 - Modify: `apps/docs/app/[lang]/(docs)/[...slug]/page.tsx`
@@ -750,6 +762,7 @@ Expected: nenhum `MISMATCH`.
 ## Task 7: Validacao Final
 
 **Files:**
+
 - Modify: somente se alguma validacao falhar.
 
 - [ ] **Step 1: Build**
@@ -882,31 +895,37 @@ This replaces the previous multi-PR plan in `.github/proposals/docs-product-poli
 Branch: `docs/product-polish-final` (criada a partir de `docs/step-2b-routes`).
 
 ### Task 1 — Branch base
+
 - Branch nova criada. PR antiga (#25) será fechada quando a PR consolidada for aberta (registrado no corpo da nova PR).
 
 ### Task 2 — Conteúdo factual
+
 - `prerequisites.mdx` (EN/PT) reescrito: descrição menciona TypeORM ou Drizzle, `## Supported adapters` com subseções `### TypeORM` e `### Drizzle`, callout de roadmap apenas para Prisma. Tabela de peer deps inclui `drizzle-orm@^0.45.0` (one-of-the-adapters).
 - Headings dos adapters padronizados: EN usa `## Install`, `## Module setup`, `## Usage`; PT usa `## Instalação`, `## Configuração do módulo`, `## Uso`. Não traduzimos identificadores de API.
 - Sweep `rg` para `exclusivo.*typeorm|drizzle.*roadmap|...`: única ocorrência remanescente é a frase legítima “TypeORM and Drizzle are stable. Prisma is on the roadmap…” na home — falso-positivo do regex.
 
 ### Task 3 — Assets
+
 - `apps/docs/public/patters-dark.png` → `patterns-dark.png` (rename via `git mv`).
 - Removidos `patterns-old.png` e `patters-dark-old.png` (não havia referências).
 - `home-content.tsx` atualizado para o novo path (a imagem foi removida na refatoração da home — ver Task 4).
 - `ADR-001-rewrites-vs-export.md` marcado como **Superado**.
 
 ### Task 4 — Home como produto
+
 - Dicionário expandido (`dictionary-shape.ts`): `home` agora tem `hero{eyebrow,title,subtitle,...}`, `beforeAfter`, `compatibility{headers,rows}`, `quickstart{steps,cta}`. Removidas as `features` antigas. Adicionada chave `footer`.
 - Copy EN/PT atualizada com a tese “Turn REST query strings into safe database queries.” / “Transforme query strings REST em queries seguras.”.
 - `home-content.tsx` reescrito: hero direto sem card decorativo, before/after lado a lado com código real (extraído de `apps/examples/02-app-with-postgres/src/companies/companies.controller.ts`), tabela de compatibilidade com ícones `lucide-react`, quickstart com 3 passos. Removida dependência de `next/image` e da imagem `patterns*.png` na home (o asset segue no repo para outros usos).
 
 ### Task 5 — Nav, Skills, Footer
+
 - `docs-shell.tsx`: link “Skills” removido do nav primário; resta `Docs` + ícone GitHub.
 - `home-shell.tsx` já não tinha Skills no nav; passou a renderizar `<SiteFooter locale={locale} />`.
 - Bridge no sidebar: `meta.json` (EN/PT) acrescenta `"skills"` no final; criados `content/en/docs/skills.mdx` e `content/pt-BR/docs/skills.mdx` com Card apontando para `/skills`.
 - Novo `components/site-footer.tsx` (Docs · Skills · GitHub · License · ©) — respeita locale via prefix.
 
 ### Task 6 — SEO, sitemap, robots, search
+
 - Novo `lib/seo.ts` com `metadataBase`, `localePrefix`, `docsPath`, `homePath`, `absoluteUrl`. `metadataBase` aponta para `https://naldomadeira.github.io/nestjs-rest-query/` (respeita `NEXT_PUBLIC_BASE_PATH`).
 - Layouts raiz (`app/(default)/layout.tsx` e `app/[lang]/layout.tsx`) exportam `metadata`/`generateMetadata` com `metadataBase`, título e descrição por dicionário.
 - `generateMetadata` das páginas docs (default e `[lang]`) retorna `alternates.canonical` + `alternates.languages` com `en`, `pt-BR` e `x-default = en`. Mesma `alternates` foi adicionada na página `/skills`.
@@ -916,6 +935,7 @@ Branch: `docs/product-polish-final` (criada a partir de `docs/step-2b-routes`).
 - `<html lang="...">` validado: páginas reais EN e PT-BR coerentes; apenas as páginas 404 não têm `lang` (esperado para Next.js error fallback estático).
 
 ### Task 7 — Validação final
+
 - `pnpm --filter docs build` (Turbopack) verde.
 - Routes esperadas presentes em `apps/docs/out/`: `/`, `/docs/`, `/docs/getting-started/prerequisites/`, `/pt-BR/`, `/pt-BR/docs/getting-started/prerequisites/`, `/sitemap.xml`, `/robots.txt`, `/skills/`, `/api/search`.
 - Smoke visual local pendente para o usuário (servidor estático: `pnpm --filter docs dev` em http://localhost:9001).
