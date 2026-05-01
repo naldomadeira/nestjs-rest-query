@@ -31,8 +31,7 @@ jobs:
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
-      - name: Use npm 11 for trusted publishing
-        run: npm install -g npm@11 && npm --version
+      - run: corepack enable
 
       - run: pnpm install --frozen-lockfile
 
