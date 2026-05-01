@@ -24,7 +24,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm add -wDtypeorm@${{ matrix.typeorm }}
+      - run: pnpm add -w -D typeorm@${{ matrix.typeorm }}
       - run: pnpm test
 
   drizzle:
@@ -44,7 +44,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm add -wDdrizzle-orm@${{ matrix.drizzle }}
+      - run: pnpm add -w -D drizzle-orm@${{ matrix.drizzle }}
       - run: pnpm test
 
   nestjs:
@@ -65,7 +65,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: |
-          pnpm add -wD \
+          pnpm add -w -D \
             @nestjs/common@${{ matrix.nestjs }} \
             @nestjs/core@${{ matrix.nestjs }} \
             @nestjs/platform-express@${{ matrix.nestjs }} \
