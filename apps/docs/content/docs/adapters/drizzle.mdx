@@ -273,12 +273,9 @@ result.data = result.data.map(row => ({
 return result;
 ```
 
-## Forma do resultado — agrupado por tabela, um nível
+## Forma do resultado — flat, compatível com TypeORM
 
-Drizzle retorna linhas flat a partir de JOINs. O adapter normaliza essas para um formato **table-grouped** com consciência de cardinalidade:
-
-- **`cardinality: 'one'`** → chave da relação é um objeto (ou `null` se nenhuma linha foi encontrada)
-- **`cardinality: 'many'`** → chave da relação é um array (deduplicated por `relation.primaryKey`, vazio se sem matches)
+`DrizzleAdapter` retorna linhas no mesmo formato flat que `TypeOrmAdapter`. Colunas da raiz ficam no nível superior; relações são chaves no mesmo nível (objeto para `'one'`, array para `'many'`).
 
 ```http
 GET /users?filters[email][ilike]=%@acme.com&includes=company,posts&page=1&perPage=2
@@ -288,12 +285,10 @@ GET /users?filters[email][ilike]=%@acme.com&includes=company,posts&page=1&perPag
 {
   "data": [
     {
-      "user": {
-        "id": 1,
-        "name": "Ana",
-        "email": "ana@acme.com",
-        "createdAt": "2024-01-15T10:00:00Z"
-      },
+      "id": 1,
+      "name": "Ana",
+      "email": "ana@acme.com",
+      "createdAt": "2024-01-15T10:00:00Z",
       "company": { "id": 101, "name": "Acme" },
       "posts": [
         {
@@ -311,12 +306,10 @@ GET /users?filters[email][ilike]=%@acme.com&includes=company,posts&page=1&perPag
       ]
     },
     {
-      "user": {
-        "id": 2,
-        "name": "Bia",
-        "email": "bia@acme.com",
-        "createdAt": "2024-02-01T08:00:00Z"
-      },
+      "id": 2,
+      "name": "Bia",
+      "email": "bia@acme.com",
+      "createdAt": "2024-02-01T08:00:00Z",
       "company": { "id": 101, "name": "Acme" },
       "posts": []
     }
@@ -330,10 +323,12 @@ GET /users?filters[email][ilike]=%@acme.com&includes=company,posts&page=1&perPag
 
 **Notas:**
 
-- A chave raiz é `rules.alias` (padrão: `"root"`). No exemplo, é `"user"` porque `alias: 'user'` foi definido.
+- Colunas da raiz vão direto pro topo do objeto. Não há chave wrapper (`root`/`user`/etc).
 - Relações 1:N (como `posts`) aparecem como arrays, deduplicated por `posts.id`.
-- Relações 1:1 (como `company`) aparecem como objetos escalares.
-- Não há aninhamento profundo (ex: sem `company.owner` dentro de cada `company`). Se você precisar de shapes aninhadas, remapeie os dados na camada de controller ou aguarde uma future `DrizzleRelationalAdapter` (roadmap futuro).
+- Relações 1:1 (como `company`) aparecem como objetos escalares (ou `null` se o LEFT JOIN não achou match).
+- Não há aninhamento profundo (sem `company.owner` dentro de `company`). Se precisar disso, aguarde o `DrizzleRelationalAdapter` futuro baseado em `db.query.<table>.findMany({ with })`.
+- `rules.alias` continua útil para logging e mensagens de erro, mas não afeta o shape da resposta.
+- **Atenção**: se uma coluna da tabela raiz tem o mesmo nome de uma chave de relação, a relação sobrescreve a coluna no objeto. Evite no design do schema.
 
 ## Paginação em duas fases (transparente)
 

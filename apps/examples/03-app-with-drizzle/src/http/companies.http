@@ -2,9 +2,8 @@
 
 # COMPANIES — drizzle adapter
 #
-# Result row shape:
-#   { company: {...}, users: [...] }
-# `company` is the root key (rules.alias = 'company').
+# Result row shape (flat, TypeORM-compatible):
+#   { id, name, createdAt, users: [...] }
 
 # ─────────────────────────────────────────────────────────────────────
 # BASIC
@@ -71,7 +70,7 @@ GET {{baseUrl}}/companies?fields=id,name
 # ─────────────────────────────────────────────────────────────────────
 
 ### Two-phase pagination kicks in because `users` is cardinality 'many'
-### Result row: { company: {...}, users: [...] }
+### Result row: { ...companyColumns, users: [...] }
 GET {{baseUrl}}/companies?includes=users&page=1&perPage=2
 
 # ─────────────────────────────────────────────────────────────────────

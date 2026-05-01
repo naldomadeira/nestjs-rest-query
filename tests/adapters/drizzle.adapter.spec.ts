@@ -721,11 +721,8 @@ describe('DrizzleAdapter', () => {
       ]);
       const result = await adapter.applyPagination(qb, {} as any);
       // Expect the order to follow rootIdsOrder = [u3, u1, u2].
-      expect(result.data.map((r: any) => r.user.id)).toEqual([
-        'u3',
-        'u1',
-        'u2',
-      ]);
+      // Flat shape: root columns at top level — `id` is the user id directly.
+      expect(result.data.map((r: any) => r.id)).toEqual(['u3', 'u1', 'u2']);
     });
 
     it('skips a 1:N row whose relation primaryKey is null (LEFT JOIN miss inside non-null object)', async () => {

@@ -827,23 +827,28 @@ export class DrizzleAdapter
   }
 
   /**
-   * Group flat joined rows into the table-grouped, cardinality-aware
-   * shape exposed to consumers.
+   * Group flat joined rows into the cardinality-aware result shape
+   * exposed to consumers. Root columns are spread to the top level
+   * (TypeORM-compatible flat shape); relations are nested as keys at
+   * the same level — object for `'one'`, array for `'many'`.
    *
-   * Input row layout (Drizzle table-grouped select):
+   * Input row layout (Drizzle's native table-grouped select):
    * ```
-   * { user: {...}, company: {...} | null, posts: {...} | null }
+   * { <alias>: {...rootColumns}, company: {...} | null, posts: {...} | null }
    * ```
    *
-   * Output bucket per root:
+   * Output bucket per root (flat):
    * ```
-   * { user: {...}, company: {...} | null, posts: [...] }
+   * { ...rootColumns, company: {...} | null, posts: [...] }
    * ```
    *
    * - `'one'` relations: take first non-null occurrence per root.
    * - `'many'` relations: array, deduplicated by `relation.primaryKey`.
    * - Order: `rootIdsOrder` (when supplied, e.g. two-phase pagination)
    *   takes precedence; otherwise insertion order.
+   *
+   * If a root column has the same name as a relation key, the relation
+   * overwrites the column. Document and avoid at schema design time.
    */
   private aggregate(
     qb: DrizzleQBState,
@@ -865,9 +870,10 @@ export class DrizzleAdapter
       if (!rootObj) continue;
       const rootId = rootObj[rootPKName];
 
-      let bucket = buckets.get(rootId);
+      let bucket: Record<string, any> | undefined = buckets.get(rootId);
       if (!bucket) {
-        bucket = { [rootKey]: rootObj };
+        // Spread root columns to the top level, then layer relation slots on top.
+        bucket = { ...rootObj } as Record<string, any>;
         for (const [path, j] of allJoins) {
           const key = sanitizeKey(path);
           bucket[key] = j.cardinality === 'many' ? [] : null;

@@ -2,9 +2,8 @@
 
 # USERS — drizzle adapter
 #
-# Result row shape (DrizzleAdapter, table-grouped, one level):
-#   { user: {...}, company: {...} | null, posts: [...] }
-# `user` is the root key (rules.alias = 'user').
+# Result row shape (flat, TypeORM-compatible):
+#   { id, name, email, companyId, createdAt, company: {...} | null, posts: [...] }
 
 # ─────────────────────────────────────────────────────────────────────
 # BASIC
@@ -119,16 +118,16 @@ GET {{baseUrl}}/users?fields=id,name,email&page=1&perPage=3
 # ─────────────────────────────────────────────────────────────────────
 
 ### 1:1 include (company)
-### Result row: { user: {...}, company: {...} | null }
+### Result row: { ...userColumns, company: {...} | null }
 GET {{baseUrl}}/users?includes=company
 
 ### 1:N include (posts) — activates two-phase pagination
 ### data.length === perPage (NOT inflated by joined rows); posts is array
-### Result row: { user: {...}, posts: [...] }
+### Result row: { ...userColumns, posts: [...] }
 GET {{baseUrl}}/users?includes=posts&page=1&perPage=2
 
 ### Both 1:1 + 1:N
-### Result row: { user: {...}, company: {...}, posts: [...] }
+### Result row: { ...userColumns, company: {...}, posts: [...] }
 GET {{baseUrl}}/users?includes=company,posts&page=1&perPage=3
 
 # ─────────────────────────────────────────────────────────────────────

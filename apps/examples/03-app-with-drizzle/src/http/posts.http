@@ -2,9 +2,8 @@
 
 # POSTS — drizzle adapter
 #
-# Result row shape:
-#   { post: {...}, user: {...} | null }
-# `post` is the root key (rules.alias = 'post').
+# Result row shape (flat, TypeORM-compatible):
+#   { id, title, content, userId, createdAt, user: {...} | null }
 
 # ─────────────────────────────────────────────────────────────────────
 # BASIC
@@ -72,7 +71,7 @@ GET {{baseUrl}}/posts?fields=id,title,content&page=1&perPage=5
 # INCLUDES — 1:1 (user) — single-pass pagination
 # ─────────────────────────────────────────────────────────────────────
 
-### Result row: { post: {...}, user: {...} | null }
+### Result row: { ...postColumns, user: {...} | null }
 ### No two-phase since `user` is cardinality 'one'.
 GET {{baseUrl}}/posts?includes=user
 

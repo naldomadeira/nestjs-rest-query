@@ -35,7 +35,6 @@ export class PostsController {
       'Fetch posts with support for filters, sorting, pagination, and user includes',
   })
   @ApiDynamicQuery<PostDto>({
-    alias: 'post', // root key in result rows: { post: {...}, user: {...} | null }
     filters: ['id', 'title', 'userId', 'createdAt', 'user'],
     sorts: ['title', 'createdAt', 'user'],
     fields: ['id', 'title', 'content', 'userId', 'createdAt'],
