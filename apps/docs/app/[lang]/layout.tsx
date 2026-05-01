@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { ThemeProvider } from '@/providers/theme';
 import { mono, sans } from '../../lib/fonts';
-import { defaultLocale, isLocale } from '../../lib/i18n';
+import { defaultLocale, isLocale, nonDefaultLocales } from '../../lib/i18n';
 import { i18nUI } from '../../lib/i18n-ui';
 
 type LayoutProps = {
@@ -17,7 +17,7 @@ export async function generateStaticParams() {
   // hideLocale: 'default-locale' means default locale routes have no /<lang>
   // prefix — they're served by the (default) route group. The [lang] tree
   // only generates routes for non-default locales.
-  return [{ lang: 'en' }];
+  return nonDefaultLocales.map((lang) => ({ lang }));
 }
 
 const Layout = async ({ params, children }: LayoutProps) => {

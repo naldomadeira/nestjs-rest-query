@@ -13,5 +13,5 @@ export function getDictionary(locale: Locale): Dictionary {
 }
 
 export type { Dictionary } from './dictionary-shape';
-export { defaultLocale, isLocale, locales } from './types';
+export { defaultLocale, isLocale, locales, nonDefaultLocales } from './types';
 export type { Locale } from './types';
