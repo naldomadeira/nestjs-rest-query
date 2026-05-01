@@ -6,17 +6,19 @@ import {
 } from 'fumadocs-ui/layouts/docs/page';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import Mermaid from '../../../components/mermaid';
-import ThemedImage from '../../../components/themed-image';
-import { source } from '../../../lib/source';
+import Mermaid from '../../../../components/mermaid';
+import ThemedImage from '../../../../components/themed-image';
+import { defaultLocale, isLocale } from '../../../../lib/i18n';
+import { source } from '../../../../lib/source';
 
 type PageProps = {
-  params: Promise<{ slug: string[] }>;
+  params: Promise<{ lang: string; slug: string[] }>;
 };
 
 const Page = async (props: PageProps) => {
   const params = await props.params;
-  const page = source.getPage(params.slug);
+  if (!isLocale(params.lang)) notFound();
+  const page = source.getPage(params.slug, params.lang);
 
   if (!page) {
     notFound();
@@ -41,20 +43,23 @@ const Page = async (props: PageProps) => {
   );
 };
 
-export const generateStaticParams = async () =>
-  source
-    .getPages()
-    .map((page) => page.slugs)
-    .filter(
-      (slugs): slugs is string[] => Array.isArray(slugs) && slugs.length > 0
-    )
-    .map((slug) => ({ slug }));
+export const generateStaticParams = async () => {
+  // hideLocale: 'default-locale' means default locale routes are served by
+  // the (default) tree (no /<lang> prefix). Only non-default locales get
+  // generated under [lang]/.
+  const params = source.generateParams('slug', 'lang') as Array<{
+    slug: string[];
+    lang: string;
+  }>;
+  return params.filter((p) => p.lang !== defaultLocale);
+};
 
 export const generateMetadata = async (props: {
-  params: Promise<{ slug: string[] }>;
+  params: Promise<{ lang: string; slug: string[] }>;
 }): Promise<Metadata> => {
   const params = await props.params;
-  const page = source.getPage(params.slug);
+  if (!isLocale(params.lang)) notFound();
+  const page = source.getPage(params.slug, params.lang);
 
   if (!page) {
     notFound();
