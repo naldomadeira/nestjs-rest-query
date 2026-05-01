@@ -1,0 +1,324 @@
+---
+title: Escrevendo seu próprio Adapter
+description: Suporte customizado para Prisma, Kysely, raw SQL, ou qualquer outro ORM.
+---
+
+O `nestjs-rest-query` é agnóstico a ORM. Se você quer suportar Prisma, Kysely, raw SQL, ou qualquer outro banco/ORM, você pode implementar a interface `RestQueryAdapter`.
+
+## Interface RestQueryAdapter
+
+```typescript
+export interface RestQueryAdapter<TQB = any, TSource = any> {
+  /**
+   * Cria um query builder acumulador.
+   * Chamado uma vez por request.
+   *
+   * @param source — objeto descrevendo a tabela/modelo raiz (formato é definido por você)
+   * @param alias — identificador para a tabela raiz nos resultados
+   * @returns um query builder opaco (seu tipo interno)
+   */
+  createQueryBuilder(source: TSource, alias: string): TQB;
+
+  /**
+   * Aplica um filtro.
+   * O valor já foi coerced (números como números, arrays como arrays, datas como Dates).
+   *
+   * @param qb — query builder
+   * @param alias — alias da entidade
+   * @param fieldPath — caminho do campo (ex: "name", "company.name")
+   * @param operator — operador (eq, ne, gt, gte, lt, lte, like, ilike, in, notIn, between, isNull, notNull, notLike, notIlike)
+   * @param value — valor já coerced
+   */
+  applyFilter(
+    qb: TQB,
+    alias: string,
+    fieldPath: string,
+    operator: QueryOperator,
+    value: unknown
+  ): void;
+
+  /**
+   * Aplica ordenação.
+   *
+   * @param qb — query builder
+   * @param alias — alias
+   * @param fieldPath — campo a ordenar
+   * @param direction — 'ASC' ou 'DESC'
+   */
+  applySort(
+    qb: TQB,
+    alias: string,
+    fieldPath: string,
+    direction: 'ASC' | 'DESC'
+  ): void;
+
+  /**
+   * Define as colunas a serem retornadas.
+   * Se fields está vazio, use todas as colunas da tabela raiz.
+   *
+   * @param qb — query builder
+   * @param alias — alias
+   * @param fields — lista de caminhos de campo (ex: ["id", "name", "company.name"])
+   * @param includes — relações a incluir (ex: ["company", "posts"])
+   */
+  applySelect(
+    qb: TQB,
+    alias: string,
+    fields: string[],
+    includes: string[]
+  ): void;
+
+  /**
+   * Registra uma relação a ser joinada (para includes ou presentation).
+   *
+   * @param qb — query builder
+   * @param alias — alias
+   * @param joinPath — caminho de relação (ex: "company")
+   */
+  applyInclude(qb: TQB, alias: string, joinPath: string): void;
+
+  /**
+   * Aplica busca full-text (search).
+   * Procure o termo em uma lista de colunas, usando OR lógico.
+   *
+   * @param qb — query builder
+   * @param alias — alias
+   * @param columns — lista de caminhos de campo (ex: ["name", "email"])
+   * @param term — termo de busca (substring match esperado)
+   */
+  applySearch(qb: TQB, alias: string, columns: string[], term: string): void;
+
+  /**
+   * Aplica paginação e executa a query.
+   * Retorna { data: [...], total: number }.
+   *
+   * @param qb — query builder
+   * @param offset — skip count
+   * @param limit — take count
+   * @returns objeto com data e total
+   */
+  applyPagination(
+    qb: TQB,
+    offset: number,
+    limit: number
+  ): Promise<{ data: any[]; total: number }>;
+
+  /**
+   * Executa a query sem paginação.
+   * Retorna apenas os dados, sem count.
+   *
+   * @param qb — query builder
+   * @returns lista de linhas
+   */
+  getMany(qb: TQB): Promise<any[]>;
+
+  /**
+   * Hook de customização.
+   * Permite que o consumer aplique operações customizadas ao query builder.
+   *
+   * @param qb — query builder
+   * @param fn — função que recebe qb e pode modificá-lo
+   */
+  customize(qb: TQB, fn: (qb: TQB) => void): void;
+}
+```
+
+## Responsabilidades do Adapter
+
+Seu adapter recebe **parâmetros já normalizados e coerced**:
+
+- **Coerção de valores** — a biblioteca já converteu `"18"` em `18`, `"2024-01-01,2024-12-31"` em `[Date, Date]`, etc. Seu adapter recebe valores no tipo correto.
+- **Validação de whitelist** — campos não autorizados foram rejeitados antes de chegar ao seu adapter.
+- **Parsing de operadores** — você recebe um `QueryOperator` válido, nunca uma string arbitrária.
+
+Seu adapter precisa apenas:
+
+1. Traduzir cada operação para a sintaxe nativa do seu ORM.
+2. Garantir que caminhos com pontos (ex: `company.name`) resultem em JOINs corretos (sua implementação é livre).
+3. Retornar dados na forma esperada pela aplicação (ex: paginação retorna `{ data, total }`).
+
+## Exemplo — Prisma Adapter (pseudo-código)
+
+```typescript
+import { RestQueryAdapter } from 'nestjs-rest-query';
+
+export class PrismaAdapter
+  implements RestQueryAdapter<PrismaQueryBuilder, PrismaSource>
+{
+  createQueryBuilder(source: PrismaSource, alias: string) {
+    return {
+      source,
+      alias,
+      whereConditions: [],
+      orderBy: [],
+      select: undefined,
+      include: {},
+    };
+  }
+
+  applyFilter(qb, alias, fieldPath, operator, value) {
+    // Traduzir para Prisma's where conditions
+    const where = this.translateOperator(fieldPath, operator, value);
+    qb.whereConditions.push(where);
+  }
+
+  applySort(qb, alias, fieldPath, direction) {
+    qb.orderBy.push({ [fieldPath]: direction === 'ASC' ? 'asc' : 'desc' });
+  }
+
+  applySelect(qb, alias, fields, includes) {
+    // Mapear para Prisma select e include
+    qb.select = fields;
+    for (const inc of includes) {
+      qb.include[inc] = true;
+    }
+  }
+
+  applyInclude(qb, alias, joinPath) {
+    qb.include[joinPath] = true;
+  }
+
+  applySearch(qb, alias, columns, term) {
+    const orConditions = columns.map((col) => ({
+      [col]: { contains: term, mode: 'insensitive' },
+    }));
+    qb.whereConditions.push({ OR: orConditions });
+  }
+
+  async applyPagination(qb, offset, limit) {
+    const data = await qb.source.client[qb.source.modelName].findMany({
+      where: qb.whereConditions.length
+        ? { AND: qb.whereConditions }
+        : undefined,
+      orderBy: qb.orderBy,
+      skip: offset,
+      take: limit,
+      select: qb.select,
+      include: qb.include,
+    });
+
+    const total = await qb.source.client[qb.source.modelName].count({
+      where: qb.whereConditions.length
+        ? { AND: qb.whereConditions }
+        : undefined,
+    });
+
+    return { data, total };
+  }
+
+  async getMany(qb) {
+    return qb.source.client[qb.source.modelName].findMany({
+      where: qb.whereConditions.length
+        ? { AND: qb.whereConditions }
+        : undefined,
+      orderBy: qb.orderBy,
+      select: qb.select,
+      include: qb.include,
+    });
+  }
+
+  customize(qb, fn) {
+    fn(qb);
+  }
+
+  private translateOperator(
+    fieldPath: string,
+    operator: string,
+    value: unknown
+  ) {
+    switch (operator) {
+      case 'eq':
+        return { [fieldPath]: value };
+      case 'ne':
+        return { NOT: { [fieldPath]: value } };
+      case 'gt':
+        return { [fieldPath]: { gt: value } };
+      // ... etc
+      default:
+        return {};
+    }
+  }
+}
+```
+
+## Padrão Source
+
+O `TSource` genérico é seu contrato. Defina-o como se encaixe melhor:
+
+```typescript
+interface PrismaSource {
+  client: PrismaClient;
+  modelName: string;
+}
+
+interface KyselySource {
+  db: Database;
+  tableName: string;
+}
+
+interface RawSqlSource {
+  connection: PoolClient;
+  table: string;
+  schema: ColumnSchema[];
+}
+```
+
+Seu adapter sabe como usar o `TSource`; o consumer passa-o:
+
+```typescript
+@Get()
+list(@Query() query: QueryInput, @QueryRules() rules: RulesConfig) {
+  return this.qb.execute(
+    {
+      client: this.prisma,
+      modelName: 'User',
+    },
+    query,
+    rules
+  );
+}
+```
+
+## Registrando seu Adapter
+
+```typescript
+import { Module } from '@nestjs/common';
+import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
+import { PrismaAdapter } from './adapters/prisma.adapter';
+
+@Module({
+  imports: [
+    DynamicQueryBuilderModule.forRoot({
+      adapter: new PrismaAdapter(),
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+## Checklist de implementação
+
+- [ ] Implementar todos os 7 métodos da interface
+- [ ] Coerção de valor — seu adapter assume valores já tipados
+- [ ] Operadores — traduzir `QueryOperator` para a sintaxe do seu ORM
+- [ ] Paginação — retornar `{ data, total }` com linhas e contagem
+- [ ] Caminhos com pontos — garantir JOINs automáticos (ou erro claro se não suportado)
+- [ ] Teste manual — executar um request com filtro, sort, include, search, pagination
+- [ ] Considere contribuir de volta — se for uma ORM popular (Prisma, Kysely), abra uma issue para discussão!
+
+## Contribuindo um Adapter
+
+Se você implementar um adapter para uma ORM popular (Prisma, Kysely, etc.), considere contribuir:
+
+1. Abra uma [Discussion](https://github.com/naldomadeira/nestjs-rest-query/discussions) descrevendo a ORM e seu interesse.
+2. Siga a estrutura de `src/infra/adapters/` (see TypeORM e Drizzle como referência).
+3. Adicione testes unitários em `tests/adapters/`.
+4. Envie um PR vinculado à discussion.
+
+Cada adapter aprovado será mantido no core e exportado como subpath (ex: `nestjs-rest-query/prisma`).
+
+## Recursos
+
+- [TypeORM Adapter source](https://github.com/naldomadeira/nestjs-rest-query/blob/main/src/infra/adapters/typeorm.adapter.ts)
+- [Drizzle Adapter source](https://github.com/naldomadeira/nestjs-rest-query/blob/main/src/infra/adapters/drizzle.adapter.ts)
+- [RestQueryAdapter interface](https://github.com/naldomadeira/nestjs-rest-query/blob/main/src/contracts/rest-query-adapter.interface.ts)

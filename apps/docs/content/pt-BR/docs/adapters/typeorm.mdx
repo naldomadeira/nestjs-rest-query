@@ -1,0 +1,107 @@
+---
+title: TypeORM Adapter
+description: Usar nestjs-rest-query com TypeORM — o adapter padrão.
+---
+
+TypeORM é o adapter padrão. Se você já está usando TypeORM e `@nestjs/typeorm`, tudo funciona sem configuração adicional.
+
+## Install
+
+```bash
+pnpm add typeorm
+# ou
+npm install typeorm
+```
+
+Se você ainda não tiver TypeORM instalado, a biblioteca o puxará automaticamente (é uma peer dependency).
+
+## Module setup
+
+```typescript title="app.module.ts"
+import { Module } from '@nestjs/common';
+import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
+
+@Module({
+  imports: [
+    DynamicQueryBuilderModule.forRoot({
+      pagination: { defaultPerPage: 20, maxPerPage: 100 },
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+Nenhuma configuração de adapter é necessária — TypeORM é o padrão. Se você quer ser explícito:
+
+```typescript
+import { TypeOrmAdapter } from 'nestjs-rest-query/typeorm';
+
+DynamicQueryBuilderModule.forRoot({
+  adapter: new TypeOrmAdapter(),
+  pagination: { defaultPerPage: 20, maxPerPage: 100 },
+});
+```
+
+## Controller
+
+```typescript title="users.controller.ts"
+import { Controller, Get, Query } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import {
+  ApiDynamicQuery,
+  QueryRules,
+  QueryBuilderService,
+  RulesConfig,
+  QueryInput,
+} from 'nestjs-rest-query';
+import { User } from './user.entity';
+
+const rules: RulesConfig = {
+  alias: 'user',
+  filters: ['email', 'name', 'createdAt', 'status'],
+  sorts: ['name', 'createdAt'],
+  fields: ['id', 'name', 'email'],
+  includes: ['company'],
+  search: ['name', 'email'],
+};
+
+@Controller('users')
+export class UsersController {
+  constructor(
+    @InjectRepository(User) private readonly users: Repository<User>,
+    private readonly qb: QueryBuilderService
+  ) {}
+
+  @Get()
+  @ApiDynamicQuery(rules)
+  list(@Query() query: QueryInput, @QueryRules() endpointRules = rules) {
+    return this.qb.execute(this.users, query, endpointRules);
+  }
+}
+```
+
+## Resultado
+
+```json
+{
+  "data": [
+    {
+      "id": "u_1",
+      "name": "Ana",
+      "email": "ana@acme.com",
+      "company": { "id": "c_1", "name": "Acme" }
+    }
+  ],
+  "page": 1,
+  "perPage": 20,
+  "total": 42,
+  "lastPage": 3
+}
+```
+
+## Próximos passos
+
+Se você quer mudar para Drizzle, veja o [Drizzle Adapter](/docs/adapters/drizzle).
+
+Para um guia completo de parâmetros e operadores, consulte [Guia de Uso](/docs/usage).

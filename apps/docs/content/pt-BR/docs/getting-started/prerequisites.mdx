@@ -1,0 +1,53 @@
+---
+title: Pré-requisito NestJS
+description: Requisitos para usar o nestjs-rest-query em uma aplicação NestJS com TypeORM.
+---
+
+Antes de instalar a biblioteca, confirme se o seu projeto NestJS já atende aos requisitos abaixo.
+
+Esta lib foi pensada para aplicações NestJS que usam TypeORM e decorators habilitados. Se esse for o seu cenário, a configuração costuma ser simples.
+
+## Aplicação NestJS
+
+| Requisito  | Versão mínima | Observação                                                                                       |
+| ---------- | ------------- | ------------------------------------------------------------------------------------------------ |
+| **NestJS** | `^11.0.0`     | A biblioteca foi desenhada para projetos NestJS com `@nestjs/common` e `@nestjs/core` presentes. |
+
+## Runtime
+
+| Requisito   | Versão mínima |
+| ----------- | ------------- |
+| **Node.js** | `>= 20`       |
+
+## Dependências peer
+
+Esses pacotes devem estar presentes no seu projeto — **não** são incluídos na biblioteca.
+
+| Pacote             | Versão mínima | Obrigatório |
+| ------------------ | ------------- | ----------- |
+| `@nestjs/common`   | `^11.0.0`     | Sim         |
+| `@nestjs/core`     | `^11.0.0`     | Sim         |
+| `typeorm`          | `^0.3.26`     | Sim         |
+| `reflect-metadata` | `^0.2.0`      | Sim         |
+| `@nestjs/swagger`  | `^11.0.0`     | Opcional    |
+
+Se o seu projeto ainda não está usando NestJS, comece por criar a aplicação com `nest new`. A biblioteca depende do ecossistema do framework para decorators, metadata e injeção de dependência.
+
+`@nestjs/swagger` só é necessário se você quiser gerar documentação OpenAPI com `@ApiDynamicQuery` e testar filtros pela UI do Swagger. Veja a seção [Swagger](/docs/swagger) para detalhes.
+
+## TypeORM
+
+A biblioteca é construída sobre o `QueryBuilder` do TypeORM. Toda a lógica de filtros, sorts, fields, includes e paginação é aplicada sobre um `SelectQueryBuilder` gerado a partir do seu `Repository`.
+
+Isso significa que:
+
+- Você precisa ter o TypeORM configurado com pelo menos um banco de dados (PostgreSQL, MySQL, SQLite, etc.)
+- Suas entidades devem usar os decorators do TypeORM (`@Entity`, `@Column`, `@ManyToOne`, etc.)
+- O `QueryBuilderService` opera exclusivamente sobre repositórios TypeORM — não há suporte a query raw ou outras camadas de abstração
+
+<Callout type="info">
+  🔭 **Roadmap — Prisma e Drizzle**
+
+O suporte atual é exclusivo para TypeORM. No futuro, pretendemos trazer a mesma experiência para **Prisma** e **Drizzle** — mantendo a mesma API de decorators e o mesmo contrato de segurança por whitelist, apenas trocando o motor de query por baixo.
+
+</Callout>
