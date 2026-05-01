@@ -3,10 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
+    "build:skills": "node scripts/build-skills.mjs",
+    "predev": "pnpm run build:skills",
+    "prebuild": "pnpm run build:skills",
     "build": "next build --turbopack",
     "dev": "next dev --turbopack --port 9001",
     "start": "next start",
-    "postinstall": "fumadocs-mdx"
+    "postinstall": "fumadocs-mdx && node scripts/build-skills.mjs"
   },
   "dependencies": {
     "@faker-js/faker": "^10.3.0",

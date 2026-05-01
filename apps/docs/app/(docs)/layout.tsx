@@ -29,6 +29,7 @@ const navTitle = (
 
 const navLinks = [
   { text: 'Docs', url: '/docs' },
+  { text: 'Skills', url: '/skills' },
   {
     type: 'icon' as const,
     text: 'GitHub',

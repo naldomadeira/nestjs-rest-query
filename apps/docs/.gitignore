@@ -5,6 +5,8 @@
 .contentlayer
 .content-collections
 .source
+/public/skills/
+/lib/skills-manifest.generated.json
 
 # test & build
 /coverage
