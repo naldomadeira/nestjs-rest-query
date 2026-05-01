@@ -16,12 +16,12 @@ import { source } from '../../../../lib/source';
 const LOCALE = 'pt-BR' as const;
 
 type PageProps = {
-  params: Promise<{ slug: string[] }>;
+  params: Promise<{ slug?: string[] }>;
 };
 
 const Page = async (props: PageProps) => {
   const params = await props.params;
-  const page = source.getPage(params.slug, LOCALE);
+  const page = source.getPage(params.slug ?? [], LOCALE);
 
   if (!page) {
     notFound();
@@ -56,25 +56,18 @@ const Page = async (props: PageProps) => {
 export const dynamicParams = false;
 
 export const generateStaticParams = async () =>
-  source
-    .getPages(LOCALE)
-    .map((page) => page.slugs)
-    .filter(
-      (slugs): slugs is string[] => Array.isArray(slugs) && slugs.length > 0
-    )
-    .map((slug) => ({ slug }));
+  source.getPages(LOCALE).map((page) => ({ slug: page.slugs as string[] }));
 
 export const generateMetadata = async (props: {
-  params: Promise<{ slug: string[] }>;
+  params: Promise<{ slug?: string[] }>;
 }): Promise<Metadata> => {
   const params = await props.params;
-  const page = source.getPage(params.slug, LOCALE);
+  const slug = params.slug ?? [];
+  const page = source.getPage(slug, LOCALE);
 
   if (!page) {
     notFound();
   }
-
-  const slug = params.slug ?? [];
   const enPath = docsPath(slug, 'en');
   const ptPath = docsPath(slug, 'pt-BR');
 

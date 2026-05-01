@@ -1,5 +1,5 @@
 import { DocsLayout } from 'fumadocs-ui/layouts/docs';
-import type { CSSProperties, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import Image from 'next/image';
 import { SiGithub } from '@icons-pack/react-simple-icons';
 import { resolveDocsAssetPath } from '../lib/asset-path';
@@ -7,12 +7,6 @@ import { defaultLocale, getDictionary, type Locale } from '../lib/i18n';
 import { source } from '../lib/source';
 
 const GITHUB_URL = 'https://github.com/naldomadeira/nestjs-rest-query';
-
-const docsLayoutStyle = {
-  '--fd-layout-width': 'min(1560px, 100%)',
-  '--fd-sidebar-width': 'clamp(198px, 13vw, 224px)',
-  '--fd-toc-width': 'clamp(192px, 11vw, 224px)',
-} as CSSProperties;
 
 type DocsShellProps = {
   readonly locale: Locale;
@@ -51,8 +45,7 @@ export const DocsShell = ({ locale, children }: DocsShellProps) => {
           external: true,
         },
       ]}
-      sidebar={{ tabs: false, collapsible: true }}
-      containerProps={{ style: docsLayoutStyle }}
+      sidebar={{ tabs: false, collapsible: true, defaultOpenLevel: 99 }}
     >
       {children}
     </DocsLayout>
