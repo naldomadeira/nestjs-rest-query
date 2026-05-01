@@ -1,47 +1,55 @@
 @baseUrl = http://localhost:3002
 
 # USERS — drizzle adapter
+#
+# Result row shape (DrizzleAdapter, table-grouped, one level):
+#   { user: {...}, company: {...} | null, posts: [...] }
+# `user` is the root key (rules.alias = 'user').
 
-### Listar tudo
+# ─────────────────────────────────────────────────────────────────────
+# BASIC
+# ─────────────────────────────────────────────────────────────────────
+
+### List all (paginated)
 GET {{baseUrl}}/users
 
-### Paginação
+### Pagination
 GET {{baseUrl}}/users?page=1&perPage=5
 
-### Sem paginação
+### No pagination — returns { data } only
 GET {{baseUrl}}/users?paginate=false
 
-# FILTROS — root columns
+# ─────────────────────────────────────────────────────────────────────
+# FILTERS — root columns
+# ─────────────────────────────────────────────────────────────────────
 
-### Exato (implícito)
-GET {{baseUrl}}/users?filter[email]=ana@acme.com
+### Exact (implicit eq)
+GET {{baseUrl}}/users?filter[email]=ana.0@acmecorp.com
 
-### Exato (explícito)
-GET {{baseUrl}}/users?filter[email][eq]=ana@acme.com
+### Exact (explicit)
+GET {{baseUrl}}/users?filter[email][eq]=ana.0@acmecorp.com
 
-### Diferente
+### Not equal
 GET {{baseUrl}}/users?filter[name][ne]=admin
 
-### Like / ILike (Drizzle: contains; o adapter envolve com %)
+### Like (case-sensitive contains; adapter wraps with %)
 GET {{baseUrl}}/users?filter[email][like]=acme
 
+### ILike (case-insensitive contains)
 GET {{baseUrl}}/users?filter[email][ilike]=ACME
 
+### Not like / not ilike
 GET {{baseUrl}}/users?filter[name][notLike]=spam
-
 GET {{baseUrl}}/users?filter[name][notIlike]=DELETED
 
-### Comparação por data
+### Comparison (date)
 GET {{baseUrl}}/users?filter[createdAt][gt]=2024-01-01
-
 GET {{baseUrl}}/users?filter[createdAt][gte]=2024-01-01T00:00:00Z
-
 GET {{baseUrl}}/users?filter[createdAt][lt]=2026-01-01
-
 GET {{baseUrl}}/users?filter[createdAt][lte]=2026-12-31
 
 ### IN / NOT IN
-GET {{baseUrl}}/users?filter[email][in]=ana@acme.com,bia@acme.com
+GET {{baseUrl}}/users?filter[email][in]=ana.0@acmecorp.com,bia.1@acmecorp.com
 
 GET {{baseUrl}}/users?filter[email][notIn]=spam@example.com
 
@@ -52,52 +60,93 @@ GET {{baseUrl}}/users?filter[companyId][isNull]=false
 
 GET {{baseUrl}}/users?filter[createdAt][between]=2024-01-01,2025-12-31
 
-# ORDENAÇÃO
+# ─────────────────────────────────────────────────────────────────────
+# FILTERS — relation paths (auto-join via DrizzleSource.relations)
+# ─────────────────────────────────────────────────────────────────────
 
-### Simples
+### Filter by 1:1 relation column (company.name)
+### Adds whereJoin → count uses countDistinct(users.id)
+GET {{baseUrl}}/users?filter[company.name][eq]=Acme Corp
+
+GET {{baseUrl}}/users?filter[company.name][ilike]=globex
+
+### Filter by 1:N relation column (posts.title)
+### Adds whereJoin AND activates two-phase pagination
+GET {{baseUrl}}/users?filter[posts.title][ilike]=hello&page=1&perPage=5
+
+# ─────────────────────────────────────────────────────────────────────
+# SORTING
+# ─────────────────────────────────────────────────────────────────────
+
+### Simple
 GET {{baseUrl}}/users?sort=name
 
-### Descendente
+### Descending
 GET {{baseUrl}}/users?sort=-createdAt
 
-### Múltipla
+### Multiple fields
 GET {{baseUrl}}/users?sort=name,-email
 
-# CAMPOS
+### Sort by 1:1 relation column (allowed)
+GET {{baseUrl}}/users?sort=-company.name
 
-### Seleção de campos (root.id é auto-injetado pelo adapter)
-GET {{baseUrl}}/users?fields=name,email
-
-### Campos + paginação
-GET {{baseUrl}}/users?fields=id,name,email&page=1&perPage=3
-
-# INCLUDES — Drizzle adapter
-
-### Include 1:1 (company)
-### Resultado: rows como { user: {...}, company: {...} | null }
-GET {{baseUrl}}/users?includes=company
-
-### Include 1:N (posts) — ATIVA TWO-PHASE PAGINATION
-### data.length === perPage (sem inflação por linhas joinadas), posts é array
-### Resultado: rows como { user: {...}, posts: [...] }
-GET {{baseUrl}}/users?includes=posts&page=1&perPage=2
-
-### Múltiplos includes (1:1 + 1:N juntos)
-GET {{baseUrl}}/users?includes=company,posts&page=1&perPage=3
-
-# COMBINAÇÕES
-
-### Filter + sort + fields + page (caminho feliz)
-GET {{baseUrl}}/users?filter[createdAt][gte]=2024-01-01&sort=-createdAt&fields=id,name,email,createdAt&page=1&perPage=10
-
-### Filter + includes 1:N (two-phase + filter no root)
-GET {{baseUrl}}/users?filter[email][ilike]=acme&includes=posts&page=1&perPage=5
-
-# ERROS ESPERADOS — confirmam contratos do adapter
-
-### ORDER BY em coluna de relação 'many' → 400 Bad Request
-### Mensagem: DrizzleAdapter: ORDER BY a column from 'many' relation "posts" is not supported. ...
+### ✗ Sort by 1:N relation column → 400 (rejected by adapter)
+###   Error: DrizzleAdapter: ORDER BY a column from 'many' relation "posts" ...
 GET {{baseUrl}}/users?sort=-posts.title
 
-### Filter em campo não whitelistado → 400 Bad Request
+# ─────────────────────────────────────────────────────────────────────
+# SEARCH (declared on name, email, company.name)
+# ─────────────────────────────────────────────────────────────────────
+
+### Search across whitelisted columns (OR-joined ilike)
+GET {{baseUrl}}/users?search=ana
+
+### Search hits company.name → triggers whereJoin
+GET {{baseUrl}}/users?search=acme
+
+# ─────────────────────────────────────────────────────────────────────
+# FIELDS (root.id is auto-injected by the adapter)
+# ─────────────────────────────────────────────────────────────────────
+
+### Project just a few root columns
+GET {{baseUrl}}/users?fields=name,email
+
+### Fields + pagination
+GET {{baseUrl}}/users?fields=id,name,email&page=1&perPage=3
+
+# ─────────────────────────────────────────────────────────────────────
+# INCLUDES
+# ─────────────────────────────────────────────────────────────────────
+
+### 1:1 include (company)
+### Result row: { user: {...}, company: {...} | null }
+GET {{baseUrl}}/users?includes=company
+
+### 1:N include (posts) — activates two-phase pagination
+### data.length === perPage (NOT inflated by joined rows); posts is array
+### Result row: { user: {...}, posts: [...] }
+GET {{baseUrl}}/users?includes=posts&page=1&perPage=2
+
+### Both 1:1 + 1:N
+### Result row: { user: {...}, company: {...}, posts: [...] }
+GET {{baseUrl}}/users?includes=company,posts&page=1&perPage=3
+
+# ─────────────────────────────────────────────────────────────────────
+# COMBINATIONS
+# ─────────────────────────────────────────────────────────────────────
+
+### Filter + sort + fields + page
+GET {{baseUrl}}/users?filter[createdAt][gte]=2024-01-01&sort=-createdAt&fields=id,name,email,createdAt&page=1&perPage=10
+
+### Relation filter + 1:N include + pagination (full picture)
+GET {{baseUrl}}/users?filter[company.name][ilike]=acme&includes=posts&sort=-createdAt&page=1&perPage=5
+
+# ─────────────────────────────────────────────────────────────────────
+# EXPECTED ERRORS — confirm adapter contracts
+# ─────────────────────────────────────────────────────────────────────
+
+### ✗ Unknown filter field → 400
 GET {{baseUrl}}/users?filter[password][eq]=anything
+
+### ✗ ORDER BY through 'many' relation → 400
+GET {{baseUrl}}/users?sort=-posts.createdAt

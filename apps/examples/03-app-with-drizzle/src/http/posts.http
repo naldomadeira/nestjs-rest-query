@@ -1,57 +1,89 @@
 @baseUrl = http://localhost:3002
 
 # POSTS — drizzle adapter
+#
+# Result row shape:
+#   { post: {...}, user: {...} | null }
+# `post` is the root key (rules.alias = 'post').
 
-### Listar tudo
+# ─────────────────────────────────────────────────────────────────────
+# BASIC
+# ─────────────────────────────────────────────────────────────────────
+
+### List all
 GET {{baseUrl}}/posts
 
-### Paginação
+### Pagination
 GET {{baseUrl}}/posts?page=1&perPage=5
 
-### Sem paginação
+### No pagination
 GET {{baseUrl}}/posts?paginate=false
 
-# FILTROS
+# ─────────────────────────────────────────────────────────────────────
+# FILTERS — root columns
+# ─────────────────────────────────────────────────────────────────────
 
-### Exato
-GET {{baseUrl}}/posts?filter[title][eq]=Hello
+### Exact
+GET {{baseUrl}}/posts?filter[title][ilike]=Hello
 
-### Like / ILike
-GET {{baseUrl}}/posts?filter[title][ilike]=intro
+### ILike + sort
+GET {{baseUrl}}/posts?filter[title][ilike]=intro&sort=-createdAt
 
-GET {{baseUrl}}/posts?filter[title][notLike]=draft
-
-### Comparação por data
+### Date comparison
 GET {{baseUrl}}/posts?filter[createdAt][gte]=2024-01-01
-
-### IN
-GET {{baseUrl}}/posts?filter[userId][in]=00000000-0000-0000-0000-000000000001,00000000-0000-0000-0000-000000000002
 
 ### Between
 GET {{baseUrl}}/posts?filter[createdAt][between]=2024-01-01,2025-12-31
 
-# ORDENAÇÃO
+# ─────────────────────────────────────────────────────────────────────
+# FILTERS — relation paths (1:1: user)
+# ─────────────────────────────────────────────────────────────────────
+
+### Filter posts where user.email matches
+### Adds whereJoin → countDistinct(posts.id)
+GET {{baseUrl}}/posts?filter[user.email][ilike]=ana
+
+### Filter by user name
+GET {{baseUrl}}/posts?filter[user.name][eq]=Ana
+
+# ─────────────────────────────────────────────────────────────────────
+# SORTING
+# ─────────────────────────────────────────────────────────────────────
 
 GET {{baseUrl}}/posts?sort=title
 
 GET {{baseUrl}}/posts?sort=-createdAt
 
+### Sort by 1:1 relation column (allowed)
+GET {{baseUrl}}/posts?sort=-user.name
+
+### Multi-field
 GET {{baseUrl}}/posts?sort=title,-createdAt
 
-# CAMPOS
+# ─────────────────────────────────────────────────────────────────────
+# FIELDS
+# ─────────────────────────────────────────────────────────────────────
 
 GET {{baseUrl}}/posts?fields=id,title
 
 GET {{baseUrl}}/posts?fields=id,title,content&page=1&perPage=5
 
-# INCLUDES — 1:1 (user)
-### Resultado: rows como { post: {...}, user: {...} | null }
-### Cardinality 'one' — sem two-phase, single query.
+# ─────────────────────────────────────────────────────────────────────
+# INCLUDES — 1:1 (user) — single-pass pagination
+# ─────────────────────────────────────────────────────────────────────
+
+### Result row: { post: {...}, user: {...} | null }
+### No two-phase since `user` is cardinality 'one'.
 GET {{baseUrl}}/posts?includes=user
 
 GET {{baseUrl}}/posts?includes=user&page=1&perPage=10
 
-# COMBINAÇÕES
+# ─────────────────────────────────────────────────────────────────────
+# COMBINATIONS
+# ─────────────────────────────────────────────────────────────────────
 
-### Filter + sort + include + paginação
+### Filter + sort + include + page
 GET {{baseUrl}}/posts?filter[title][ilike]=hello&sort=-createdAt&includes=user&page=1&perPage=5
+
+### Relation filter + sort by relation + include
+GET {{baseUrl}}/posts?filter[user.email][ilike]=acme&sort=-user.name&includes=user&page=1&perPage=10

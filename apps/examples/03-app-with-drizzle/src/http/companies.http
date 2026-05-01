@@ -1,51 +1,85 @@
 @baseUrl = http://localhost:3002
 
 # COMPANIES — drizzle adapter
+#
+# Result row shape:
+#   { company: {...}, users: [...] }
+# `company` is the root key (rules.alias = 'company').
 
-### Listar tudo
+# ─────────────────────────────────────────────────────────────────────
+# BASIC
+# ─────────────────────────────────────────────────────────────────────
+
+### List all
 GET {{baseUrl}}/companies
 
-### Paginação
+### Pagination
 GET {{baseUrl}}/companies?page=1&perPage=5
 
-### Sem paginação
+### No pagination
 GET {{baseUrl}}/companies?paginate=false
 
-# FILTROS
+# ─────────────────────────────────────────────────────────────────────
+# FILTERS — root columns
+# ─────────────────────────────────────────────────────────────────────
 
-### Exato
-GET {{baseUrl}}/companies?filter[name][eq]=Acme
+### Exact
+GET {{baseUrl}}/companies?filter[name][eq]=Acme Corp
 
-### Like / ILike
+### ILike
 GET {{baseUrl}}/companies?filter[name][ilike]=tech
 
-### Comparação por data
+### Date comparison
 GET {{baseUrl}}/companies?filter[createdAt][gte]=2024-01-01
 
 ### IN
-GET {{baseUrl}}/companies?filter[name][in]=Acme,Globex,Initech
+GET {{baseUrl}}/companies?filter[name][in]=Acme Corp,Globex,Initech
 
-# ORDENAÇÃO
+# ─────────────────────────────────────────────────────────────────────
+# FILTERS — relation paths (1:N: users)
+# ─────────────────────────────────────────────────────────────────────
+
+### Filter companies that have any user matching email
+### Adds whereJoin AND activates two-phase pagination
+GET {{baseUrl}}/companies?filter[users.email][ilike]=ana
+
+# ─────────────────────────────────────────────────────────────────────
+# SORTING
+# ─────────────────────────────────────────────────────────────────────
 
 GET {{baseUrl}}/companies?sort=name
 
 GET {{baseUrl}}/companies?sort=-createdAt
 
-# CAMPOS
+### ✗ Sort by 'many' relation column (users) → 400
+GET {{baseUrl}}/companies?sort=-users.name
+
+# ─────────────────────────────────────────────────────────────────────
+# SEARCH (declared on name)
+# ─────────────────────────────────────────────────────────────────────
+
+GET {{baseUrl}}/companies?search=acme
+
+# ─────────────────────────────────────────────────────────────────────
+# FIELDS
+# ─────────────────────────────────────────────────────────────────────
 
 GET {{baseUrl}}/companies?fields=id,name
 
+# ─────────────────────────────────────────────────────────────────────
 # INCLUDES — 1:N (users)
-### Two-phase pagination ativa porque users é cardinality 'many'
-### Resultado: rows como { company: {...}, users: [...] }
+# ─────────────────────────────────────────────────────────────────────
+
+### Two-phase pagination kicks in because `users` is cardinality 'many'
+### Result row: { company: {...}, users: [...] }
 GET {{baseUrl}}/companies?includes=users&page=1&perPage=2
 
-# COMBINAÇÕES
+# ─────────────────────────────────────────────────────────────────────
+# COMBINATIONS
+# ─────────────────────────────────────────────────────────────────────
 
-### Filter + include 1:N + paginação (two-phase + filter no root)
+### Filter + 1:N include + pagination
 GET {{baseUrl}}/companies?filter[name][ilike]=acme&includes=users&page=1&perPage=5
 
-# ERROS ESPERADOS
-
-### ORDER BY em coluna da relação 'many' (users) → 400
-GET {{baseUrl}}/companies?sort=-users.name
+### Relation filter + include
+GET {{baseUrl}}/companies?filter[users.email][ilike]=acme&includes=users&page=1&perPage=3
