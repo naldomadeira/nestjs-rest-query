@@ -21,14 +21,17 @@ Step-3 mergeado (factual já correto antes de virar copy).
 ### Seção 1 — Hero com tese forte
 
 Hoje:
+
 > "Filtros, paginação e ordenação dinâmicos a partir de parâmetros HTTP. TypeORM-first..."
 
 Vira (texto final é decisão de Opus durante execução):
 
 EN:
+
 > "Stop writing the same WHERE clauses. nestjs-rest-query turns REST query strings into safe, whitelisted database queries — for TypeORM and Drizzle, in NestJS."
 
 PT-BR (tradução fiel):
+
 > "Pare de escrever os mesmos `WHERE`. nestjs-rest-query transforma query strings REST em queries seguras, com whitelist — para TypeORM e Drizzle, em NestJS."
 
 CTAs: "Get started" / "View on GitHub" (no PT: "Começar" / "Ver no GitHub").
@@ -43,6 +46,7 @@ Crítica do Codex foi acertada: código fictício no marketing pode prometer red
 - "DEPOIS" — copia literal do código que existe em `apps/02`.
 
 Procedimento:
+
 1. Opus lê `apps/02-app-with-postgres/src/**/*.controller.ts` e `*.service.ts`.
 2. Escolhe **um** endpoint suficientemente rico (filtro + sort + include + paginação).
 3. Reescreve a versão "manual" do mesmo endpoint sem a lib (`@nestjs/typeorm` cru).
@@ -54,13 +58,13 @@ Layout: dois `<CodeBlock>` lado a lado em desktop, empilhados em mobile. Highlig
 ### Seção 3 — Compatibilidade (matriz visual)
 
 | ORM     | Status         |
-|---------|----------------|
-| TypeORM | ✅ Stable       |
-| Drizzle | ✅ Stable       |
-| Prisma  | 🚧 Coming soon  |
+| ------- | -------------- |
+| TypeORM | ✅ Stable      |
+| Drizzle | ✅ Stable      |
+| Prisma  | 🚧 Coming soon |
 
 | Runtime | Versão |
-|---------|--------|
+| ------- | ------ |
 | NestJS  | ^11    |
 | Node    | ≥ 20   |
 
@@ -82,23 +86,23 @@ Cada bloco com 1 frase de contexto. Sem prosa longa.
 
 ## Tarefas
 
-| # | Tarefa | Modelo | Notas |
-|---|---|---|---|
-| 4.1 | Ler `apps/02` e escolher endpoint para before/after | **Opus** | Decisão de positioning |
-| 4.2 | Escrever versão "manual" equivalente do endpoint escolhido | **Opus** | Realista, não palha |
-| 4.3 | Validar que o "depois" reproduz a mesma SQL para o caso de uso típico | **Opus** | Smoke manual |
-| 4.4 | Definir copy final do hero EN + PT (3 versões mentais, escolher 1) | **Opus** | Voz |
-| 4.5 | Definir layout exato e responsividade do before/after | **Opus** | UX call |
-| 4.6 | Conceituar OG image (composição visual + texto) | **Opus** | Não delegável |
-| 4.7 | Implementar nova `app/(home)/page.tsx` lendo do dicionário | Sonnet | Spec fechado |
-| 4.8 | Implementar nova `app/pt/page.tsx` espelho | Sonnet | Mesma estrutura |
-| 4.9 | Componente `<BeforeAfter>` reutilizável | Sonnet | Recebe duas strings de código + highlights |
-| 4.10 | Componente `<CompatMatrix>` | Sonnet | Recebe array tipado, renderiza |
-| 4.11 | Atualizar dicionário `i18n/dictionaries/{en,pt-BR}.ts` com `home.*` final | Sonnet | Após copy de Opus |
-| 4.12 | Renderizar OG image (Vercel OG API ou pré-renderizar PNG) | Sonnet | Implementação seguindo conceito |
-| 4.13 | Atualizar OG metadata em `app/layout.tsx` | Sonnet | Lê asset gerado |
-| 4.14 | Lighthouse (mobile, ambas as homes) | Haiku | LCP, CLS, Performance ≥ 90 |
-| 4.15 | Smoke `curl -I` nas duas homes | Haiku | 200 OK |
+| #    | Tarefa                                                                    | Modelo   | Notas                                      |
+| ---- | ------------------------------------------------------------------------- | -------- | ------------------------------------------ |
+| 4.1  | Ler `apps/02` e escolher endpoint para before/after                       | **Opus** | Decisão de positioning                     |
+| 4.2  | Escrever versão "manual" equivalente do endpoint escolhido                | **Opus** | Realista, não palha                        |
+| 4.3  | Validar que o "depois" reproduz a mesma SQL para o caso de uso típico     | **Opus** | Smoke manual                               |
+| 4.4  | Definir copy final do hero EN + PT (3 versões mentais, escolher 1)        | **Opus** | Voz                                        |
+| 4.5  | Definir layout exato e responsividade do before/after                     | **Opus** | UX call                                    |
+| 4.6  | Conceituar OG image (composição visual + texto)                           | **Opus** | Não delegável                              |
+| 4.7  | Implementar nova `app/(home)/page.tsx` lendo do dicionário                | Sonnet   | Spec fechado                               |
+| 4.8  | Implementar nova `app/pt/page.tsx` espelho                                | Sonnet   | Mesma estrutura                            |
+| 4.9  | Componente `<BeforeAfter>` reutilizável                                   | Sonnet   | Recebe duas strings de código + highlights |
+| 4.10 | Componente `<CompatMatrix>`                                               | Sonnet   | Recebe array tipado, renderiza             |
+| 4.11 | Atualizar dicionário `i18n/dictionaries/{en,pt-BR}.ts` com `home.*` final | Sonnet   | Após copy de Opus                          |
+| 4.12 | Renderizar OG image (Vercel OG API ou pré-renderizar PNG)                 | Sonnet   | Implementação seguindo conceito            |
+| 4.13 | Atualizar OG metadata em `app/layout.tsx`                                 | Sonnet   | Lê asset gerado                            |
+| 4.14 | Lighthouse (mobile, ambas as homes)                                       | Haiku    | LCP, CLS, Performance ≥ 90                 |
+| 4.15 | Smoke `curl -I` nas duas homes                                            | Haiku    | 200 OK                                     |
 
 ## Arquivos que vão mudar
 

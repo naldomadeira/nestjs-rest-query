@@ -2,14 +2,14 @@
 
 ## Prerequisites
 
-| Dependency        | Version   | Required                    |
-| ----------------- | --------- | --------------------------- |
-| NestJS            | `^11.0.0` | Yes                         |
-| Node.js           | `>= 20`   | Yes                         |
+| Dependency        | Version   | Required                               |
+| ----------------- | --------- | -------------------------------------- |
+| NestJS            | `^11.0.0` | Yes                                    |
+| Node.js           | `>= 20`   | Yes                                    |
 | TypeORM           | `^0.3.26` | If using the TypeORM adapter (default) |
-| `@nestjs/typeorm` | `^11.0.0` | If using the TypeORM adapter |
-| Drizzle ORM       | `^0.45`   | If using the Drizzle adapter |
-| `@nestjs/swagger` | `^11.0.0` | Only for `@ApiDynamicQuery` |
+| `@nestjs/typeorm` | `^11.0.0` | If using the TypeORM adapter           |
+| Drizzle ORM       | `^0.45`   | If using the Drizzle adapter           |
+| `@nestjs/swagger` | `^11.0.0` | Only for `@ApiDynamicQuery`            |
 
 ## Installation
 
@@ -46,12 +46,15 @@ async function bootstrap() {
     new ValidationPipe({
       transform: true,
       transformOptions: { enableImplicitConversion: true },
-    }),
+    })
   );
 
   // 3. OPTIONAL: Swagger setup with DQB interceptor
   // Only needed if you use @ApiDynamicQuery and want to test filters in Swagger UI.
-  const config = new DocumentBuilder().setTitle('API').setVersion('1.0').build();
+  const config = new DocumentBuilder()
+    .setTitle('API')
+    .setVersion('1.0')
+    .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document, {
     swaggerOptions: { requestInterceptor: dqbSwaggerRequestInterceptor },
@@ -75,7 +78,9 @@ import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
 
 @Module({
   imports: [
-    TypeOrmModule.forRoot({ /* your config */ }),
+    TypeOrmModule.forRoot({
+      /* your config */
+    }),
     DynamicQueryBuilderModule.forRoot(),
   ],
 })
@@ -115,18 +120,31 @@ DynamicQueryBuilderModule.forRoot({
 
   pagination: {
     defaultPerPage: 10, // Items per page when not specified (default: 10)
-    maxPerPage: 100,    // Maximum allowed perPage value (default: 100)
+    maxPerPage: 100, // Maximum allowed perPage value (default: 100)
   },
 
   operators: {
     // Restrict globally which operators are available.
     // undefined = all 14 operators allowed.
-    allowed: ['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'like', 'ilike', 'in', 'notIn', 'between', 'isNull'],
+    allowed: [
+      'eq',
+      'ne',
+      'gt',
+      'gte',
+      'lt',
+      'lte',
+      'like',
+      'ilike',
+      'in',
+      'notIn',
+      'between',
+      'isNull',
+    ],
   },
 
   logging: {
-    enabled: false,    // Enable query builder logging (default: false)
-    level: 'info',     // 'error' | 'warn' | 'info' | 'debug'
+    enabled: false, // Enable query builder logging (default: false)
+    level: 'info', // 'error' | 'warn' | 'info' | 'debug'
     logger: undefined, // Custom logger instance (must implement LoggerLike)
   },
 });

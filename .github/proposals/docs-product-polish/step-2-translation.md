@@ -22,21 +22,21 @@ Step-1 mergeado (dicionário de chrome existindo, refactor invisível concluído
 
 Antes de Sonnet começar a traduzir, Opus fixa em `lib/i18n/glossary.md` (não-código, doc para revisores):
 
-| Termo | EN | PT-BR |
-|---|---|---|
-| whitelist | whitelist | whitelist (mantém) |
-| filter (URL/UI) | filter | filtro |
-| sort | sort | ordenação |
-| field | field | campo |
-| relation | relation | relação |
-| decorator | decorator | decorator (mantém) |
-| rule (RulesConfig) | rule | regra |
-| pagination | pagination | paginação |
-| query string | query string | query string (mantém) |
-| query param | query parameter | parâmetro de query |
-| handler | handler | handler (mantém) |
-| repository | repository | repository (mantém) |
-| middleware | middleware | middleware (mantém) |
+| Termo              | EN              | PT-BR                 |
+| ------------------ | --------------- | --------------------- |
+| whitelist          | whitelist       | whitelist (mantém)    |
+| filter (URL/UI)    | filter          | filtro                |
+| sort               | sort            | ordenação             |
+| field              | field           | campo                 |
+| relation           | relation        | relação               |
+| decorator          | decorator       | decorator (mantém)    |
+| rule (RulesConfig) | rule            | regra                 |
+| pagination         | pagination      | paginação             |
+| query string       | query string    | query string (mantém) |
+| query param        | query parameter | parâmetro de query    |
+| handler            | handler         | handler (mantém)      |
+| repository         | repository      | repository (mantém)   |
+| middleware         | middleware      | middleware (mantém)   |
 
 **Princípio:** termos que o desenvolvedor encontra **literal no código** ficam em EN. Termos de UX traduzem.
 
@@ -61,6 +61,7 @@ apps/docs/content/docs/
 Cada arquivo MDX em `pt-BR/` ganha um par em `en/` com a mesma estrutura. Tradução fiel ao glossário, **não** reformulação.
 
 Ordem sugerida (mais visível primeiro):
+
 1. `index.mdx`
 2. `getting-started/*`
 3. `adapters/index.mdx` + `typeorm.mdx` + `drizzle.mdx`
@@ -69,6 +70,7 @@ Ordem sugerida (mais visível primeiro):
 6. `advanced/*`
 
 **Opus revisa amostragem (3 páginas obrigatórias antes de Sonnet continuar):**
+
 - `index.mdx` — define o tom de toda a docs.
 - `getting-started/prerequisites.mdx` — primeira leitura do dev.
 - `adapters/index.mdx` — termos técnicos centrais.
@@ -109,6 +111,7 @@ Seguindo decisão estratégica #6 do PLAN: slugs em **inglês também no PT**.
 ### 2.7 Flip do default (Sonnet)
 
 Última edição do PR:
+
 - `lib/i18n/types.ts` → `defaultLocale = 'en'`
 - Components atualmente lendo `defaultLocale` agora retornam EN
 - `/` agora serve EN; `/pt/docs/...` serve PT
@@ -137,12 +140,12 @@ Falha o PR se algum 4xx/5xx aparecer.
 
 ## Riscos e mitigações
 
-| Risco | Mitigação |
-|---|---|
-| Tradução robotizada / drift de tom | Opus revisa as 3 páginas-âncora **antes** de Sonnet continuar |
-| Fumadocs source não suporta bem pasta-por-locale | Plan B documentado em `step-1.4`; se aparecer aqui, Opus reavalia migrar para Fumadocs i18n nativo |
-| Rota espelho não existe (página em PT, não em EN) | Switcher cai para raiz do locale alvo + log silencioso pra acompanhar |
-| Build estático fica lento | Aceitar — é build, não runtime |
+| Risco                                             | Mitigação                                                                                          |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Tradução robotizada / drift de tom                | Opus revisa as 3 páginas-âncora **antes** de Sonnet continuar                                      |
+| Fumadocs source não suporta bem pasta-por-locale  | Plan B documentado em `step-1.4`; se aparecer aqui, Opus reavalia migrar para Fumadocs i18n nativo |
+| Rota espelho não existe (página em PT, não em EN) | Switcher cai para raiz do locale alvo + log silencioso pra acompanhar                              |
+| Build estático fica lento                         | Aceitar — é build, não runtime                                                                     |
 
 ## Não escopo
 

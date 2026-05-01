@@ -28,32 +28,34 @@ const navLinks = [
 ```
 
 Skills:
+
 - **Footer link** discreto (mesmo nível que License, Changelog).
 - **Item dentro de `/docs`** no sidebar, no mesmo nível que "Adapters", "Advanced".
 - Continua acessível em ≤ 2 cliques de qualquer página.
 - Continua **só em EN** (decisão estratégica #3 do PLAN: Skills é apêndice, não traduz).
 
 Razões:
+
 - Audiência primária da home é dev escolhendo a lib. Skills é secundária.
 - Skills serve agentes — agente lê `SKILL.md` direto, não precisa de visibilidade no nav.
 - Manter descobrível mas sem competir com Docs.
 
 ## Tarefas
 
-| # | Tarefa | Modelo | Notas |
-|---|---|---|---|
-| 5.1 | Definir copy final dos CTAs e dos meta tags afetados (EN + PT) | **Opus** | Continua proteção contra "ajuste mecânico apaga nuance" |
-| 5.2 | Decidir slug da seção Skills dentro de `/docs` (`/docs/skills`? `/docs/integrations/skills`?) | **Opus** | Hierarquia |
-| 5.3 | Atualizar `app/(docs)/layout.tsx` — remover entrada Skills do `navLinks` | Sonnet | Edit pequeno |
-| 5.4 | Adicionar entrada de Skills no sidebar (`content/docs/en/meta.json`) | Sonnet | Mapping |
-| 5.5 | Criar `content/docs/en/skills.mdx` que linka pra `/skills` (mantém URL) | Sonnet | Bridge page; explica e linka |
-| 5.6 | Adicionar `<Footer>` (ou ajustar existente) com link Skills | Sonnet | Component |
-| 5.7 | Atualizar dicionário `i18n/dictionaries/{en,pt-BR}.ts` — chaves `nav.*`, `footer.*` | Sonnet | Reflete decisão |
-| 5.8 | Atualizar `apps/docs/app/(home)/page.tsx` se algum CTA mencionar Skills | Sonnet | Spec de Opus |
-| 5.9 | Atualizar `metadata` da home (description) se mencionar Skills | Sonnet | Idem |
-| 5.10 | Atualizar `og-home.png` se conceito da Step-4 mencionava Skills | Sonnet | Reusa pipeline da Step-4 |
-| 5.11 | Smoke: crawl de todas as páginas, sem 404 em links internos | Haiku | curl + lista |
-| 5.12 | Verificar redirect/canonical para `/skills` original | Haiku | curl -I |
+| #    | Tarefa                                                                                        | Modelo   | Notas                                                   |
+| ---- | --------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------- |
+| 5.1  | Definir copy final dos CTAs e dos meta tags afetados (EN + PT)                                | **Opus** | Continua proteção contra "ajuste mecânico apaga nuance" |
+| 5.2  | Decidir slug da seção Skills dentro de `/docs` (`/docs/skills`? `/docs/integrations/skills`?) | **Opus** | Hierarquia                                              |
+| 5.3  | Atualizar `app/(docs)/layout.tsx` — remover entrada Skills do `navLinks`                      | Sonnet   | Edit pequeno                                            |
+| 5.4  | Adicionar entrada de Skills no sidebar (`content/docs/en/meta.json`)                          | Sonnet   | Mapping                                                 |
+| 5.5  | Criar `content/docs/en/skills.mdx` que linka pra `/skills` (mantém URL)                       | Sonnet   | Bridge page; explica e linka                            |
+| 5.6  | Adicionar `<Footer>` (ou ajustar existente) com link Skills                                   | Sonnet   | Component                                               |
+| 5.7  | Atualizar dicionário `i18n/dictionaries/{en,pt-BR}.ts` — chaves `nav.*`, `footer.*`           | Sonnet   | Reflete decisão                                         |
+| 5.8  | Atualizar `apps/docs/app/(home)/page.tsx` se algum CTA mencionar Skills                       | Sonnet   | Spec de Opus                                            |
+| 5.9  | Atualizar `metadata` da home (description) se mencionar Skills                                | Sonnet   | Idem                                                    |
+| 5.10 | Atualizar `og-home.png` se conceito da Step-4 mencionava Skills                               | Sonnet   | Reusa pipeline da Step-4                                |
+| 5.11 | Smoke: crawl de todas as páginas, sem 404 em links internos                                   | Haiku    | curl + lista                                            |
+| 5.12 | Verificar redirect/canonical para `/skills` original                                          | Haiku    | curl -I                                                 |
 
 ## Arquivos que vão mudar
 

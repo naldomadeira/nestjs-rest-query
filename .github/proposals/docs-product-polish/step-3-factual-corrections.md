@@ -21,15 +21,18 @@ Step-2 mergeado (estrutura por locale existe; conteúdo PT e EN em paralelo).
 ### 3.1 Reescrever `prerequisites.mdx` (Drizzle estável) — em ambos locales (Sonnet)
 
 Hoje (em PT, será espelhado em EN após step-2):
+
 - Linha 8: "Esta lib foi pensada para aplicações NestJS que usam TypeORM..."
 - Linhas 49-55: callout 🔭 com "Roadmap — Prisma e Drizzle" dizendo "suporte atual é exclusivo para TypeORM".
 
 Atualizar para:
+
 - Linha 8: mencionar **TypeORM e Drizzle**.
 - Renomear seção "TypeORM" para "Adapters suportados" com sub-seções TypeORM e Drizzle.
 - Callout 🔭 vira "Prisma — roadmap" apenas.
 
 Aplicar em:
+
 - `apps/docs/content/docs/en/getting-started/prerequisites.mdx`
 - `apps/docs/content/docs/pt-BR/getting-started/prerequisites.mdx`
 

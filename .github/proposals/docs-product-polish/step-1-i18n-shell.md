@@ -81,6 +81,7 @@ Por enquanto resolve pra `pt-BR` em build. No step-2 vira dinâmico.
 ### 1.4 Validar com Fumadocs (Opus)
 
 Antes de Sonnet começar, Opus confirma:
+
 - Fumadocs aceita conviver com nosso dicionário paralelo (não sobrepõe seus próprios mecanismos de i18n).
 - Não há conflito com `lib/source.ts` ou `source.config.ts`.
 
@@ -105,5 +106,6 @@ Se aparecer fricção, Opus reavalia se vale usar [Fumadocs i18n nativo](https:/
 ## Tarefas mecânicas (Haiku, opcional)
 
 Se Sonnet preferir delegar:
+
 - Inventariar todas as strings PT hard-coded com `grep -rn "PT regex" apps/docs/app/`.
 - Gerar lista CSV (arquivo, linha, string) para Sonnet usar como to-do.

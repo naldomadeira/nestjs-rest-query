@@ -38,6 +38,7 @@ export function getAlternates(slug: string, locale: Locale) {
 ```
 
 Aplicar em:
+
 - `app/(home)/page.tsx`
 - `app/pt/page.tsx`
 - `app/(docs)/[...slug]/page.tsx` (via `generateMetadata`)
@@ -49,8 +50,16 @@ Aplicar em:
 ```html
 <link rel="canonical" href="https://.../docs/adapters/drizzle" />
 <link rel="alternate" hreflang="en" href="https://.../docs/adapters/drizzle" />
-<link rel="alternate" hreflang="pt-BR" href="https://.../pt/docs/adapters/drizzle" />
-<link rel="alternate" hreflang="x-default" href="https://.../docs/adapters/drizzle" />
+<link
+  rel="alternate"
+  hreflang="pt-BR"
+  href="https://.../pt/docs/adapters/drizzle"
+/>
+<link
+  rel="alternate"
+  hreflang="x-default"
+  href="https://.../docs/adapters/drizzle"
+/>
 ```
 
 ### 6.2 Sitemap com ambos locales (Haiku)
@@ -84,6 +93,7 @@ Decisão de arquitetura (Opus referee se aparecer dúvida):
 Recomendação: **Plan A**. Resultado de search em PT não vaza pra EN.
 
 Implementação:
+
 - `lib/source.ts` ganha helpers `getEnSource()`, `getPtSource()` retornando trees separadas.
 - API route ou client de search inicializado com source apropriado por rota.
 - UI de search reusa o componente atual mas alimentado pelo source correto.
@@ -109,6 +119,7 @@ lighthouse https://localhost:9001/docs/adapters/drizzle \
 ```
 
 Verificar:
+
 - `hreflang` válido em todas as páginas amostradas (5 EN + 5 PT).
 - `canonical` correto.
 - `lang` no `<html>` correto.

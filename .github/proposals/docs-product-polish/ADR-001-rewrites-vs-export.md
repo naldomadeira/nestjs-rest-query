@@ -41,7 +41,9 @@ Se os rewrites são todos dev-only ou removíveis:
 const nextConfig: NextConfig = {
   output: 'export',
   ...(process.env.NODE_ENV === 'development' && {
-    rewrites: async () => [/* dev-only rewrites */],
+    rewrites: async () => [
+      /* dev-only rewrites */
+    ],
   }),
 };
 ```
