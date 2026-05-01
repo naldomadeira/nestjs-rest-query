@@ -1,0 +1,80 @@
+---
+title: Introdução
+description: O que é o nestjs-rest-query e por que utilizá-lo.
+---
+
+**`nestjs-rest-query`** é uma biblioteca para NestJS que constrói instâncias de `SelectQueryBuilder` do TypeORM de forma dinâmica a partir de parâmetros de query HTTP — filtros, ordenações, paginação, seleção de campos e carregamento de relações — tudo controlado por uma whitelist de segurança por endpoint.
+
+## Fluxo principal
+
+```mermaid
+flowchart TD
+  subgraph IN["Requisição HTTP"]
+    Q["GET /users\n?filter[status][eq]=active\n&sort=name,-createdAt\n&fields=id,name,status\n&page=1&perPage=20"]
+  end
+
+  subgraph CTRL["Controller (por endpoint)"]
+    D["@ApiDynamicQuery / @DynamicQuery\ndefine: filters · sorts · fields · includes"]
+  end
+
+  subgraph LIB["nestjs-rest-query"]
+    W["Whitelist de segurança\nvalida campos e operadores permitidos"]
+    H["applyFilters · applySorts · applyFields\napplyIncludes · applyPagination"]
+    W --> H
+  end
+
+  subgraph OUT["Resposta"]
+    R["{ data[], page, perPage, total, lastPage }"]
+  end
+
+  IN --> CTRL
+  CTRL --> LIB
+  LIB --> OUT
+```
+
+Cada endpoint declara sua própria whitelist via `@ApiDynamicQuery` (com OpenAPI) ou `@DynamicQuery` (sem). Em runtime, `QueryBuilderService` valida os parâmetros recebidos contra essa whitelist, aplica cada handler e devolve o resultado já paginado.
+
+## Funcionalidades
+
+- **Filtros dinâmicos** — filtre por qualquer campo permitido usando operadores como `eq`, `like`, `in`, `between`, `isNull` e mais
+- **Ordenação** — ordenação multi-coluna com `ASC` / `DESC`, controlada por endpoint
+- **Paginação** — baseada em página ou limit/offset, com `page`, `perPage`, `total` e `lastPage` no topo da resposta
+- **Seleção de campos** — retorne apenas as colunas que o cliente precisa
+- **Carregamento de relações** — carregue relações TypeORM declaradas na sua whitelist
+- **Whitelist de segurança** — os decorators `@ApiDynamicQuery` / `@DynamicQuery` definem exatamente quais campos e operadores cada endpoint permite
+- **Integração com Swagger** — `@ApiDynamicQuery` gera automaticamente decorators `@ApiQuery` para todos os parâmetros de query suportados
+- **Totalmente tipado** — escrito em TypeScript, com definições de tipos completas
+
+## Como funciona
+
+1. Decore o método do seu controller com `@ApiDynamicQuery(rules)` (ou `@DynamicQuery(rules)`)
+2. Adicione `@QueryRules()` como decorator de parâmetro para receber as regras em tempo de execução
+3. Chame `queryBuilderService.execute(repo, query, rules)` — a biblioteca aplica filtros, ordenações, paginação e relações, retornando os resultados com os dados de paginação no topo da resposta
+
+```typescript
+@Get()
+@ApiDynamicQuery({
+  filters: ['name', 'status', 'createdAt'],
+  sorts: ['name', 'createdAt'],
+  includes: ['company'],
+})
+findAll(
+  @Query() query: DynamicQueryDto,
+  @QueryRules() rules: RulesConfig,
+) {
+  return this.queryBuilderService.execute(this.repo, query, rules);
+}
+```
+
+## Começar
+
+<Cards>
+  <Card
+    title="Pré-requisito NestJS"
+    href="/docs/getting-started/prerequisites"
+  />
+  <Card title="Instalação" href="/docs/getting-started/installation" />
+  <Card title="Primeiro endpoint" href="/docs/getting-started/first-endpoint" />
+  <Card title="Swagger" href="/docs/swagger" />
+  <Card title="Customizando a Query" href="/docs/advanced/customizing" />
+</Cards>

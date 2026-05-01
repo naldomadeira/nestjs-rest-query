@@ -50,7 +50,7 @@ const docsLayoutStyle = {
 const DocsRootLayout = ({ children }: DocsRootLayoutProps) => (
   <HomeLayout nav={{ title: navTitle, url: '/' }} links={navLinks}>
     <DocsLayout
-      tree={source.pageTree}
+      tree={source.pageTree[defaultLocale]}
       nav={{ enabled: false }}
       sidebar={{ tabs: false, collapsible: true }}
       containerProps={{ style: docsLayoutStyle }}
