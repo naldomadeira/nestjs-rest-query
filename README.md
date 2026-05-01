@@ -6,12 +6,12 @@
 
 Turn `?filters[email][like]=acme&sorts=-createdAt&page=2` into safe, typed database queries — without writing a single `WHERE` clause.
 
-[![npm version](https://img.shields.io/npm/v/nestjs-rest-query.svg?style=flat-square)](https://www.npmjs.com/package/nestjs-rest-query)
+[![npm version](https://img.shields.io/npm/v/nestjs-rest-query.svg?style=flat-square&logo=npm)](https://www.npmjs.com/package/nestjs-rest-query)
 [![npm downloads](https://img.shields.io/npm/dm/nestjs-rest-query.svg?style=flat-square)](https://www.npmjs.com/package/nestjs-rest-query)
-[![CI](https://img.shields.io/github/actions/workflow/status/naldomadeira/nestjs-rest-query/ci.yml?branch=main&style=flat-square)](https://github.com/naldomadeira/nestjs-rest-query/actions/workflows/ci.yml)
-[![Documentation](https://img.shields.io/badge/docs-naldomadeira.github.io%2Fnestjs--rest--query-2563eb?style=flat-square)](https://naldomadeira.github.io/nestjs-rest-query/)
+[![CI](https://img.shields.io/github/actions/workflow/status/naldomadeira/nestjs-rest-query/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/naldomadeira/nestjs-rest-query/actions/workflows/ci.yml)
+[![OSSF Scorecard](https://api.scorecard.dev/projects/github.com/naldomadeira/nestjs-rest-query/badge?style=flat-square)](https://scorecard.dev/viewer/?uri=github.com/naldomadeira/nestjs-rest-query)
+[![Provenance](https://img.shields.io/badge/published%20with-provenance-brightgreen?style=flat-square&logo=npm)](https://www.npmjs.com/package/nestjs-rest-query)
 [![License](https://img.shields.io/npm/l/nestjs-rest-query.svg?style=flat-square)](./LICENSE)
-[![Bundle size](https://img.shields.io/bundlephobia/minzip/nestjs-rest-query?style=flat-square)](https://bundlephobia.com/package/nestjs-rest-query)
 
 </div>
 
@@ -36,13 +36,20 @@ NestJS has controllers. TypeORM has a query builder. The boilerplate between the
 - 🛡️ **Type-safe** end-to-end.
 - 🪶 **Zero runtime dependencies** beyond your peers.
 
-## Roadmap
+## Compatibility
 
-| ORM     | Status         |
-| ------- | -------------- |
-| TypeORM | ✅ Stable      |
-| Drizzle | ✅ Stable      |
-| Prisma  | 🚧 Coming soon |
+| nestjs-rest-query | NestJS | TypeORM | Drizzle  | Node   |
+| ----------------- | ------ | ------- | -------- | ------ |
+| `2.x`             | `11.x` | `0.3.x` | `0.45.x` | `>=20` |
+| `1.x`             | `11.x` | `0.3.x` | —        | `>=20` |
+
+## Adapters
+
+| ORM     | Status         | Import path                 |
+| ------- | -------------- | --------------------------- |
+| TypeORM | ✅ Stable      | `nestjs-rest-query`         |
+| Drizzle | ✅ Stable      | `nestjs-rest-query/drizzle` |
+| Prisma  | 🚧 Coming soon | —                           |
 
 Want a different ORM? [Open a discussion](https://github.com/naldomadeira/nestjs-rest-query/discussions).
 
@@ -260,11 +267,17 @@ See [SECURITY.md](./SECURITY.md) for vulnerability reporting.
 | `@QueryRules()`                               | Parameter decorator — injects rules at runtime.      |
 | `RulesConfig`, `QueryInput`, `QueryResult<T>` | Public types.                                        |
 
-A future major release will rename these to `RestQueryModule`, `RestQueryService`, `@RestQuery`, etc. See [MIGRATION.md](./MIGRATION.md).
+## Try a PR before it ships
 
-## Migration
+Every pull request publishes a one-off preview release via [pkg.pr.new](https://pkg.pr.new). Install it with:
 
-If you used the internal `@multitechbr/nestjs-dynamic-query-builder`, see [MIGRATION.md](./MIGRATION.md). The behavior is identical; only the package name changes in 1.0.0.
+```bash
+pnpm add https://pkg.pr.new/naldomadeira/nestjs-rest-query@<commit-or-pr>
+```
+
+## Supply chain
+
+Releases are published with [npm provenance](https://docs.npmjs.com/generating-provenance-statements) via GitHub Actions Trusted Publishing — no long-lived `NPM_TOKEN`. Each release tarball can be cryptographically traced to the exact commit and workflow run that built it.
 
 ## Contributing
 

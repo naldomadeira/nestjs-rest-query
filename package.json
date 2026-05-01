@@ -37,6 +37,7 @@
     "docs:build": "pnpm --filter docs build",
     "docs:start": "pnpm --filter docs start"
   },
+  "type": "commonjs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -51,6 +52,17 @@
     "./drizzle": {
       "types": "./dist/infra/adapters/drizzle.adapter.d.ts",
       "require": "./dist/infra/adapters/drizzle.adapter.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "typeorm": [
+        "./dist/infra/adapters/typeorm.adapter.d.ts"
+      ],
+      "drizzle": [
+        "./dist/infra/adapters/drizzle.adapter.d.ts"
+      ]
     }
   },
   "files": [

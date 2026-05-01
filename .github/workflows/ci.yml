@@ -54,3 +54,9 @@ jobs:
       - run: pnpm pack --pack-destination /tmp
       - name: Inspect tarball contents
         run: tar -tzf /tmp/nestjs-rest-query-*.tgz | sort
+
+      - name: Validate package.json (publint)
+        run: pnpm dlx publint@latest
+
+      - name: Validate type exports (attw)
+        run: pnpm dlx @arethetypeswrong/cli@latest --pack .
