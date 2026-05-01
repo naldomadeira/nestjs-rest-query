@@ -61,10 +61,10 @@ Relations:
 curl "http://localhost:3002/users?page=1&perPage=10"
 
 # Filter by email (ilike)
-curl "http://localhost:3002/users?filters[email][ilike]=%@acme.com&page=1&perPage=10"
+curl "http://localhost:3002/users?filter[email][ilike]=acme&page=1&perPage=10"
 
 # Filter by company name (nested relation)
-curl "http://localhost:3002/users?filters[company.name][eq]=Acme"
+curl "http://localhost:3002/users?filter[company.name][eq]=Acme"
 
 # Include posts (1:N pagination)
 curl "http://localhost:3002/users?includes=posts&page=1&perPage=2"
@@ -73,7 +73,7 @@ curl "http://localhost:3002/users?includes=posts&page=1&perPage=2"
 curl "http://localhost:3002/users?paginate=false"
 
 # Sort descending by creation date
-curl "http://localhost:3002/users?sorts=-createdAt"
+curl "http://localhost:3002/users?sort=-createdAt"
 
 # Select specific fields
 curl "http://localhost:3002/users?fields=id,name,email"
@@ -90,7 +90,7 @@ curl "http://localhost:3002/companies?includes=users"
 
 ```bash
 curl "http://localhost:3002/posts?page=1&perPage=10"
-curl "http://localhost:3002/posts?filters[title][ilike]=%featured%"
+curl "http://localhost:3002/posts?filter[title][ilike]=featured"
 curl "http://localhost:3002/posts?includes=user"
 ```
 

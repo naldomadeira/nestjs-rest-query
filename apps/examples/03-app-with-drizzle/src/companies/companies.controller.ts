@@ -12,7 +12,7 @@ import { CompaniesBusiness } from './companies.business';
 
 /**
  * Company entity shape for Swagger documentation. Relation slot
- * reflects the table-grouped shape produced by `DrizzleAdapter`.
+ * reflects the flat response produced by `DrizzleAdapter`.
  */
 class CompanyDto {
   id: string;

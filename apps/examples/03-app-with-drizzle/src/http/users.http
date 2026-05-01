@@ -37,26 +37,39 @@ GET {{baseUrl}}/users?filter[email][like]=acme
 ### ILike (case-insensitive contains)
 GET {{baseUrl}}/users?filter[email][ilike]=ACME
 
-### Not like / not ilike
+### Not like
 GET {{baseUrl}}/users?filter[name][notLike]=spam
+
+### Not ilike
 GET {{baseUrl}}/users?filter[name][notIlike]=DELETED
 
-### Comparison (date)
+### Greater than date
+# @name users_created_at_gt
 GET {{baseUrl}}/users?filter[createdAt][gt]=2024-01-01
+
+### Greater than or equal date
+# @name users_created_at_gte
 GET {{baseUrl}}/users?filter[createdAt][gte]=2024-01-01T00:00:00Z
+
+### Less than date
 GET {{baseUrl}}/users?filter[createdAt][lt]=2026-01-01
+
+### Less than or equal date
 GET {{baseUrl}}/users?filter[createdAt][lte]=2026-12-31
 
 ### IN / NOT IN
 GET {{baseUrl}}/users?filter[email][in]=ana.0@acmecorp.com,bia.1@acmecorp.com
 
+### NOT IN
 GET {{baseUrl}}/users?filter[email][notIn]=spam@example.com
 
-### NULL / BETWEEN
+### Is null
 GET {{baseUrl}}/users?filter[companyId][isNull]=true
 
+### Is not null
 GET {{baseUrl}}/users?filter[companyId][isNull]=false
 
+### Between dates
 GET {{baseUrl}}/users?filter[createdAt][between]=2024-01-01,2025-12-31
 
 # ─────────────────────────────────────────────────────────────────────
@@ -67,6 +80,7 @@ GET {{baseUrl}}/users?filter[createdAt][between]=2024-01-01,2025-12-31
 ### Adds whereJoin → count uses countDistinct(users.id)
 GET {{baseUrl}}/users?filter[company.name][eq]=Acme Corp
 
+### Filter by 1:1 relation column with ilike
 GET {{baseUrl}}/users?filter[company.name][ilike]=globex
 
 ### Filter by 1:N relation column (posts.title)
@@ -138,6 +152,19 @@ GET {{baseUrl}}/users?includes=company,posts&page=1&perPage=3
 GET {{baseUrl}}/users?filter[createdAt][gte]=2024-01-01&sort=-createdAt&fields=id,name,email,createdAt&page=1&perPage=10
 
 ### Relation filter + 1:N include + pagination (full picture)
+# @name users_two_phase_root_sort
+GET {{baseUrl}}/users?filter[company.name][ilike]=acme&includes=posts&sort=-createdAt&page=1&perPage=5
+
+# ─────────────────────────────────────────────────────────────────────
+# REGRESSIONS
+# ─────────────────────────────────────────────────────────────────────
+
+### Regression: temporal coercion on timestamp columns
+# @name users_regression_temporal_gte
+GET {{baseUrl}}/users?filter[createdAt][gte]=2024-01-01
+
+### Regression: two-phase pagination must keep root sort valid in Postgres
+# @name users_regression_two_phase_distinct_order
 GET {{baseUrl}}/users?filter[company.name][ilike]=acme&includes=posts&sort=-createdAt&page=1&perPage=5
 
 # ─────────────────────────────────────────────────────────────────────

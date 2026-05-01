@@ -68,6 +68,7 @@ interface DrizzleQBState {
   alias: string;
   whereClauses: SQL[];
   orderByClauses: SQL[];
+  sortEntries: Array<{ column: AnyColumn; dir: 'ASC' | 'DESC' }>;
   /**
    * When set, the adapter emits a table-grouped projection instead of
    * the default full-row select. Root columns + per-relation columns.
@@ -219,6 +220,54 @@ function coerceValueForOperator(
   }
 }
 
+function isTemporalColumn(column: AnyColumn): boolean {
+  const candidate = column as any;
+  const dataType = candidate?.dataType ?? candidate?._?.dataType;
+  const columnType = candidate?.columnType ?? candidate?._?.columnType;
+
+  return (
+    dataType === 'date' ||
+    (typeof columnType === 'string' &&
+      /(Date|Timestamp|Datetime)/.test(columnType))
+  );
+}
+
+function coerceTemporalValue(raw: unknown): Date | unknown {
+  if (raw === null || raw === undefined || raw instanceof Date) return raw;
+
+  if (typeof raw === 'string' || typeof raw === 'number') {
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) {
+      throw new BadRequestException(`Invalid date value: "${raw}"`);
+    }
+    return date;
+  }
+
+  return raw;
+}
+
+function coerceValueForColumn(
+  column: AnyColumn,
+  operator: QueryOperator,
+  raw: unknown
+): unknown {
+  const value = coerceValueForOperator(operator, raw);
+  if (!isTemporalColumn(column)) return value;
+
+  if (operator === 'between') {
+    const [a, b] = value as [unknown, unknown];
+    return [coerceTemporalValue(a), coerceTemporalValue(b)] as const;
+  }
+
+  if (operator === 'in' || operator === 'notIn') {
+    return Array.isArray(value) ? value.map(coerceTemporalValue) : value;
+  }
+
+  if (operator === 'isNull') return value;
+
+  return coerceTemporalValue(value);
+}
+
 function translateOperator(
   column: AnyColumn,
   operator: QueryOperator,
@@ -302,6 +351,7 @@ export class DrizzleAdapter
       alias,
       whereClauses: [],
       orderByClauses: [],
+      sortEntries: [],
       selectFields: undefined,
       whereJoins: new Map(),
       presentationJoins: new Map(),
@@ -444,6 +494,7 @@ export class DrizzleAdapter
 
       const column = resolveDottedField(qb, field, 'presentation');
       qb.orderByClauses.push(dir === 'DESC' ? desc(column) : asc(column));
+      qb.sortEntries.push({ column, dir });
     }
     log.debug('sorts resolved', { count: seen.size });
   }
@@ -693,7 +744,8 @@ export class DrizzleAdapter
       );
     }
 
-    const value = coerceValueForOperator(operator, raw);
+    const column = resolveDottedField(qb, field, 'where');
+    const value = coerceValueForColumn(column, operator, raw);
 
     // Skip empty IN / NOT IN — matches existing TypeORM handler behavior.
     if (
@@ -704,7 +756,6 @@ export class DrizzleAdapter
       return;
     }
 
-    const column = resolveDottedField(qb, field, 'where');
     const sql = translateOperator(column, operator, value);
     if (sql) qb.whereClauses.push(sql);
   }
@@ -786,8 +837,15 @@ export class DrizzleAdapter
 
   private buildRootIdsQuery(qb: DrizzleQBState) {
     const { db, table, primaryKey } = qb.source;
+    const distinctShape: Record<string, AnyColumn> = {
+      [primaryKey.name]: primaryKey,
+    };
+    qb.sortEntries.forEach(({ column }, index) => {
+      distinctShape[`__sort_${index}`] = column;
+    });
+
     let q: any = (db as any)
-      .selectDistinct({ [primaryKey.name]: primaryKey })
+      .selectDistinct(distinctShape)
       .from(table)
       .$dynamic();
     for (const [, j] of qb.whereJoins) q = q.leftJoin(j.table, j.on);

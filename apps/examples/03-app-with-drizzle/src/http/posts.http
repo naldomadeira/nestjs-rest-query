@@ -22,13 +22,14 @@ GET {{baseUrl}}/posts?paginate=false
 # FILTERS — root columns
 # ─────────────────────────────────────────────────────────────────────
 
-### Exact
+### ILike
 GET {{baseUrl}}/posts?filter[title][ilike]=Hello
 
 ### ILike + sort
 GET {{baseUrl}}/posts?filter[title][ilike]=intro&sort=-createdAt
 
 ### Date comparison
+# @name posts_created_at_gte
 GET {{baseUrl}}/posts?filter[createdAt][gte]=2024-01-01
 
 ### Between
@@ -86,3 +87,11 @@ GET {{baseUrl}}/posts?filter[title][ilike]=hello&sort=-createdAt&includes=user&p
 
 ### Relation filter + sort by relation + include
 GET {{baseUrl}}/posts?filter[user.email][ilike]=acme&sort=-user.name&includes=user&page=1&perPage=10
+
+# ─────────────────────────────────────────────────────────────────────
+# REGRESSIONS
+# ─────────────────────────────────────────────────────────────────────
+
+### Regression: temporal coercion on timestamp columns
+# @name posts_regression_temporal_gte
+GET {{baseUrl}}/posts?filter[createdAt][gte]=2024-01-01
