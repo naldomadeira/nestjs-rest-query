@@ -29,6 +29,7 @@ GET {{baseUrl}}/companies?filter[name][eq]=Acme Corp
 GET {{baseUrl}}/companies?filter[name][ilike]=tech
 
 ### Date comparison
+# @name companies_created_at_gte
 GET {{baseUrl}}/companies?filter[createdAt][gte]=2024-01-01
 
 ### IN
@@ -82,3 +83,15 @@ GET {{baseUrl}}/companies?filter[name][ilike]=acme&includes=users&page=1&perPage
 
 ### Relation filter + include
 GET {{baseUrl}}/companies?filter[users.email][ilike]=acme&includes=users&page=1&perPage=3
+
+# ─────────────────────────────────────────────────────────────────────
+# REGRESSIONS
+# ─────────────────────────────────────────────────────────────────────
+
+### Regression: temporal coercion on timestamp columns
+# @name companies_regression_temporal_gte
+GET {{baseUrl}}/companies?filter[createdAt][gte]=2024-01-01
+
+### Regression: 1:N include + root sort stays valid under two-phase pagination
+# @name companies_regression_two_phase_root_sort
+GET {{baseUrl}}/companies?includes=users&sort=-createdAt&page=1&perPage=5
