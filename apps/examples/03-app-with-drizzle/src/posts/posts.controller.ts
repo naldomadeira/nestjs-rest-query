@@ -12,7 +12,7 @@ import { PostsBusiness } from './posts.business';
 
 /**
  * Post entity shape for Swagger documentation. Relation slot
- * reflects the table-grouped shape produced by `DrizzleAdapter`.
+ * reflects the flat response produced by `DrizzleAdapter`.
  */
 class PostDto {
   id: string;

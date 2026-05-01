@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { BadRequestException } from '@nestjs/common';
+import { PgDialect, pgTable, timestamp, uuid } from 'drizzle-orm/pg-core';
 import {
   DrizzleAdapter,
   type DrizzleQB,
@@ -51,6 +52,7 @@ const usersCols = {
   email: fakeColumn('users', 'email'),
   name: fakeColumn('users', 'name'),
   companyId: fakeColumn('users', 'company_id'),
+  createdAt: fakeColumn('users', 'created_at'),
 };
 const users = fakeTable('users', usersCols);
 
@@ -64,8 +66,14 @@ const postsCols = {
   id: fakeColumn('posts', 'id'),
   title: fakeColumn('posts', 'title'),
   userId: fakeColumn('posts', 'user_id'),
+  createdAt: fakeColumn('posts', 'created_at'),
 };
 const posts = fakeTable('posts', postsCols);
+
+const temporalUsers = pgTable('temporal_users', {
+  id: uuid('id').primaryKey(),
+  createdAt: timestamp('created_at').notNull(),
+});
 
 // ----------------------------------------------------------------------
 // Helpers
@@ -310,6 +318,29 @@ describe('DrizzleAdapter', () => {
           { allowed: ['eq'] }
         )
       ).toThrow(/not allowed/);
+    });
+
+    it('coerces timestamp filters to Date-compatible values before SQL compilation', () => {
+      const adapter = new DrizzleAdapter();
+      const stub = makeStubDb();
+      const qb = adapter.createQueryBuilder(
+        {
+          db: stub.db,
+          table: temporalUsers,
+          primaryKey: temporalUsers.id,
+        },
+        'user'
+      );
+
+      adapter.applyFilters(
+        qb,
+        { filter: { createdAt: { gte: '2024-01-01' } } } as any,
+        'user',
+        ['createdAt']
+      );
+
+      const dialect = new PgDialect();
+      expect(() => dialect.sqlToQuery(qb.whereClauses[0]!)).not.toThrow();
     });
   });
 
@@ -631,6 +662,56 @@ describe('DrizzleAdapter', () => {
       expect(
         stub.__calls.filter((c) => c.__kind === 'select' && c.__shape).length
       ).toBe(0);
+    });
+
+    it('projects ORDER BY columns in phase 1 DISTINCT query when sorting paginated roots', async () => {
+      const adapter = new DrizzleAdapter();
+      const stub = makeStubDb();
+      stub.__setIdRows([{ id: 'u1' }, { id: 'u2' }]);
+      stub.__setRows([
+        {
+          user: { id: 'u1', name: 'Ana', created_at: '2024-01-02' },
+          posts: { id: 'p1', title: 'A' },
+        },
+        {
+          user: { id: 'u2', name: 'Bia', created_at: '2024-01-01' },
+          posts: null,
+        },
+      ]);
+      stub.__setCount(2);
+
+      const qb = adapter.createQueryBuilder(
+        baseSource(stub.db, {
+          relations: {
+            posts: {
+              table: posts,
+              on: {} as any,
+              cardinality: 'many',
+              primaryKey: postsCols.id,
+            },
+          },
+        }),
+        'user'
+      );
+
+      adapter.applyIncludes(qb, { includes: 'posts' } as any, 'user', [
+        'posts',
+      ]);
+      adapter.applySorts(qb, { sort: '-createdAt' } as any, 'user', [
+        'createdAt',
+      ]);
+
+      await adapter.applyPagination(qb, {
+        page: 1,
+        perPage: 5,
+      } as any);
+
+      const distinctCall = stub.__calls.find(
+        (c) => c.__kind === 'selectDistinct'
+      );
+      expect(Object.keys(distinctCall.__shape)).toEqual(
+        expect.arrayContaining(['id', '__sort_0'])
+      );
     });
   });
 

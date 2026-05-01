@@ -12,8 +12,8 @@ import { UsersBusiness } from './users.business';
 
 /**
  * User entity shape for Swagger documentation. Relation slots reflect
- * the table-grouped shape produced by `DrizzleAdapter` so the
- * generic-typed `RulesConfig<UserDto>` accepts include keys.
+ * the flat response produced by `DrizzleAdapter` so the generic-typed
+ * `RulesConfig<UserDto>` accepts include keys.
  */
 class UserDto {
   id: string;
