@@ -18,6 +18,10 @@ export function homePath(locale: Locale) {
   return `${localePrefix(locale)}/`;
 }
 
+export function skillsPath(locale: Locale) {
+  return `${localePrefix(locale)}/skills`;
+}
+
 export function absoluteUrl(path: string) {
   const normalized = path.startsWith('/') ? path.slice(1) : path;
   return new URL(normalized, metadataBase).toString();

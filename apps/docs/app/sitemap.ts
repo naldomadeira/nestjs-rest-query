@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import { absoluteUrl, docsPath, homePath } from '../lib/seo';
+import { absoluteUrl, docsPath, homePath, skillsPath } from '../lib/seo';
 import { source } from '../lib/source';
 
 export const dynamic = 'force-static';
@@ -20,7 +20,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     { url: absoluteUrl(homePath('en')), lastModified: now, priority: 1 },
     { url: absoluteUrl(homePath('pt-BR')), lastModified: now, priority: 0.8 },
-    { url: absoluteUrl('/skills'), lastModified: now, priority: 0.6 },
+    { url: absoluteUrl(skillsPath('en')), lastModified: now, priority: 0.6 },
+    {
+      url: absoluteUrl(skillsPath('pt-BR')),
+      lastModified: now,
+      priority: 0.6,
+    },
     ...enDocs,
     ...ptDocs,
   ];

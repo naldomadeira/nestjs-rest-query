@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { defaultLocale, getDictionary, type Locale } from '../lib/i18n';
+import { skillsPath } from '../lib/seo';
 
 const GITHUB_URL = 'https://github.com/naldomadeira/nestjs-rest-query';
 const LICENSE_URL = `${GITHUB_URL}/blob/main/LICENSE`;
@@ -30,7 +31,7 @@ export const SiteFooter = ({ locale }: SiteFooterProps) => {
             {t.footer.docs}
           </Link>
           <Link
-            href="/skills"
+            href={skillsPath(locale)}
             className="-mx-2 inline-flex h-11 min-w-11 items-center justify-center rounded-md px-2 hover:text-foreground"
           >
             {t.footer.skills}

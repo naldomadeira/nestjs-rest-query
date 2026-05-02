@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { SiGithub } from '@icons-pack/react-simple-icons';
 import { resolveDocsAssetPath } from '../lib/asset-path';
 import { defaultLocale, getDictionary, type Locale } from '../lib/i18n';
+import { skillsPath } from '../lib/seo';
 import { SiteFooter } from './site-footer';
 
 const GITHUB_URL = 'https://github.com/naldomadeira/nestjs-rest-query';
@@ -39,7 +40,7 @@ export const HomeShell = ({ locale, children }: HomeShellProps) => {
       }}
       links={[
         { text: t.nav.docs, url: `${prefix}/docs` },
-        { text: t.nav.skills, url: '/skills' },
+        { text: t.nav.skills, url: skillsPath(locale) },
         {
           type: 'icon' as const,
           text: t.nav.github,

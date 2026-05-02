@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { SiGithub } from '@icons-pack/react-simple-icons';
 import { resolveDocsAssetPath } from '../lib/asset-path';
 import { defaultLocale, getDictionary, type Locale } from '../lib/i18n';
+import { skillsPath } from '../lib/seo';
 import { source } from '../lib/source';
 
 const GITHUB_URL = 'https://github.com/naldomadeira/nestjs-rest-query';
@@ -18,7 +19,7 @@ export const DocsShell = ({ locale, children }: DocsShellProps) => {
   const t = getDictionary(locale);
   const prefix = locale === defaultLocale ? '' : `/${locale}`;
   const docsUrl = `${prefix}/docs`;
-  const skillsUrl = '/skills';
+  const skillsUrl = skillsPath(locale);
 
   const navTitle = (
     <div className="flex items-center gap-2">
