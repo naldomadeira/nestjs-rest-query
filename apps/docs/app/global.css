@@ -149,7 +149,6 @@
 /* Custom */
 
 :root {
-  --nav-height: 61px;
   --fd-nav-height: calc(var(--spacing) * 14);
 }
 
@@ -157,17 +156,6 @@
 #nd-page h2,
 #nd-page h3 {
   @apply tracking-tight;
-}
-
-:root {
-  --fd-layout-width: 100%;
-  --fd-sidebar-width: 260px;
-  --fd-toc-width: 220px;
-  --fd-banner-height: var(--nav-height);
-}
-
-#nd-page {
-  margin-top: calc(var(--nav-height) - 19px);
 }
 
 .landing-page #nd-docs-layout {
@@ -179,23 +167,16 @@
   @apply hidden;
 }
 
-#nd-docs-layout [data-sidebar-placeholder] {
-  --fd-sidebar-width: 260px !important;
-}
+@media (min-width: 48rem) {
+  /* Desktop docs already have a global header, so the sidebar should start
+     directly with search/navigation instead of repeating the brand block. */
+  #nd-sidebar > div:first-child > div:first-child {
+    justify-content: flex-end;
+  }
 
-#nd-docs-layout [grid-area='toc'],
-#nd-docs-layout [data-toc-panel] {
-  --fd-toc-width: 220px;
-}
-
-#nd-docs-layout #nd-sidebar {
-  width: var(--fd-sidebar-width) !important;
-  max-width: var(--fd-sidebar-width) !important;
-  min-width: var(--fd-sidebar-width) !important;
-}
-
-#nd-docs-layout #nd-sidebar > * {
-  width: 100% !important;
+  #nd-sidebar > div:first-child > div:first-child > a {
+    display: none;
+  }
 }
 
 @utility container {

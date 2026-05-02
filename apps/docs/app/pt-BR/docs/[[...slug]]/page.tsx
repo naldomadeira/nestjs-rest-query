@@ -39,7 +39,6 @@ const Page = async (props: PageProps) => {
     >
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
-      <EditOnGitHub href={githubUrl} />
       <DocsBody>
         <MDX
           components={{
@@ -49,6 +48,9 @@ const Page = async (props: PageProps) => {
           }}
         />
       </DocsBody>
+      <EditOnGitHub href={githubUrl} className="self-start">
+        Editar esta página no GitHub
+      </EditOnGitHub>
     </DocsPage>
   );
 };
