@@ -75,12 +75,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Package renamed from `@multitechbr/nestjs-dynamic-query-builder` (private GitLab) to `nestjs-rest-query` (public npm).
+- Package renamed from `@multitechbr/nestjs-dynamic-query-builder` (private package) to `nestjs-rest-query` (public npm).
 - License changed from ISC to **MIT**.
 
 ### Removed
 
-- GitLab CI configuration (replaced by GitHub Actions).
+- Legacy CI configuration (replaced by GitHub Actions).
 - Internal `@multitechbr` registry references.
 
 See [MIGRATION.md](./MIGRATION.md) for the upgrade path from the internal package.

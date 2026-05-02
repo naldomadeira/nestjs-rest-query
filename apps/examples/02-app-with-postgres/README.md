@@ -6,18 +6,18 @@
 
 # 02 - Starter App With Postgres
 
-Aplicação de exemplo para testar o **NestJS Dynamic Query Builder** com banco de dados postgres
+Aplicacao de exemplo para testar o **nestjs-rest-query** com banco de dados Postgres
 
 </div>
 
 ## Skill no projeto
 
-Este exemplo inclui uma skill local em `.agents/skills/nestjs-dynamic-query-builder`.
+Este exemplo inclui uma skill local em `.agents/skills/nestjs-rest-query`.
 
 Exemplo de uso:
 
 ```text
-Use a skill nestjs-dynamic-query-builder para criar um endpoint com filtros avançados para Company.
+Use a skill nestjs-rest-query para criar um endpoint com filtros avancados para Company.
 ```
 
 ## Como executar

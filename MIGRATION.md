@@ -2,7 +2,7 @@
 
 ## From `@multitechbr/nestjs-dynamic-query-builder` to `nestjs-rest-query`
 
-This library was previously published as `@multitechbr/nestjs-dynamic-query-builder` on a private GitLab registry. It has been renamed and released as the public, MIT-licensed `nestjs-rest-query` on npm.
+This library was previously published as `@multitechbr/nestjs-dynamic-query-builder` on a private registry. It has been renamed and released as the public, MIT-licensed `nestjs-rest-query` on npm.
 
 ### Install
 
@@ -11,7 +11,7 @@ pnpm remove @multitechbr/nestjs-dynamic-query-builder
 pnpm add nestjs-rest-query
 ```
 
-You can also remove the GitLab `.npmrc` configuration that was required to access the private registry — it is no longer needed.
+You can also remove the legacy `.npmrc` configuration that was required to access the private registry - it is no longer needed.
 
 ### Imports
 

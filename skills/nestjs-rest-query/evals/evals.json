@@ -4,11 +4,11 @@
     {
       "id": 1,
       "prompt": "Estou criando um projeto NestJS do zero com TypeORM e PostgreSQL. Preciso instalar e configurar o nestjs-rest-query pra usar filtros dinâmicos nos meus endpoints. Me ajuda a fazer o setup completo — main.ts, app.module.ts — tudo que precisa pra funcionar.",
-      "expected_output": "Complete setup with: pnpm/npm install command for nestjs-rest-query, main.ts with extended query parser + ValidationPipe with enableImplicitConversion, app.module.ts with DynamicQueryBuilderModule.forRoot(). All bootstrap steps present and correct. NO references to private GitLab registry or @multitechbr scope.",
+      "expected_output": "Complete setup with: pnpm/npm install command for nestjs-rest-query, main.ts with extended query parser + ValidationPipe with enableImplicitConversion, app.module.ts with DynamicQueryBuilderModule.forRoot(). All bootstrap steps present and correct. NO references to a private registry or @multitechbr scope.",
       "files": [],
       "expectations": [
         "Output includes pnpm add nestjs-rest-query OR npm install nestjs-rest-query",
-        "Output does NOT include any .npmrc with @multitechbr or GitLab registry",
+        "Output does NOT include any .npmrc with @multitechbr or private registry configuration",
         "Output includes app.set('query parser', 'extended') in main.ts",
         "Output includes ValidationPipe with transform: true and enableImplicitConversion: true",
         "Output includes DynamicQueryBuilderModule.forRoot() in app.module.ts imports",

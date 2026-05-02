@@ -7,7 +7,7 @@ import { ThemeProvider } from '@/providers/theme';
 import { mono, sans } from '../../lib/fonts';
 import { defaultLocale, getDictionary } from '../../lib/i18n';
 import { i18nUI } from '../../lib/i18n-ui';
-import { metadataBase } from '../../lib/seo';
+import { metadataBase, openGraphImagePath } from '../../lib/seo';
 
 const dict = getDictionary(defaultLocale);
 
@@ -20,13 +20,20 @@ export const metadata: Metadata = {
     siteName: dict.meta.title,
     title: dict.meta.title,
     description: dict.meta.description,
-    images: ['/opengraph-image.jpg'],
+    images: [
+      {
+        url: openGraphImagePath,
+        width: 1200,
+        height: 630,
+        alt: `${dict.meta.title} Open Graph image`,
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: dict.meta.title,
     description: dict.meta.description,
-    images: ['/opengraph-image.jpg'],
+    images: [openGraphImagePath],
   },
 };
 
