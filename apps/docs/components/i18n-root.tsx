@@ -1,7 +1,7 @@
 'use client';
 
 import { RootProvider } from 'fumadocs-ui/provider/next';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import type { ComponentProps, ReactNode } from 'react';
 import { useCallback } from 'react';
 import { defaultLocale, type Locale } from '../lib/i18n';
@@ -30,13 +30,16 @@ const stripLocalePrefix = (path: string, locales: readonly string[]) => {
 // hideLocale: 'default-locale' → default locale URLs have no prefix.
 export const I18nRoot = ({ locale, i18n, search, children }: I18nRootProps) => {
   const router = useRouter();
+  // usePathname returns the path WITHOUT basePath — safe for GitHub Pages where
+  // window.location.pathname includes the /nestjs-rest-query prefix and would
+  // produce broken URLs like /pt-BR/nestjs-rest-query when switching locales.
+  const pathname = usePathname();
 
   const onLocaleChange = useCallback(
     (next: string) => {
-      if (typeof window === 'undefined') return;
       const locales = (i18n.locales ?? []).map((l) => l.locale);
       const currentPath = stripLocalePrefix(
-        window.location.pathname,
+        pathname,
         locales.length ? locales : ['pt-BR', 'en']
       );
       const target =
@@ -45,7 +48,7 @@ export const I18nRoot = ({ locale, i18n, search, children }: I18nRootProps) => {
           : `/${next}${currentPath === '/' ? '' : currentPath}`;
       router.push(target);
     },
-    [i18n.locales, router]
+    [i18n.locales, pathname, router]
   );
 
   return (
