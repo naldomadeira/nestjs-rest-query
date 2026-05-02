@@ -2,8 +2,7 @@ import { defaultLocale, type Locale } from './i18n';
 
 const siteUrl = 'https://naldomadeira.github.io';
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '/nestjs-rest-query';
-const openGraphImageVersion = '2026-05-02b';
-export const openGraphImagePath = `/opengraph-image.png?v=${openGraphImageVersion}`;
+export const openGraphImagePath = '/opengraph-image-2026-05-02b.png';
 
 export const metadataBase = new URL(`${siteUrl}${basePath}/`);
 
