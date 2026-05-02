@@ -39,6 +39,7 @@ export const HomeShell = ({ locale, children }: HomeShellProps) => {
       }}
       links={[
         { text: t.nav.docs, url: `${prefix}/docs` },
+        { text: t.nav.skills, url: '/skills' },
         {
           type: 'icon' as const,
           text: t.nav.github,

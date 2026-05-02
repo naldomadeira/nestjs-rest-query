@@ -18,6 +18,7 @@ export const DocsShell = ({ locale, children }: DocsShellProps) => {
   const t = getDictionary(locale);
   const prefix = locale === defaultLocale ? '' : `/${locale}`;
   const docsUrl = `${prefix}/docs`;
+  const skillsUrl = '/skills';
 
   const navTitle = (
     <div className="flex items-center gap-2">
@@ -49,6 +50,12 @@ export const DocsShell = ({ locale, children }: DocsShellProps) => {
               className="rounded-lg bg-fd-primary/10 px-3 py-2 font-medium text-fd-primary transition-colors hover:bg-fd-primary/15"
             >
               {t.nav.docs}
+            </Link>
+            <Link
+              href={skillsUrl}
+              className="rounded-lg px-3 py-2 font-medium text-fd-muted-foreground transition-colors hover:bg-fd-accent/60 hover:text-fd-accent-foreground"
+            >
+              {t.nav.skills}
             </Link>
           </nav>
           <div className="ml-auto flex items-center gap-2">
