@@ -7,7 +7,7 @@ import { ThemeProvider } from '@/providers/theme';
 import { mono, sans } from '../../lib/fonts';
 import { getDictionary } from '../../lib/i18n';
 import { i18nUI } from '../../lib/i18n-ui';
-import { metadataBase, openGraphImagePath } from '../../lib/seo';
+import { metadataBase, openGraphImagePath, openGraphImages } from '../../lib/seo';
 
 const LOCALE = 'pt-BR' as const;
 const dict = getDictionary(LOCALE);
@@ -22,14 +22,7 @@ export const metadata: Metadata = {
     title: dict.meta.title,
     description: dict.meta.description,
     locale: LOCALE,
-    images: [
-      {
-        url: openGraphImagePath,
-        width: 1200,
-        height: 630,
-        alt: `Imagem Open Graph de ${dict.meta.title}`,
-      },
-    ],
+    images: openGraphImages(`Imagem Open Graph de ${dict.meta.title}`),
   },
   twitter: {
     card: 'summary_large_image',

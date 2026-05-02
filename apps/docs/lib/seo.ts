@@ -2,7 +2,8 @@ import { defaultLocale, type Locale } from './i18n';
 
 const siteUrl = 'https://naldomadeira.github.io';
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '/nestjs-rest-query';
-export const openGraphImagePath = '/opengraph-image.png';
+const openGraphImageVersion = '2026-05-02b';
+export const openGraphImagePath = `/opengraph-image.png?v=${openGraphImageVersion}`;
 
 export const metadataBase = new URL(`${siteUrl}${basePath}/`);
 
@@ -26,4 +27,15 @@ export function skillsPath(locale: Locale) {
 export function absoluteUrl(path: string) {
   const normalized = path.startsWith('/') ? path.slice(1) : path;
   return new URL(normalized, metadataBase).toString();
+}
+
+export function openGraphImages(alt: string) {
+  return [
+    {
+      url: absoluteUrl(openGraphImagePath),
+      width: 1200,
+      height: 630,
+      alt,
+    },
+  ];
 }
