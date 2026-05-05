@@ -31,7 +31,7 @@
     "glob": "^13.0.6",
     "import-in-the-middle": "^3.0.0",
     "lodash.groupby": "^4.6.0",
-    "lucide-react": "^0.577.0",
+    "lucide-react": "^1.14.0",
     "mcp-handler": "^1.0.7",
     "mermaid": "^11.13.0",
     "motion": "^12.35.1",
