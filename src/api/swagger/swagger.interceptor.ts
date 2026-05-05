@@ -30,13 +30,16 @@ type OpenApiDocumentLike = {
 export function dqbSwaggerRequestInterceptor(
   document: OpenApiDocumentLike
 ): (req: SwaggerRequest) => SwaggerRequest;
-export function dqbSwaggerRequestInterceptor(req: SwaggerRequest): SwaggerRequest;
+export function dqbSwaggerRequestInterceptor(
+  req: SwaggerRequest
+): SwaggerRequest;
 export function dqbSwaggerRequestInterceptor(
   arg: OpenApiDocumentLike | SwaggerRequest
 ): ((req: SwaggerRequest) => SwaggerRequest) | SwaggerRequest {
   if (isOpenApiDocumentLike(arg)) {
     const dqbGetRouteMatchers = collectDqbGetRouteMatchers(arg);
-    return (req: SwaggerRequest) => interceptSwaggerRequest(req, dqbGetRouteMatchers);
+    return (req: SwaggerRequest) =>
+      interceptSwaggerRequest(req, dqbGetRouteMatchers);
   }
 
   return interceptSwaggerRequest(arg);
