@@ -39,7 +39,7 @@ async function bootstrap() {
 
   SwaggerModule.setup('/', app, document, {
     swaggerOptions: {
-      requestInterceptor: dqbSwaggerRequestInterceptor,
+      requestInterceptor: dqbSwaggerRequestInterceptor(document),
     },
   });
 

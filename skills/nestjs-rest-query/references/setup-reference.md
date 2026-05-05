@@ -57,7 +57,9 @@ async function bootstrap() {
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document, {
-    swaggerOptions: { requestInterceptor: dqbSwaggerRequestInterceptor },
+    swaggerOptions: {
+      requestInterceptor: dqbSwaggerRequestInterceptor(document),
+    },
   });
 
   await app.listen(3000);

@@ -133,7 +133,7 @@ import { dqbSwaggerRequestInterceptor } from 'nestjs-rest-query';
 
 SwaggerModule.setup('docs', app, document, {
   swaggerOptions: {
-    requestInterceptor: dqbSwaggerRequestInterceptor,
+    requestInterceptor: dqbSwaggerRequestInterceptor(document),
   },
 });
 ```

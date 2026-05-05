@@ -51,7 +51,7 @@ import { dqbSwaggerRequestInterceptor } from 'nestjs-rest-query';
 
 SwaggerModule.setup('/', app, document, {
   swaggerOptions: {
-    requestInterceptor: dqbSwaggerRequestInterceptor,
+    requestInterceptor: dqbSwaggerRequestInterceptor(document),
   },
 });
 ```
@@ -97,7 +97,7 @@ async function bootstrap() {
 
   SwaggerModule.setup('/', app, document, {
     swaggerOptions: {
-      requestInterceptor: dqbSwaggerRequestInterceptor,
+      requestInterceptor: dqbSwaggerRequestInterceptor(document),
     },
   });
 

@@ -301,7 +301,9 @@ When using `@ApiDynamicQuery`, register the request interceptor so the Swagger U
 import { dqbSwaggerRequestInterceptor } from 'nestjs-rest-query';
 
 SwaggerModule.setup('/', app, document, {
-  swaggerOptions: { requestInterceptor: dqbSwaggerRequestInterceptor },
+  swaggerOptions: {
+    requestInterceptor: dqbSwaggerRequestInterceptor(document),
+  },
 });
 ```
 
