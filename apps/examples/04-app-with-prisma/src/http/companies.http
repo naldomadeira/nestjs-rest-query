@@ -1,0 +1,65 @@
+@baseUrl = http://localhost:3003
+
+# COMPANIES — prisma adapter
+#
+# Result row shape (Prisma's native nested graph):
+#   { id, name, createdAt, users: [...] }
+
+### List all
+GET {{baseUrl}}/companies
+
+### Pagination
+GET {{baseUrl}}/companies?page=1&perPage=5
+
+### No pagination
+GET {{baseUrl}}/companies?paginate=false
+
+# ─────────────────────────────────────────────────────────────────────
+# FILTERS — root columns
+# ─────────────────────────────────────────────────────────────────────
+
+GET {{baseUrl}}/companies?filter[name][eq]=Acme Corp
+GET {{baseUrl}}/companies?filter[name][ilike]=tech
+GET {{baseUrl}}/companies?filter[createdAt][gte]=2024-01-01
+GET {{baseUrl}}/companies?filter[name][in]=Acme Corp,Globex,Initech
+
+# ─────────────────────────────────────────────────────────────────────
+# FILTERS — relation paths (1:N: users) wrap in `some`
+# ─────────────────────────────────────────────────────────────────────
+
+GET {{baseUrl}}/companies?filter[users.email][ilike]=ana
+
+# ─────────────────────────────────────────────────────────────────────
+# SORTING
+# ─────────────────────────────────────────────────────────────────────
+
+GET {{baseUrl}}/companies?sort=name
+GET {{baseUrl}}/companies?sort=-createdAt
+
+### ✗ Sort through 'many' relation → 400
+GET {{baseUrl}}/companies?sort=-users.name
+
+# ─────────────────────────────────────────────────────────────────────
+# SEARCH
+# ─────────────────────────────────────────────────────────────────────
+
+GET {{baseUrl}}/companies?search=acme
+
+# ─────────────────────────────────────────────────────────────────────
+# FIELDS / INCLUDES
+# ─────────────────────────────────────────────────────────────────────
+
+GET {{baseUrl}}/companies?fields=id,name
+
+### 'many' include — Prisma returns users as an array
+GET {{baseUrl}}/companies?includes=users&page=1&perPage=2
+
+### fields + includes: users reduced to PK only
+GET {{baseUrl}}/companies?fields=name&includes=users
+
+# ─────────────────────────────────────────────────────────────────────
+# COMBINATIONS
+# ─────────────────────────────────────────────────────────────────────
+
+GET {{baseUrl}}/companies?filter[name][ilike]=acme&includes=users&page=1&perPage=5
+GET {{baseUrl}}/companies?filter[users.email][ilike]=acme&includes=users&page=1&perPage=3

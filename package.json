@@ -33,6 +33,7 @@
     "release": "pnpm build && changeset publish",
     "s02:dev": "pnpm --filter 02-app-with-postgres dev",
     "s03:dev": "pnpm --filter 03-app-with-drizzle dev",
+    "s04:dev": "pnpm --filter 04-app-with-prisma dev",
     "docs:dev": "pnpm --filter docs dev",
     "docs:build": "pnpm --filter docs build",
     "docs:start": "pnpm --filter docs start"
@@ -53,6 +54,10 @@
       "types": "./dist/infra/adapters/drizzle.adapter.d.ts",
       "require": "./dist/infra/adapters/drizzle.adapter.js"
     },
+    "./prisma": {
+      "types": "./dist/infra/adapters/prisma.adapter.d.ts",
+      "require": "./dist/infra/adapters/prisma.adapter.js"
+    },
     "./package.json": "./package.json"
   },
   "typesVersions": {
@@ -62,6 +67,9 @@
       ],
       "drizzle": [
         "./dist/infra/adapters/drizzle.adapter.d.ts"
+      ],
+      "prisma": [
+        "./dist/infra/adapters/prisma.adapter.d.ts"
       ]
     }
   },
@@ -129,12 +137,16 @@
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/swagger": "^11.0.0",
+    "@prisma/client": "^5.0.0 || ^6.0.0 || ^7.0.0",
     "drizzle-orm": "^0.45.0",
     "reflect-metadata": "^0.2.0",
     "typeorm": "^0.3.26"
   },
   "peerDependenciesMeta": {
     "@nestjs/swagger": {
+      "optional": true
+    },
+    "@prisma/client": {
       "optional": true
     },
     "drizzle-orm": {

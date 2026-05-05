@@ -8,6 +8,8 @@ export {
   TypeOrmAdapter,
   DrizzleAdapter,
   type DrizzleQB,
+  PrismaAdapter,
+  type PrismaQB,
 } from './infra/adapters';
 export type { RestQueryAdapter } from './contracts/rest-query-adapter.interface';
 export type {
@@ -16,6 +18,10 @@ export type {
   DrizzleRelationOne,
   DrizzleRelationMany,
 } from './contracts/drizzle-source.interface';
+export type {
+  PrismaSource,
+  PrismaRelation,
+} from './contracts/prisma-source.interface';
 
 // API — Decorators
 export { ApiDynamicQuery } from './api/decorators/api-dynamic-query.decorator';

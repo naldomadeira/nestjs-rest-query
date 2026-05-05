@@ -45,11 +45,11 @@ NestJS has controllers. TypeORM has a query builder. The boilerplate between the
 
 ## Adapters
 
-| ORM     | Status         | Import path                 |
-| ------- | -------------- | --------------------------- |
-| TypeORM | ✅ Stable      | `nestjs-rest-query`         |
-| Drizzle | ✅ Stable      | `nestjs-rest-query/drizzle` |
-| Prisma  | 🚧 Coming soon | —                           |
+| ORM     | Status    | Import path                 |
+| ------- | --------- | --------------------------- |
+| TypeORM | ✅ Stable | `nestjs-rest-query`         |
+| Drizzle | ✅ Stable | `nestjs-rest-query/drizzle` |
+| Prisma  | ✅ Stable | `nestjs-rest-query/prisma`  |
 
 Want a different ORM? [Open a discussion](https://github.com/naldomadeira/nestjs-rest-query/discussions).
 

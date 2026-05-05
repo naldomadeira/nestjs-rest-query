@@ -1,0 +1,53 @@
+// Prisma schema for the 04-app-with-prisma sample.
+//
+// Mirrors the Drizzle sample schema (companies / users / posts) so the
+// REST API surface and `.http` fixtures map 1:1 across the two examples.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  users     User[]
+
+  @@index([name])
+  @@map("companies")
+}
+
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  email     String   @unique
+  companyId String?  @map("company_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  company   Company? @relation(fields: [companyId], references: [id])
+  posts     Post[]
+
+  @@index([email])
+  @@index([companyId])
+  @@map("users")
+}
+
+model Post {
+  id        String   @id @default(uuid()) @db.Uuid
+  title     String
+  content   String?
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([title])
+  @@map("posts")
+}

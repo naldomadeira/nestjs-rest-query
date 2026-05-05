@@ -1,0 +1,813 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { BadRequestException } from '@nestjs/common';
+import type { QueryInput } from '@contracts/query-input.interface';
+import type { QueryResult } from '@contracts/query-result.interface';
+import type {
+  OperatorsConfig,
+  PaginationConfig,
+} from '@contracts/query-builder-config.interface';
+import type { RestQueryAdapter } from '@contracts/rest-query-adapter.interface';
+import type {
+  PrismaSource,
+  PrismaRelation,
+} from '@contracts/prisma-source.interface';
+import type { QueryOperator } from '@domain/operators/operator.types';
+import { operatorRegistry } from '@domain/operators/operator.registry';
+import {
+  isSafeFieldPath,
+  parseCSV,
+  coerceValue,
+  coerceForIn,
+  coerceForBetween,
+  toBool,
+  parseIntParam,
+} from '@domain/normalizers/normalizers';
+import { DQBLogger } from '@infra/logger';
+
+/**
+ * Internal accumulator that the Prisma adapter mutates across the
+ * apply* phases. The final `findMany` / `count` arguments are built from
+ * this object inside `applyPagination` / `getMany` so customization (and
+ * the post-customize snapshot guarantee for paginated queries) is honored.
+ *
+ * Repeated filters always stack under `where.AND`, never structurally merge.
+ */
+export interface PrismaQB {
+  source: PrismaSource;
+  alias: string;
+  where: { AND: any[] };
+  orderBy: any[];
+  include?: Record<string, any>;
+  select?: Record<string, any>;
+}
+
+interface PathHop {
+  name: string;
+  cardinality: 'one' | 'many';
+  meta: PrismaRelation;
+}
+
+interface ResolvedPath {
+  hops: PathHop[];
+  leafField: string;
+  /** True only when the entire path resolves to a relation node (used for `isNull` on a relation). */
+  leafIsRelation: boolean;
+  /** Cardinality of the leaf relation when `leafIsRelation` is true. */
+  leafCardinality?: 'one' | 'many';
+}
+
+const SORT_THROUGH_MANY = (path: string) =>
+  `Cannot sort by '${path}': sorting through to-many relations is not supported.`;
+
+const UNKNOWN_RELATION = (hop: string, fullPath: string) =>
+  `Unknown relation '${hop}' in path '${fullPath}'. Declare it in PrismaSource.relations.`;
+
+function walkPath(source: PrismaSource, fieldPath: string): ResolvedPath {
+  const segments = fieldPath.split('.');
+  if (segments.length === 1) {
+    const seg = segments[0];
+    const relation = source.relations?.[seg];
+    if (relation) {
+      return {
+        hops: [],
+        leafField: seg,
+        leafIsRelation: true,
+        leafCardinality: relation.cardinality ?? 'one',
+      };
+    }
+    return { hops: [], leafField: seg, leafIsRelation: false };
+  }
+
+  const hops: PathHop[] = [];
+  let currentRelations: Record<string, PrismaRelation> | undefined =
+    source.relations;
+
+  for (let i = 0; i < segments.length - 1; i++) {
+    const seg = segments[i];
+    const relation = currentRelations?.[seg];
+    if (!relation) {
+      throw new BadRequestException(UNKNOWN_RELATION(seg, fieldPath));
+    }
+    hops.push({
+      name: seg,
+      cardinality: relation.cardinality ?? 'one',
+      meta: relation,
+    });
+    currentRelations = relation.relations;
+  }
+
+  const leafField = segments[segments.length - 1];
+  return { hops, leafField, leafIsRelation: false };
+}
+
+function translateOperator(
+  operator: QueryOperator,
+  value: unknown,
+  isRelationLeaf: boolean
+): unknown {
+  switch (operator) {
+    case 'eq':
+      return { equals: value };
+    case 'ne':
+      return { not: value };
+    case 'gt':
+      return { gt: value };
+    case 'gte':
+      return { gte: value };
+    case 'lt':
+      return { lt: value };
+    case 'lte':
+      return { lte: value };
+    case 'like':
+      return { contains: value };
+    case 'ilike':
+      return { contains: value, mode: 'insensitive' };
+    case 'notLike':
+      return { not: { contains: value } };
+    case 'notIlike':
+      return { not: { contains: value, mode: 'insensitive' } };
+    case 'in':
+      return { in: value as unknown[] };
+    case 'notIn':
+      return { notIn: value as unknown[] };
+    case 'between': {
+      const [a, b] = value as [unknown, unknown];
+      return { gte: a, lte: b };
+    }
+    case 'isNull':
+      // Relation leaves use `is`/`isNot`; Prisma rejects `not` on relations.
+      if (isRelationLeaf) {
+        return value === true ? { is: null } : { isNot: null };
+      }
+      return value === true ? null : { not: null };
+    default: {
+      const _exhaustive: never = operator;
+      throw new BadRequestException(
+        `Operator "${_exhaustive}" is not implemented`
+      );
+    }
+  }
+}
+
+function coerceValueForOperator(operator: QueryOperator, raw: any): any {
+  switch (operator) {
+    case 'in':
+    case 'notIn':
+      return coerceForIn(raw);
+    case 'between':
+      return coerceForBetween(raw);
+    case 'isNull':
+      return toBool(raw, false);
+    default:
+      return coerceValue(raw);
+  }
+}
+
+function buildRelationAwareWhere(
+  hops: PathHop[],
+  leafKey: string,
+  leafFragment: unknown
+): Record<string, unknown> {
+  let inner: Record<string, unknown> = { [leafKey]: leafFragment };
+  for (let i = hops.length - 1; i >= 0; i--) {
+    const hop = hops[i];
+    inner =
+      hop.cardinality === 'many'
+        ? { [hop.name]: { some: inner } }
+        : { [hop.name]: inner };
+  }
+  return inner;
+}
+
+function buildRelationLeafWhere(
+  fieldPath: string,
+  cardinality: 'one' | 'many',
+  operator: QueryOperator,
+  value: unknown
+): Record<string, unknown> {
+  if (operator !== 'isNull') {
+    throw new BadRequestException(
+      `Operator "${operator}" cannot be applied directly to relation "${fieldPath}". Use a dotted path to a scalar field on the relation.`
+    );
+  }
+  if (cardinality === 'many') {
+    throw new BadRequestException(
+      `Operator "isNull" is not supported on to-many relation "${fieldPath}".`
+    );
+  }
+  const fragment = translateOperator('isNull', value, true);
+  return { [fieldPath]: fragment };
+}
+
+function mergeIncludeTree(
+  target: Record<string, any>,
+  segments: string[]
+): void {
+  if (segments.length === 0) return;
+  const [head, ...rest] = segments;
+  const existing = target[head];
+  if (rest.length === 0) {
+    // Only set to `true` if there's nothing more specific already there.
+    if (existing === undefined) {
+      target[head] = true;
+    }
+    return;
+  }
+  if (existing === undefined || existing === true) {
+    target[head] = { include: {} };
+  }
+  if (target[head].include === undefined) {
+    target[head].include = {};
+  }
+  mergeIncludeTree(target[head].include, rest);
+}
+
+function getRelationByPath(
+  source: PrismaSource,
+  pathSegments: string[]
+): PrismaRelation | undefined {
+  let current: Record<string, PrismaRelation> | undefined = source.relations;
+  let relation: PrismaRelation | undefined;
+  for (const seg of pathSegments) {
+    relation = current?.[seg];
+    if (!relation) return undefined;
+    current = relation.relations;
+  }
+  return relation;
+}
+
+/**
+ * Recursively converts an `include` tree (from `applyIncludes`) into a
+ * `select` tree, reducing each included relation to its primary key.
+ * Existing entries in `selectTarget` (from dotted-field selections) are
+ * preserved and merged with the auto-injected PK.
+ */
+function mergeIncludeIntoSelect(
+  includeTree: Record<string, any>,
+  selectTarget: Record<string, any>,
+  source: PrismaSource,
+  pathSoFar: string[]
+): void {
+  for (const [key, value] of Object.entries(includeTree)) {
+    const relation = getRelationByPath(source, [...pathSoFar, key]);
+    if (!relation) {
+      throw new BadRequestException(
+        UNKNOWN_RELATION(key, [...pathSoFar, key].join('.'))
+      );
+    }
+    const pk = relation.primaryKeyField ?? 'id';
+
+    // Existing select entry shape: undefined | { select: {...} }
+    let existing: { select: Record<string, any> } | undefined =
+      selectTarget[key];
+    if (!existing) {
+      existing = { select: {} };
+      selectTarget[key] = existing;
+    } else if (!existing.select) {
+      existing.select = {};
+    }
+    // Auto-inject PK.
+    if (existing.select[pk] === undefined) {
+      existing.select[pk] = true;
+    }
+
+    // Recurse into nested includes, if any.
+    if (value && typeof value === 'object' && value.include) {
+      mergeIncludeIntoSelect(value.include, existing.select, source, [
+        ...pathSoFar,
+        key,
+      ]);
+    }
+  }
+}
+
+function setNestedSelect(
+  selectRoot: Record<string, any>,
+  hops: PathHop[],
+  leafField: string
+): void {
+  let current = selectRoot;
+  for (const hop of hops) {
+    if (current[hop.name] === undefined) {
+      current[hop.name] = { select: {} };
+    } else if (current[hop.name] === true) {
+      current[hop.name] = { select: {} };
+    } else if (!current[hop.name].select) {
+      current[hop.name].select = {};
+    }
+    current = current[hop.name].select;
+  }
+  current[leafField] = true;
+}
+
+function buildOrderByEntry(
+  hops: PathHop[],
+  leafField: string,
+  direction: 'asc' | 'desc'
+): Record<string, any> {
+  let inner: Record<string, any> = { [leafField]: direction };
+  for (let i = hops.length - 1; i >= 0; i--) {
+    inner = { [hops[i].name]: inner };
+  }
+  return inner;
+}
+
+function buildFindManyArgs(
+  qb: PrismaQB,
+  pagination?: { take: number; skip: number }
+): Record<string, any> {
+  const args: Record<string, any> = {};
+  const where = compactWhere(qb.where);
+  if (where !== undefined) args.where = where;
+  if (qb.orderBy.length > 0) args.orderBy = qb.orderBy;
+  if (qb.select) {
+    args.select = qb.select;
+  } else if (qb.include) {
+    args.include = qb.include;
+  }
+  if (pagination) {
+    args.take = pagination.take;
+    args.skip = pagination.skip;
+  }
+  return args;
+}
+
+/**
+ * Strip empty `AND: []` so generated args look natural in Prisma logs and
+ * `count` calls don't carry a meaningless wrapper.
+ */
+function compactWhere(where: { AND: any[] }): Record<string, any> | undefined {
+  if (where.AND.length === 0) return undefined;
+  if (where.AND.length === 1) return where.AND[0];
+  return { AND: where.AND };
+}
+
+/**
+ * Adapter for Prisma. Implements the full `RestQueryAdapter` contract,
+ * translating the existing REST query grammar into nested `where`,
+ * `orderBy`, `include`, and `select` shapes that `prisma[model].findMany`
+ * understands.
+ *
+ * Filters/searches that traverse to-many relations wrap each `'many'`
+ * hop in `some` so the semantics ("any related row matches") match the
+ * existing TypeORM/Drizzle behavior.
+ *
+ * `select` and `include` are reconciled inside `applyFields` because
+ * Prisma rejects both at the same level.
+ */
+export class PrismaAdapter
+  implements RestQueryAdapter<PrismaQB, PrismaSource<any>>
+{
+  constructor() {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require('@prisma/client');
+    } catch {
+      throw new Error(
+        'PrismaAdapter requires "@prisma/client" to be installed. Run: pnpm add @prisma/client && pnpm add -D prisma'
+      );
+    }
+  }
+
+  createQueryBuilder(source: PrismaSource<any>, alias: string): PrismaQB {
+    if (!source || typeof source !== 'object') {
+      throw new BadRequestException(
+        'PrismaAdapter requires a PrismaSource: { prisma, model, ... }'
+      );
+    }
+    if (!source.prisma) {
+      throw new BadRequestException('PrismaSource.prisma is required.');
+    }
+    if (!source.model || typeof source.model !== 'string') {
+      throw new BadRequestException(
+        'PrismaSource.model is required and must be a string (the delegate key).'
+      );
+    }
+    return {
+      source,
+      alias,
+      where: { AND: [] },
+      orderBy: [],
+    };
+  }
+
+  applyFilters(
+    qb: PrismaQB,
+    query: QueryInput,
+    _alias: string,
+    allowedFilters: string[],
+    operatorsConfig?: OperatorsConfig,
+    logger?: DQBLogger
+  ): void {
+    const log = logger?.withContext('applyFilters') ?? DQBLogger.noop();
+    const filterParam = query.filter;
+    if (!filterParam || typeof filterParam !== 'object') return;
+
+    const entries = Object.entries(filterParam);
+    log.debug('processing filters', {
+      count: entries.length,
+      fields: Object.keys(filterParam),
+    });
+
+    const invalidFields: string[] = [];
+
+    for (const [field, valueOrOps] of entries) {
+      if (!isSafeFieldPath(field)) {
+        throw new BadRequestException(
+          `Invalid filter field name: "${field}". Only alphanumeric, underscore, and dots are allowed.`
+        );
+      }
+
+      const rootField = field.includes('.') ? field.split('.')[0] : field;
+      const isAllowed = field.includes('.')
+        ? allowedFilters.includes(rootField) || allowedFilters.includes(field)
+        : allowedFilters.includes(field);
+
+      if (!isAllowed) {
+        invalidFields.push(field);
+        continue;
+      }
+
+      if (typeof valueOrOps === 'string' || typeof valueOrOps === 'number') {
+        this.applySingleFilter(qb, field, 'eq', valueOrOps, operatorsConfig);
+        continue;
+      }
+
+      if (typeof valueOrOps === 'object' && valueOrOps !== null) {
+        for (const [op, value] of Object.entries(valueOrOps)) {
+          if (!operatorRegistry[op as QueryOperator]) {
+            throw new BadRequestException(
+              `Unsupported operator "${op}" for field "${field}". Supported: ${Object.keys(operatorRegistry).join(', ')}`
+            );
+          }
+          this.applySingleFilter(
+            qb,
+            field,
+            op as QueryOperator,
+            value,
+            operatorsConfig
+          );
+        }
+        continue;
+      }
+
+      throw new BadRequestException(
+        `Invalid filter format for field "${field}". Expected string, number, or object with operators.`
+      );
+    }
+
+    if (invalidFields.length > 0) {
+      const unique = Array.from(new Set(invalidFields));
+      throw new BadRequestException(
+        `Filter field(s) not allowed: ${unique.join(', ')}. Allowed fields: ${allowedFilters.join(', ')}`
+      );
+    }
+  }
+
+  private applySingleFilter(
+    qb: PrismaQB,
+    fieldPath: string,
+    operator: QueryOperator,
+    rawValue: any,
+    operatorsConfig?: OperatorsConfig
+  ): void {
+    if (operatorsConfig?.allowed !== undefined) {
+      if (!operatorsConfig.allowed.includes(operator)) {
+        throw new BadRequestException(
+          `Operator "${operator}" is not allowed. Allowed operators: ${operatorsConfig.allowed.join(', ')}`
+        );
+      }
+    }
+
+    const value = coerceValueForOperator(operator, rawValue);
+
+    // Silent skip on empty in/notIn arrays — TypeORM parity.
+    if (
+      (operator === 'in' || operator === 'notIn') &&
+      Array.isArray(value) &&
+      value.length === 0
+    ) {
+      return;
+    }
+
+    const resolved = walkPath(qb.source, fieldPath);
+
+    if (resolved.leafIsRelation) {
+      const fragment = buildRelationLeafWhere(
+        resolved.leafField,
+        resolved.leafCardinality ?? 'one',
+        operator,
+        value
+      );
+      qb.where.AND.push(fragment);
+      return;
+    }
+
+    const leafFragment = translateOperator(operator, value, false);
+    const fragment = buildRelationAwareWhere(
+      resolved.hops,
+      resolved.leafField,
+      leafFragment
+    );
+    qb.where.AND.push(fragment);
+  }
+
+  applySorts(
+    qb: PrismaQB,
+    query: QueryInput,
+    _alias: string,
+    allowedSorts: string[],
+    allowedFields?: string[],
+    logger?: DQBLogger
+  ): void {
+    const log = logger?.withContext('applySorts') ?? DQBLogger.noop();
+    if (!query.sort || typeof query.sort !== 'string') return;
+
+    const tokens = parseCSV(query.sort);
+    if (tokens.length === 0) return;
+    log.debug('processing sorts', { count: tokens.length });
+
+    const invalid: string[] = [];
+
+    for (const token of tokens) {
+      const direction: 'asc' | 'desc' = token.startsWith('-') ? 'desc' : 'asc';
+      const path = token.startsWith('-') ? token.slice(1) : token;
+
+      if (!isSafeFieldPath(path)) {
+        throw new BadRequestException(
+          `Invalid sort field: "${path}". Only alphanumeric, underscore, and dots are allowed.`
+        );
+      }
+
+      const rootField = path.includes('.') ? path.split('.')[0] : path;
+      const allowedBySort = path.includes('.')
+        ? allowedSorts.includes(rootField) || allowedSorts.includes(path)
+        : allowedSorts.includes(path);
+      const allowedByField =
+        allowedFields?.includes(rootField) || allowedFields?.includes(path);
+
+      if (!allowedBySort && !allowedByField) {
+        invalid.push(path);
+        continue;
+      }
+
+      const resolved = walkPath(qb.source, path);
+      if (resolved.hops.some((h) => h.cardinality === 'many')) {
+        throw new BadRequestException(SORT_THROUGH_MANY(path));
+      }
+      if (resolved.leafIsRelation) {
+        throw new BadRequestException(
+          `Cannot sort by relation '${path}' directly. Sort by a scalar field on the relation.`
+        );
+      }
+
+      qb.orderBy.push(
+        buildOrderByEntry(resolved.hops, resolved.leafField, direction)
+      );
+    }
+
+    if (invalid.length > 0) {
+      const unique = Array.from(new Set(invalid));
+      throw new BadRequestException(
+        `Sort field(s) not allowed: ${unique.join(', ')}. Allowed sorts: ${allowedSorts.join(', ')}`
+      );
+    }
+  }
+
+  applyIncludes(
+    qb: PrismaQB,
+    query: QueryInput,
+    _alias: string,
+    allowedIncludes: string[],
+    logger?: DQBLogger
+  ): void {
+    const log = logger?.withContext('applyIncludes') ?? DQBLogger.noop();
+    if (!query.includes || typeof query.includes !== 'string') return;
+
+    const tokens = parseCSV(query.includes);
+    if (tokens.length === 0) return;
+    log.debug('processing includes', { count: tokens.length });
+
+    // Process longer paths first so a more-specific entry isn't clobbered
+    // by a later top-level `true`.
+    const sorted = [...tokens].sort(
+      (a, b) => b.split('.').length - a.split('.').length
+    );
+
+    const invalid: string[] = [];
+    qb.include = qb.include ?? {};
+
+    for (const path of sorted) {
+      if (!isSafeFieldPath(path)) {
+        throw new BadRequestException(
+          `Invalid include path: "${path}". Only alphanumeric, underscore, and dots are allowed.`
+        );
+      }
+
+      const rootField = path.includes('.') ? path.split('.')[0] : path;
+      const isAllowed = path.includes('.')
+        ? allowedIncludes.includes(rootField) || allowedIncludes.includes(path)
+        : allowedIncludes.includes(path);
+
+      if (!isAllowed) {
+        invalid.push(path);
+        continue;
+      }
+
+      const segments = path.split('.');
+      // Validate every hop exists in the relations metadata.
+      let cursor: Record<string, PrismaRelation> | undefined =
+        qb.source.relations;
+      for (const seg of segments) {
+        const rel = cursor?.[seg];
+        if (!rel) {
+          throw new BadRequestException(UNKNOWN_RELATION(seg, path));
+        }
+        cursor = rel.relations;
+      }
+
+      mergeIncludeTree(qb.include, segments);
+    }
+
+    if (invalid.length > 0) {
+      const unique = Array.from(new Set(invalid));
+      throw new BadRequestException(
+        `Include path(s) not allowed: ${unique.join(', ')}. Allowed includes: ${allowedIncludes.join(', ')}`
+      );
+    }
+  }
+
+  applySearch(
+    qb: PrismaQB,
+    query: QueryInput,
+    _alias: string,
+    searchFields: string[],
+    logger?: DQBLogger
+  ): void {
+    const log = logger?.withContext('applySearch') ?? DQBLogger.noop();
+    if (!query.search || typeof query.search !== 'string') return;
+    const term = query.search.trim();
+    if (!term) return;
+    if (searchFields.length === 0) return;
+    log.debug('processing search', { term, fields: searchFields.length });
+
+    const orFragments: Record<string, unknown>[] = [];
+    for (const field of searchFields) {
+      if (!isSafeFieldPath(field)) {
+        throw new BadRequestException(
+          `Invalid search field: "${field}". Only alphanumeric, underscore, and dots are allowed.`
+        );
+      }
+      const resolved = walkPath(qb.source, field);
+      if (resolved.leafIsRelation) {
+        throw new BadRequestException(
+          `Search field "${field}" cannot be a relation. Use a dotted path to a scalar field on the relation.`
+        );
+      }
+      const leaf = { contains: term, mode: 'insensitive' };
+      orFragments.push(
+        buildRelationAwareWhere(resolved.hops, resolved.leafField, leaf)
+      );
+    }
+
+    if (orFragments.length > 0) {
+      qb.where.AND.push({ OR: orFragments });
+    }
+  }
+
+  applyFields(
+    qb: PrismaQB,
+    query: QueryInput,
+    _alias: string,
+    allowedFields: string[],
+    _allowedIncludes?: string[],
+    logger?: DQBLogger
+  ): void {
+    const log = logger?.withContext('applyFields') ?? DQBLogger.noop();
+    if (!query.fields || typeof query.fields !== 'string') return;
+
+    const tokens = parseCSV(query.fields);
+    if (tokens.length === 0) return;
+    log.debug('processing fields', { count: tokens.length });
+
+    const select: Record<string, any> = {};
+    const rootPk = qb.source.primaryKeyField ?? 'id';
+    select[rootPk] = true;
+
+    const invalid: string[] = [];
+
+    for (const path of tokens) {
+      if (!isSafeFieldPath(path)) {
+        throw new BadRequestException(
+          `Invalid field name: "${path}". Only alphanumeric, underscore, and dots are allowed.`
+        );
+      }
+
+      const rootField = path.includes('.') ? path.split('.')[0] : path;
+      const isAllowed = path.includes('.')
+        ? allowedFields.includes(rootField) || allowedFields.includes(path)
+        : allowedFields.includes(path);
+
+      if (!isAllowed) {
+        invalid.push(path);
+        continue;
+      }
+
+      if (!path.includes('.')) {
+        select[path] = true;
+        continue;
+      }
+
+      const resolved = walkPath(qb.source, path);
+      if (resolved.leafIsRelation) {
+        throw new BadRequestException(
+          `Field "${path}" cannot be a relation. Use scalar field paths.`
+        );
+      }
+      setNestedSelect(select, resolved.hops, resolved.leafField);
+    }
+
+    if (invalid.length > 0) {
+      const unique = Array.from(new Set(invalid));
+      throw new BadRequestException(
+        `Field(s) not allowed: ${unique.join(', ')}. Allowed fields: ${allowedFields.join(', ')}`
+      );
+    }
+
+    // Reconcile any prior `include` state into `select` form. Prisma rejects
+    // both at the same level, so once we choose `select`, included relations
+    // must move under it as nested `select` trees with their PK injected.
+    if (qb.include) {
+      mergeIncludeIntoSelect(qb.include, select, qb.source, []);
+      qb.include = undefined;
+    }
+
+    qb.select = select;
+  }
+
+  async applyPagination<T = unknown>(
+    qb: PrismaQB,
+    query: QueryInput,
+    paginationConfig?: PaginationConfig,
+    logger?: DQBLogger
+  ): Promise<QueryResult<T>> {
+    const log = logger?.withContext('applyPagination') ?? DQBLogger.noop();
+    const defaultPerPage = paginationConfig?.defaultPerPage ?? 10;
+    const maxPerPage = paginationConfig?.maxPerPage ?? 100;
+
+    const page = parseIntParam(query.page, 'page', 1);
+    const requested = parseIntParam(query.perPage, 'perPage', defaultPerPage);
+    const perPage = Math.min(requested, maxPerPage);
+    if (page < 1) throw new BadRequestException('"page" must be >= 1');
+    if (perPage < 1) throw new BadRequestException('"perPage" must be >= 1');
+
+    const skip = (page - 1) * perPage;
+    log.debug('executing paginated query', { page, perPage, skip });
+
+    // Build args here, AFTER customize had its chance to mutate `qb`.
+    // Both findMany and count must read from the same post-customize `where`.
+    const findArgs = buildFindManyArgs(qb, { take: perPage, skip });
+    const countArgs: Record<string, any> = {};
+    const compactedWhere = compactWhere(qb.where);
+    if (compactedWhere !== undefined) countArgs.where = compactedWhere;
+
+    const delegate = this.getDelegate(qb);
+    const [data, total] = await Promise.all([
+      delegate.findMany(findArgs),
+      delegate.count(countArgs),
+    ]);
+
+    const lastPage = Math.max(1, Math.ceil(total / perPage));
+    log.debug('pagination result', { total, lastPage, count: data.length });
+
+    return { data: data as T[], page, perPage, total, lastPage };
+  }
+
+  async getMany<T = unknown>(qb: PrismaQB): Promise<T[]> {
+    const args = buildFindManyArgs(qb);
+    const delegate = this.getDelegate(qb);
+    const rows = await delegate.findMany(args);
+    return rows as T[];
+  }
+
+  customize(qb: PrismaQB, fn: (qb: PrismaQB) => void): void {
+    fn(qb);
+  }
+
+  private getDelegate(qb: PrismaQB): {
+    findMany(args: Record<string, any>): Promise<unknown[]>;
+    count(args: Record<string, any>): Promise<number>;
+  } {
+    const delegate = (qb.source.prisma as any)?.[qb.source.model];
+    if (
+      !delegate ||
+      typeof delegate.findMany !== 'function' ||
+      typeof delegate.count !== 'function'
+    ) {
+      throw new Error(
+        `PrismaAdapter: model "${qb.source.model}" not found on the provided Prisma client (expected prisma.${qb.source.model}.findMany / .count to be functions).`
+      );
+    }
+    return delegate;
+  }
+}
