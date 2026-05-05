@@ -47,7 +47,7 @@ async function bootstrap() {
   SwaggerModule.setup('/', app, document, {
     swaggerOptions: {
       // Necessário para testar filtros aninhados diretamente pelo Swagger UI
-      requestInterceptor: dqbSwaggerRequestInterceptor,
+      requestInterceptor: dqbSwaggerRequestInterceptor(document),
     },
   });
 

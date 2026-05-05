@@ -1,15 +1,21 @@
 import { RulesConfig } from '@contracts/rules-config.interface';
 import { QueryOperator } from '@domain/operators/operator.types';
+import { DQB_SWAGGER_EXTENSION_KEY } from './swagger.interceptor';
 
 type ApiQueryFn = (typeof import('@nestjs/swagger'))['ApiQuery'];
+type ApiExtensionFn = (typeof import('@nestjs/swagger'))['ApiExtension'];
 
 let ApiQuery: ApiQueryFn | undefined;
+let ApiExtension: ApiExtensionFn | undefined;
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   ApiQuery = require('@nestjs/swagger').ApiQuery;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  ApiExtension = require('@nestjs/swagger').ApiExtension;
 } catch {
   // @nestjs/swagger nao instalado — Swagger docs desabilitado
 }
+
 function buildOperatorsTable(operators: QueryOperator[]): string {
   const COLS = 4;
   const header =
@@ -34,9 +40,10 @@ export function buildDQBSwaggerDecorators(
   rules: RulesConfig,
   operators: QueryOperator[]
 ): MethodDecorator[] {
-  if (!ApiQuery) return [];
+  if (!ApiQuery || !ApiExtension) return [];
 
   const decorators: MethodDecorator[] = [
+    ApiExtension(DQB_SWAGGER_EXTENSION_KEY, true),
     ApiQuery({
       name: 'page',
       required: false,

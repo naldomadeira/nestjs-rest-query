@@ -217,7 +217,9 @@ Use `@ApiDynamicQuery(rules)` instead of `@DynamicQuery(rules)` and every query 
 import { dqbSwaggerRequestInterceptor } from 'nestjs-rest-query';
 
 SwaggerModule.setup('docs', app, document, {
-  swaggerOptions: { requestInterceptor: dqbSwaggerRequestInterceptor },
+  swaggerOptions: {
+    requestInterceptor: dqbSwaggerRequestInterceptor(document),
+  },
 });
 ```
 

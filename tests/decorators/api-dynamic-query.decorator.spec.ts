@@ -21,14 +21,14 @@ describe('buildDQBSwaggerDecorators', () => {
   it('includes pagination decorators (page, perPage, paginate) for any rules', () => {
     const result = buildDQBSwaggerDecorators(RULES, ALL_OPERATORS);
     // When swagger is available, returns at least the 3 pagination ApiQuery decorators
-    // plus sort, fields, includes, filter = 7 total for RULES above
-    expect(result.length).toBeGreaterThanOrEqual(3);
+    // plus extension + sort + fields + includes + filter = 8 total for RULES above
+    expect(result.length).toBeGreaterThanOrEqual(4);
   });
 
   it('returns empty array when rules have no filters/sorts/fields/includes', () => {
     const result = buildDQBSwaggerDecorators({}, ALL_OPERATORS);
-    // Only pagination (page, perPage, paginate) — 3 entries
-    expect(result.length).toBe(3);
+    // Extension + pagination (page, perPage, paginate) — 4 entries
+    expect(result.length).toBe(4);
   });
 
   it('adds sort ApiQuery when rules.sorts is provided', () => {
@@ -70,8 +70,8 @@ describe('buildDQBSwaggerDecorators', () => {
 
   it('returns all decorators for fully populated rules', () => {
     const result = buildDQBSwaggerDecorators(RULES, ALL_OPERATORS);
-    // 3 pagination + sort + fields + includes + filter = 7
-    expect(result.length).toBe(7);
+    // extension + 3 pagination + sort + fields + includes + filter = 8
+    expect(result.length).toBe(8);
   });
 
   it('each entry is a function (MethodDecorator)', () => {
@@ -83,7 +83,7 @@ describe('buildDQBSwaggerDecorators', () => {
 
   it('accepts a restricted operators list', () => {
     const result = buildDQBSwaggerDecorators(RULES, ['eq', 'like']);
-    expect(result.length).toBe(7);
+    expect(result.length).toBe(8);
   });
 });
 
