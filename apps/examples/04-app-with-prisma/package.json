@@ -1,6 +1,6 @@
 {
   "name": "04-app-with-prisma",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "NestJS sample app demonstrating nestjs-rest-query with Prisma ORM",
   "author": "Naldo Madeira",
   "private": true,

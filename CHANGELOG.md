@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.0
+
+### Minor Changes
+
+- [#29](https://github.com/naldomadeira/nestjs-rest-query/pull/29) [`41a7719`](https://github.com/naldomadeira/nestjs-rest-query/commit/41a771903c5ac13a313bbaff177710a5ba92bd8b) Thanks [@naldomadeira](https://github.com/naldomadeira)! - Add `PrismaAdapter` exported from `nestjs-rest-query/prisma`. `@prisma/client` is now an optional peer dependency. The adapter implements the full `RestQueryAdapter` contract — filters, sorts, includes, search, fields (with root-PK auto-injection), pagination, and `customize` — and translates dotted relation paths through `'many'` hops with Prisma's `some` semantics. `select` and `include` are reconciled into a single `select` tree when both are needed at the same level. No changes to existing TypeORM or Drizzle behavior, no public-API changes.
+
 ## 2.0.0
 
 ### Major Changes
