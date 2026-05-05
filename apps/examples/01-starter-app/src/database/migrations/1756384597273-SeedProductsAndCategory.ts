@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class SeedProductsAndCategory1756384597273
-  implements MigrationInterface
-{
+export class SeedProductsAndCategory1756384597273 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     const categories = [
       'Eletroportáteis',

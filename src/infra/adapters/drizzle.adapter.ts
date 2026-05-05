@@ -323,9 +323,10 @@ function translateOperator(
  * Source contract: `DrizzleSource<TTable, TDb>` — see
  * `src/contracts/drizzle-source.interface.ts` for the full shape.
  */
-export class DrizzleAdapter
-  implements RestQueryAdapter<DrizzleQBState, DrizzleSource<Table, unknown>>
-{
+export class DrizzleAdapter implements RestQueryAdapter<
+  DrizzleQBState,
+  DrizzleSource<Table, unknown>
+> {
   constructor() {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports

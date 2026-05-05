@@ -27,9 +27,9 @@ import { DQBLogger } from '@infra/logger';
  * to a different adapter (and uninstalled `typeorm`) get a clear error if
  * this class is accidentally instantiated.
  */
-export class TypeOrmAdapter<T extends ObjectLiteral = ObjectLiteral>
-  implements RestQueryAdapter<SelectQueryBuilder<T>, Repository<T>>
-{
+export class TypeOrmAdapter<
+  T extends ObjectLiteral = ObjectLiteral,
+> implements RestQueryAdapter<SelectQueryBuilder<T>, Repository<T>> {
   constructor() {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
