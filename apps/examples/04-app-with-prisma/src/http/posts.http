@@ -1,0 +1,68 @@
+@baseUrl = http://localhost:3003
+
+# POSTS — prisma adapter
+#
+# Result row shape (Prisma's native nested graph):
+#   { id, title, content, userId, createdAt, user: {...} | null }
+
+### List all
+GET {{baseUrl}}/posts
+
+### Pagination
+GET {{baseUrl}}/posts?page=1&perPage=5
+
+### No pagination
+GET {{baseUrl}}/posts?paginate=false
+
+# ─────────────────────────────────────────────────────────────────────
+# FILTERS — root columns
+# ─────────────────────────────────────────────────────────────────────
+
+GET {{baseUrl}}/posts?filter[title][ilike]=Hello
+GET {{baseUrl}}/posts?filter[title][ilike]=intro&sort=-createdAt
+GET {{baseUrl}}/posts?filter[createdAt][gte]=2024-01-01
+GET {{baseUrl}}/posts?filter[createdAt][between]=2024-01-01,2025-12-31
+
+# ─────────────────────────────────────────────────────────────────────
+# FILTERS — relation paths (1:1: user)
+# ─────────────────────────────────────────────────────────────────────
+
+GET {{baseUrl}}/posts?filter[user.email][ilike]=ana
+GET {{baseUrl}}/posts?filter[user.name][eq]=Ana
+
+# ─────────────────────────────────────────────────────────────────────
+# SORTING
+# ─────────────────────────────────────────────────────────────────────
+
+GET {{baseUrl}}/posts?sort=title
+GET {{baseUrl}}/posts?sort=-createdAt
+
+### Sort by 'one' relation column (allowed)
+GET {{baseUrl}}/posts?sort=-user.name
+
+### Multi-field
+GET {{baseUrl}}/posts?sort=title,-createdAt
+
+# ─────────────────────────────────────────────────────────────────────
+# FIELDS / INCLUDES
+# ─────────────────────────────────────────────────────────────────────
+
+GET {{baseUrl}}/posts?fields=id,title
+GET {{baseUrl}}/posts?fields=id,title,content&page=1&perPage=5
+
+### 'one' include — Prisma returns the user as a nested object
+GET {{baseUrl}}/posts?includes=user
+GET {{baseUrl}}/posts?includes=user&page=1&perPage=10
+
+### fields + includes: relation reduced to PK only
+GET {{baseUrl}}/posts?fields=title&includes=user
+
+### Opt in to a relation scalar:
+GET {{baseUrl}}/posts?fields=title,user.name&includes=user
+
+# ─────────────────────────────────────────────────────────────────────
+# COMBINATIONS
+# ─────────────────────────────────────────────────────────────────────
+
+GET {{baseUrl}}/posts?filter[title][ilike]=hello&sort=-createdAt&includes=user&page=1&perPage=5
+GET {{baseUrl}}/posts?filter[user.email][ilike]=acme&sort=-user.name&includes=user&page=1&perPage=10

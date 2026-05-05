@@ -1,0 +1,272 @@
+---
+title: Prisma Adapter
+description: Usar nestjs-rest-query com Prisma — grafo aninhado nativo, integração aditiva, sem mudança de contrato.
+---
+
+O Prisma adapter permite usar `nestjs-rest-query` com Prisma. É **aditivo**: nenhuma mudança de API pública, o mesmo formato de query string que os outros adapters aceitam, e o resultado vem no shape nativo de grafo aninhado do Prisma.
+
+## Instalação
+
+```bash
+pnpm add @prisma/client
+pnpm add -D prisma
+```
+
+Depois instale `nestjs-rest-query`:
+
+```bash
+pnpm add nestjs-rest-query
+```
+
+<Callout type="info">
+  `@prisma/client` é uma **peer dependency opcional**. Se você usa só TypeORM ou
+  Drizzle, não precisa instalar Prisma.
+</Callout>
+
+## Configuração do módulo
+
+```typescript title="app.module.ts"
+import { Module } from '@nestjs/common';
+import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
+import { PrismaAdapter } from 'nestjs-rest-query/prisma';
+
+@Module({
+  imports: [
+    DynamicQueryBuilderModule.forRoot({
+      adapter: new PrismaAdapter(),
+      pagination: { defaultPerPage: 20, maxPerPage: 100 },
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+## Definindo `PrismaSource`
+
+Cada endpoint Prisma passa um objeto `PrismaSource` para `queryBuilderService.execute()`. Esse objeto descreve:
+
+- **`prisma`** — a instância `PrismaClient` (ou um facade compatível)
+- **`model`** — a chave do delegate no client (`'user'`, `'company'`, `'post'`)
+- **`primaryKeyField`** (opcional) — campo PK da raiz, default `'id'`
+- **`relations`** (opcional) — metadata de relações para validar dotted paths e escolher entre `'one'` e `'many'`
+
+Note o que **não** existe aqui:
+
+- Sem `columnMap` — Prisma resolve nomes de campo via o client gerado pelo schema.
+- Sem coluna PK por relação — `primaryKeyField: string` basta porque `findMany` do Prisma já retorna linhas raiz sem precisar de dedup no client.
+
+```typescript title="users.business.ts"
+import { Injectable } from '@nestjs/common';
+import {
+  DynamicQueryDto,
+  PrismaSource,
+  QueryBuilderService,
+  QueryResult,
+  RulesConfig,
+} from 'nestjs-rest-query';
+import { PrismaService } from './prisma/prisma.service';
+
+@Injectable()
+export class UsersBusiness {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly qb: QueryBuilderService
+  ) {}
+
+  list(
+    query: DynamicQueryDto,
+    rules: RulesConfig
+  ): Promise<QueryResult<unknown>> {
+    const source: PrismaSource = {
+      prisma: this.prisma,
+      model: 'user',
+      primaryKeyField: 'id',
+      relations: {
+        company: { cardinality: 'one' },
+        posts: { cardinality: 'many' },
+      },
+    };
+    // `as never`: QueryBuilderService está tipado contra ObjectLiteral (TypeORM)
+    // por compatibilidade. Em runtime o adapter é agnóstico.
+    return this.qb.execute(source as never, query, rules);
+  }
+}
+```
+
+## O `relations` map é obrigatório para dotted paths
+
+Prisma conhece seu schema, mas o adapter intencionalmente **não** introspecta DMMF nem APIs internas do Prisma. Se uma query referencia um dotted path (`?filter[company.name][eq]=Acme`, `?includes=posts`), o hop precisa estar declarado em `PrismaSource.relations`.
+
+Se faltar:
+
+```
+Unknown relation 'company' in path 'company.name'. Declare it in PrismaSource.relations.
+```
+
+Use a forma aninhada para paths mais profundos:
+
+```typescript
+relations: {
+  company: {
+    cardinality: 'one',
+    relations: {
+      owner: { cardinality: 'one' },
+    },
+  },
+  posts: { cardinality: 'many' },
+}
+```
+
+`primaryKeyField` por relação só é necessário quando o PK do model relacionado **não** é `'id'`. Default é `'id'`.
+
+## Semântica de dotted path: `'one'` vs `'many'`
+
+Por uma relação `'one'`, o adapter aninha um objeto simples:
+
+```http
+GET /users?filter[company.name][eq]=Acme
+```
+
+```ts
+where: {
+  company: {
+    name: {
+      equals: 'Acme';
+    }
+  }
+}
+```
+
+Por uma relação `'many'`, o adapter envolve cada hop `'many'` em `some` para preservar a semântica ("qualquer linha relacionada combina") que os outros adapters já têm:
+
+```http
+GET /users?filter[posts.title][ilike]=hello
+```
+
+```ts
+where: { posts: { some: { title: { contains: 'hello', mode: 'insensitive' } } } }
+```
+
+Cadeias profundas envolvem cada hop `'many'` independentemente:
+
+```http
+GET /users?filter[posts.tags.label][eq]=urgent
+```
+
+```ts
+where: {
+  posts: {
+    some: {
+      tags: {
+        some: {
+          label: {
+            equals: 'urgent';
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## ORDER BY através de relação `'many'` é rejeitado
+
+```http
+GET /users?sort=-posts.createdAt
+```
+
+```
+Cannot sort by 'posts.createdAt': sorting through to-many relations is not supported.
+```
+
+Idêntico ao adapter Drizzle. Para ordenar arrays de relação, ordene-os na camada de aplicação depois do retorno do adapter.
+
+## `fields + includes` é constrained de propósito
+
+Prisma rejeita `select` e `include` no mesmo nível. Quando `fields` aparece, o adapter monta uma árvore `select` e reconcilia o estado de `include` para dentro dela — **sem** auto-expandir colunas escalares de relação:
+
+```http
+GET /users?fields=id,name&includes=company
+```
+
+```ts
+{
+  select: {
+    id: true,
+    name: true,
+    company: { select: { id: true } }, // só PK
+  },
+}
+```
+
+Para incluir `company.name`, opte explicitamente:
+
+```http
+GET /users?fields=id,name,company.name&includes=company
+```
+
+```ts
+{
+  select: {
+    id: true,
+    name: true,
+    company: { select: { id: true, name: true } },
+  },
+}
+```
+
+Isso evita qualquer dependência da metadata interna do Prisma e mantém o contrato previsível.
+
+## Forma do resultado — grafo aninhado nativo
+
+```http
+GET /users?includes=company,posts&page=1&perPage=2
+```
+
+```json
+{
+  "data": [
+    {
+      "id": "f1c4...",
+      "name": "Ana",
+      "email": "ana@acme.com",
+      "createdAt": "2024-01-15T10:00:00Z",
+      "company": { "id": "c1...", "name": "Acme" },
+      "posts": [{ "id": "p1...", "title": "Hello", "userId": "f1c4..." }]
+    }
+  ],
+  "page": 1,
+  "perPage": 2,
+  "total": 17,
+  "lastPage": 9
+}
+```
+
+Prisma hidrata arrays de relação nativamente — não há paginação em duas fases. `total` vem de `prisma.<model>.count({ where })` usando o mesmo `where` que `findMany`.
+
+## Diferenças em relação aos adapters TypeORM e Drizzle
+
+A mesma query string pode produzir comportamento ligeiramente diferente entre adapters. São diferenças documentadas, não bugs:
+
+- **`like` / `ilike` são literais.** Prisma `contains` não interpreta `%` ou `_` como wildcards SQL. O adapter não re-introduz wildcard parsing porque isso acoplaria o contrato a um dialeto SQL.
+- **`ilike` exige um provider Prisma que suporte `mode: 'insensitive'`.** Postgres e MongoDB suportam; **SQLite não**. Restrinja `OperatorsConfig.allowed` para excluir `ilike`/`notIlike` se você usa SQLite, ou espere erro em runtime do Prisma.
+- **`isNull` traduz diferente por tipo de leaf.** Campos escalares usam `{ not: null }`/`null`; campos de relação usam `{ isNot: null }`/`{ is: null }`. O adapter escolhe o shape correto automaticamente com base em `PrismaSource.relations` — mas se um hop está faltando, o adapter lança (em vez de gerar shape inválido em silêncio).
+- **Containers `AND: [...]` aparecem no `where` gerado.** Filtros repetidos sempre empilham sob um array `AND` no top-level. Equivalente a objetos mesclados na maioria dos casos, mas visualmente diferente no log do Prisma.
+
+## `customize` recebe o accumulator interno
+
+```typescript
+this.qb.execute(prismaSource as never, query, rules, (qb) => {
+  // `qb` é o accumulator interno PrismaQB:
+  //   { source, alias, where: { AND: [] }, orderBy, include?, select? }
+  qb.where.AND.push({ tenantId: 'tenant-1' });
+});
+```
+
+Mutações são visíveis tanto para `findMany` quanto para `count` porque o adapter monta os argumentos **depois** do `customize` rodar. Use isso para escopo de tenant, filtros de soft-delete, ou flags nativas do Prisma que a query grammar REST não expõe.
+
+## Próximos passos
+
+- Para um guia completo de parâmetros, operadores e whitelist, veja [Guia de Uso](/docs/usage).
+- A [página do adapter Drizzle](/docs/adapters/drizzle) explica os mesmos conceitos por outro ângulo de ORM.
+- Se quiser implementar seu próprio adapter, veja [Escrevendo seu próprio](/docs/adapters/writing-your-own).

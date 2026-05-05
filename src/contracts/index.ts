@@ -8,3 +8,4 @@ export type {
 } from './query-builder-config.interface';
 export type { RulesConfig } from './rules-config.interface';
 export type { RestQueryAdapter } from './rest-query-adapter.interface';
+export type { PrismaSource, PrismaRelation } from './prisma-source.interface';

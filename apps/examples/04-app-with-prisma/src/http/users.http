@@ -1,0 +1,172 @@
+@baseUrl = http://localhost:3003
+
+# USERS — prisma adapter
+#
+# Result row shape (Prisma's native nested graph):
+#   { id, name, email, companyId, createdAt, company: {...} | null, posts: [...] }
+
+# ─────────────────────────────────────────────────────────────────────
+# BASIC
+# ─────────────────────────────────────────────────────────────────────
+
+### List all (paginated)
+GET {{baseUrl}}/users
+
+### Pagination
+GET {{baseUrl}}/users?page=1&perPage=5
+
+### No pagination — returns { data } only
+GET {{baseUrl}}/users?paginate=false
+
+# ─────────────────────────────────────────────────────────────────────
+# FILTERS — root columns
+# ─────────────────────────────────────────────────────────────────────
+
+### Exact (implicit eq)
+GET {{baseUrl}}/users?filter[email]=ana.0@acmecorp.com
+
+### Exact (explicit)
+GET {{baseUrl}}/users?filter[email][eq]=ana.0@acmecorp.com
+
+### Not equal
+GET {{baseUrl}}/users?filter[name][ne]=admin
+
+### Like (Prisma `contains`, literal — `%` and `_` are NOT wildcards here)
+GET {{baseUrl}}/users?filter[email][like]=acme
+
+### ILike (case-insensitive contains, requires Postgres provider)
+GET {{baseUrl}}/users?filter[email][ilike]=ACME
+
+### Not like
+GET {{baseUrl}}/users?filter[name][notLike]=spam
+
+### Not ilike
+GET {{baseUrl}}/users?filter[name][notIlike]=DELETED
+
+### Greater than date
+GET {{baseUrl}}/users?filter[createdAt][gt]=2024-01-01
+
+### Greater than or equal date
+GET {{baseUrl}}/users?filter[createdAt][gte]=2024-01-01T00:00:00Z
+
+### Less than date
+GET {{baseUrl}}/users?filter[createdAt][lt]=2026-01-01
+
+### Less than or equal date
+GET {{baseUrl}}/users?filter[createdAt][lte]=2026-12-31
+
+### IN
+GET {{baseUrl}}/users?filter[email][in]=ana.0@acmecorp.com,bia.1@acmecorp.com
+
+### NOT IN
+GET {{baseUrl}}/users?filter[email][notIn]=spam@example.com
+
+### Is null on scalar (companyId) → emits `{ companyId: null }`
+GET {{baseUrl}}/users?filter[companyId][isNull]=true
+
+### Is not null on scalar
+GET {{baseUrl}}/users?filter[companyId][isNull]=false
+
+### Is null on a 'one' relation (company) → emits `{ company: { is: null } }`
+GET {{baseUrl}}/users?filter[company][isNull]=true
+
+### Between dates
+GET {{baseUrl}}/users?filter[createdAt][between]=2024-01-01,2025-12-31
+
+# ─────────────────────────────────────────────────────────────────────
+# FILTERS — relation paths
+# ─────────────────────────────────────────────────────────────────────
+
+### 'one' relation column → nested `where` object
+GET {{baseUrl}}/users?filter[company.name][eq]=Acme Corp
+
+### 'one' relation column with ilike
+GET {{baseUrl}}/users?filter[company.name][ilike]=globex
+
+### 'many' relation column → wraps in `some`
+GET {{baseUrl}}/users?filter[posts.title][ilike]=hello&page=1&perPage=5
+
+# ─────────────────────────────────────────────────────────────────────
+# SORTING
+# ─────────────────────────────────────────────────────────────────────
+
+### Simple
+GET {{baseUrl}}/users?sort=name
+
+### Descending
+GET {{baseUrl}}/users?sort=-createdAt
+
+### Multiple fields
+GET {{baseUrl}}/users?sort=name,-email
+
+### Sort by 'one' relation column (allowed)
+GET {{baseUrl}}/users?sort=-company.name
+
+### ✗ Sort by 'many' relation column → 400
+###   Error: Cannot sort by 'posts.title': sorting through to-many relations is not supported.
+GET {{baseUrl}}/users?sort=-posts.title
+
+# ─────────────────────────────────────────────────────────────────────
+# SEARCH (declared on name, email, company.name)
+# ─────────────────────────────────────────────────────────────────────
+
+### Search across whitelisted fields (OR-joined `contains` + insensitive)
+GET {{baseUrl}}/users?search=ana
+
+### Search hits company.name
+GET {{baseUrl}}/users?search=acme
+
+# ─────────────────────────────────────────────────────────────────────
+# FIELDS (root.id is auto-injected)
+# ─────────────────────────────────────────────────────────────────────
+
+### Project root scalars
+GET {{baseUrl}}/users?fields=name,email
+
+### Fields + pagination
+GET {{baseUrl}}/users?fields=id,name,email&page=1&perPage=3
+
+# ─────────────────────────────────────────────────────────────────────
+# INCLUDES
+# ─────────────────────────────────────────────────────────────────────
+
+### 'one' include — Prisma returns the nested object
+GET {{baseUrl}}/users?includes=company
+
+### 'many' include — Prisma returns an array; no row inflation
+GET {{baseUrl}}/users?includes=posts&page=1&perPage=2
+
+### Both
+GET {{baseUrl}}/users?includes=company,posts&page=1&perPage=3
+
+# ─────────────────────────────────────────────────────────────────────
+# FIELDS + INCLUDES (locked behavior)
+# ─────────────────────────────────────────────────────────────────────
+
+### `fields=name&includes=company` → relation reduced to its PK only.
+###   args: select: { id, name, company: { select: { id } } }
+###   `company.name` won't appear in the response. Opt in explicitly to get it.
+GET {{baseUrl}}/users?fields=name&includes=company
+
+### Opt in to a relation scalar:
+GET {{baseUrl}}/users?fields=name,company.name&includes=company
+
+# ─────────────────────────────────────────────────────────────────────
+# COMBINATIONS
+# ─────────────────────────────────────────────────────────────────────
+
+### Filter + sort + fields + page
+GET {{baseUrl}}/users?filter[createdAt][gte]=2024-01-01&sort=-createdAt&fields=id,name,email,createdAt&page=1&perPage=10
+
+### Relation filter + 'many' include + pagination
+GET {{baseUrl}}/users?filter[company.name][ilike]=acme&includes=posts&sort=-createdAt&page=1&perPage=5
+
+# ─────────────────────────────────────────────────────────────────────
+# EXPECTED ERRORS — confirm adapter contracts
+# ─────────────────────────────────────────────────────────────────────
+
+### ✗ Unknown filter field → 400
+GET {{baseUrl}}/users?filter[password][eq]=anything
+
+### ✗ ORDER BY through 'many' relation → 400
+GET {{baseUrl}}/users?sort=-posts.createdAt
