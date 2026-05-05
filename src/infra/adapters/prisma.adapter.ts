@@ -163,6 +163,52 @@ function coerceValueForOperator(operator: QueryOperator, raw: any): any {
   }
 }
 
+function isBooleanLike(value: unknown): boolean {
+  if (typeof value === 'boolean') return true;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return ['true', 'false', '1', '0'].includes(normalized);
+  }
+  return false;
+}
+
+function validateOperatorValue(
+  fieldPath: string,
+  operator: QueryOperator,
+  value: unknown
+): void {
+  if (value === undefined) {
+    throw new BadRequestException(
+      `filter[${fieldPath}][${operator}] requires a value`
+    );
+  }
+
+  if (operator === 'in' || operator === 'notIn') {
+    if (!Array.isArray(value) || value.length === 0) {
+      throw new BadRequestException(
+        `filter[${fieldPath}][${operator}] requires a non-empty array`
+      );
+    }
+    if (value.some((item) => item === undefined)) {
+      throw new BadRequestException(
+        `filter[${fieldPath}][${operator}] requires a value`
+      );
+    }
+  }
+
+  if (operator === 'between') {
+    if (
+      !Array.isArray(value) ||
+      value.length !== 2 ||
+      value.some((item) => item === undefined)
+    ) {
+      throw new BadRequestException(
+        `filter[${fieldPath}][between] requires exactly two values`
+      );
+    }
+  }
+}
+
 function buildRelationAwareWhere(
   hops: PathHop[],
   leafKey: string,
@@ -479,16 +525,14 @@ export class PrismaAdapter
       }
     }
 
-    const value = coerceValueForOperator(operator, rawValue);
-
-    // Silent skip on empty in/notIn arrays — TypeORM parity.
-    if (
-      (operator === 'in' || operator === 'notIn') &&
-      Array.isArray(value) &&
-      value.length === 0
-    ) {
-      return;
+    if (operator === 'isNull' && !isBooleanLike(rawValue)) {
+      throw new BadRequestException(
+        `filter[${fieldPath}][isNull] requires a boolean`
+      );
     }
+
+    const value = coerceValueForOperator(operator, rawValue);
+    validateOperatorValue(fieldPath, operator, value);
 
     const resolved = walkPath(qb.source, fieldPath);
 
@@ -714,6 +758,12 @@ export class PrismaAdapter
       }
 
       if (!path.includes('.')) {
+        const resolved = walkPath(qb.source, path);
+        if (resolved.leafIsRelation) {
+          throw new BadRequestException(
+            `Field "${path}" cannot be a relation. Use scalar field paths.`
+          );
+        }
         select[path] = true;
         continue;
       }

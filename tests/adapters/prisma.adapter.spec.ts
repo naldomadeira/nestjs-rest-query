@@ -174,12 +174,63 @@ describe('applyFilters: operatorsConfig.allowed', () => {
 
 describe('applyFilters: value validation', () => {
   const source = userSource(makePrisma('user').prisma);
-  it('silently skips empty in / notIn (TypeORM parity)', () => {
+  it('throws BadRequest when in / notIn resolve to an empty array', () => {
     const qb = makeQB(adapter, source);
-    adapter.applyFilters(qb, { filter: { name: { in: '' } } }, 'user', [
-      'name',
-    ]);
-    expect(qb.where.AND).toEqual([]);
+    expect(() =>
+      adapter.applyFilters(qb, { filter: { name: { in: '' } } }, 'user', [
+        'name',
+      ])
+    ).toThrow(/filter\[name\]\[in\] requires a non-empty array/);
+
+    const qb2 = makeQB(adapter, source);
+    expect(() =>
+      adapter.applyFilters(qb2, { filter: { name: { notIn: [] } } }, 'user', [
+        'name',
+      ])
+    ).toThrow(/filter\[name\]\[notIn\] requires a non-empty array/);
+  });
+  it('throws BadRequest when isNull is not boolean-like', () => {
+    const qb = makeQB(adapter, source);
+    expect(() =>
+      adapter.applyFilters(
+        qb,
+        { filter: { company: { isNull: 'banana' } } },
+        'user',
+        ['company']
+      )
+    ).toThrow(/filter\[company\]\[isNull\] requires a boolean/);
+  });
+  it('throws BadRequest when an operator value is missing', () => {
+    const qb = makeQB(adapter, source);
+    expect(() =>
+      adapter.applyFilters(
+        qb,
+        { filter: { name: { eq: undefined } } } as any,
+        'user',
+        ['name']
+      )
+    ).toThrow(/filter\[name\]\[eq\] requires a value/);
+  });
+  it('throws BadRequest when collection operators contain undefined values', () => {
+    const qb = makeQB(adapter, source);
+    expect(() =>
+      adapter.applyFilters(
+        qb,
+        { filter: { name: { in: ['ana', undefined] } } } as any,
+        'user',
+        ['name']
+      )
+    ).toThrow(/filter\[name\]\[in\] requires a value/);
+
+    const qb2 = makeQB(adapter, source);
+    expect(() =>
+      adapter.applyFilters(
+        qb2,
+        { filter: { age: { between: [18, undefined] } } } as any,
+        'user',
+        ['age']
+      )
+    ).toThrow(/filter\[age\]\[between\] requires exactly two values/);
   });
   it('throws BadRequest when between has wrong arity', () => {
     const qb = makeQB(adapter, source);
@@ -468,6 +519,12 @@ describe('applyFields', () => {
       name: true,
       company: { select: { name: true } },
     });
+  });
+  it('rejects a direct relation field to avoid auto-expanding relation columns', () => {
+    const qb = makeQB(adapter, source);
+    expect(() =>
+      adapter.applyFields(qb, { fields: 'company' }, 'user', ['company'])
+    ).toThrow(/Field "company" cannot be a relation/);
   });
   it('fields + includes: relation reduced to PK, include cleared', () => {
     const qb = makeQB(adapter, source);
