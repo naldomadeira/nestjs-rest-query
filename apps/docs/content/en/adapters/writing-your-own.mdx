@@ -142,9 +142,10 @@ Your adapter only needs to:
 ```typescript
 import { RestQueryAdapter } from 'nestjs-rest-query';
 
-export class PrismaAdapter
-  implements RestQueryAdapter<PrismaQueryBuilder, PrismaSource>
-{
+export class PrismaAdapter implements RestQueryAdapter<
+  PrismaQueryBuilder,
+  PrismaSource
+> {
   createQueryBuilder(source: PrismaSource, alias: string) {
     return {
       source,

@@ -401,9 +401,10 @@ function compactWhere(where: { AND: any[] }): Record<string, any> | undefined {
  * `select` and `include` are reconciled inside `applyFields` because
  * Prisma rejects both at the same level.
  */
-export class PrismaAdapter
-  implements RestQueryAdapter<PrismaQB, PrismaSource<any>>
-{
+export class PrismaAdapter implements RestQueryAdapter<
+  PrismaQB,
+  PrismaSource<any>
+> {
   constructor() {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports

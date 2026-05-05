@@ -49,7 +49,6 @@ apps/examples/**/coverage
 !.vscode/extensions.json
 .env
 todo.txt
-.vscode
 
 apps/examples/**/node_modules
 
