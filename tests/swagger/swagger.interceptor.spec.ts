@@ -32,7 +32,7 @@ describe('dqbSwaggerRequestInterceptor', () => {
 
     const result = interceptor(req);
 
-    expect(result.url).toBe('/users?filter[name][eq]=john&page=1');
+    expect(result.url).toBe('/users?filter%5Bname%5D%5Beq%5D=john&page=1');
   });
 
   it('does not rewrite GET routes that are not marked by the library', () => {
@@ -68,7 +68,9 @@ describe('dqbSwaggerRequestInterceptor', () => {
 
     const result = interceptor(req);
 
-    expect(result.url).toBe('/users/42/posts?filter[title][like]=hello');
+    expect(result.url).toBe(
+      '/users/42/posts?filter%5Btitle%5D%5Blike%5D=hello'
+    );
   });
 
   it('preserves the absolute URL when Swagger sends a full request URL', () => {
@@ -81,7 +83,7 @@ describe('dqbSwaggerRequestInterceptor', () => {
     const result = interceptor(req);
 
     expect(result.url).toBe(
-      'http://localhost:3011/users?filter[username][eq]=admin.system'
+      'http://localhost:3011/users?filter%5Busername%5D%5Beq%5D=admin.system'
     );
   });
 });

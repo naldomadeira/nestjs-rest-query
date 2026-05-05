@@ -125,14 +125,14 @@ function normalizeSwaggerQueryParam(pair: string): string {
   if (!decodedValue) return rawKey;
 
   if (decodedValue.charAt(0) === '[' && decodedValue.indexOf('=') !== -1) {
-    return `filter${decodedValue}`;
+    return encodeNormalizedFilterParam(`filter${decodedValue}`);
   }
 
   if (
     decodedValue.substring(0, 7) === 'filter[' &&
     decodedValue.indexOf('=') !== -1
   ) {
-    return decodedValue;
+    return encodeNormalizedFilterParam(decodedValue);
   }
 
   return rawValue ? `${rawKey}=${rawValue}` : rawKey;
@@ -148,4 +148,16 @@ function safeDecode(value: string): string {
 
 function hasAbsoluteUrl(value: string): boolean {
   return /^https?:\/\//i.test(value);
+}
+
+function encodeNormalizedFilterParam(value: string): string {
+  const eqIdx = value.indexOf('=');
+  if (eqIdx === -1) {
+    return encodeURIComponent(value);
+  }
+
+  const key = value.slice(0, eqIdx);
+  const paramValue = value.slice(eqIdx + 1);
+
+  return `${encodeURIComponent(key)}=${encodeURIComponent(paramValue)}`;
 }
