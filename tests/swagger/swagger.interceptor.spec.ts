@@ -70,4 +70,18 @@ describe('dqbSwaggerRequestInterceptor', () => {
 
     expect(result.url).toBe('/users/42/posts?filter[title][like]=hello');
   });
+
+  it('preserves the absolute URL when Swagger sends a full request URL', () => {
+    const interceptor = dqbSwaggerRequestInterceptor(document);
+    const req = {
+      method: 'GET',
+      url: 'http://localhost:3011/users?filter=%5Busername%5D%5Beq%5D%3Dadmin.system',
+    };
+
+    const result = interceptor(req);
+
+    expect(result.url).toBe(
+      'http://localhost:3011/users?filter[username][eq]=admin.system'
+    );
+  });
 });

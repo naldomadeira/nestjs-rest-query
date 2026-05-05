@@ -6,10 +6,8 @@ type SwaggerRequest = {
   curlOptions?: unknown[];
 };
 
-type OpenApiOperationLike = Record<string, unknown>;
-type OpenApiPathItemLike = Record<string, OpenApiOperationLike | undefined>;
 type OpenApiDocumentLike = {
-  paths?: Record<string, OpenApiPathItemLike | undefined>;
+  paths?: Record<string, { get?: unknown } | undefined>;
 };
 
 /**
@@ -54,7 +52,12 @@ function collectDqbGetRouteMatchers(document: OpenApiDocumentLike): RegExp[] {
   const paths = document.paths ?? {};
 
   return Object.entries(paths).flatMap(([path, pathItem]) => {
-    if (!pathItem?.get?.[DQB_SWAGGER_EXTENSION_KEY]) {
+    const getOperation =
+      pathItem?.get && typeof pathItem.get === 'object'
+        ? (pathItem.get as Record<string, unknown>)
+        : undefined;
+
+    if (!getOperation?.[DQB_SWAGGER_EXTENSION_KEY]) {
       return [];
     }
 
@@ -99,7 +102,10 @@ function interceptSwaggerRequest(
       .map((pair) => normalizeSwaggerQueryParam(pair));
 
     const nextQuery = parts.join('&');
-    req.url = `${url.pathname}${nextQuery ? `?${nextQuery}` : ''}`;
+    const normalizedUrl = `${url.pathname}${nextQuery ? `?${nextQuery}` : ''}`;
+    req.url = hasAbsoluteUrl(req.url)
+      ? `${url.origin}${normalizedUrl}`
+      : normalizedUrl;
   } catch (err) {
     console.error('[DQB] erro no interceptor:', err);
   }
@@ -138,4 +144,8 @@ function safeDecode(value: string): string {
   } catch {
     return value;
   }
+}
+
+function hasAbsoluteUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value);
 }
