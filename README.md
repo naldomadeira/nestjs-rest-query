@@ -38,10 +38,11 @@ NestJS has controllers. TypeORM has a query builder. The boilerplate between the
 
 ## Compatibility
 
-| nestjs-rest-query | NestJS | TypeORM | Drizzle  | Node   |
-| ----------------- | ------ | ------- | -------- | ------ |
-| `2.x`             | `11.x` | `0.3.x` | `0.45.x` | `>=20` |
-| `1.x`             | `11.x` | `0.3.x` | —        | `>=20` |
+| nestjs-rest-query | NestJS | TypeORM | Drizzle  | Prisma              | Node   |
+| ----------------- | ------ | ------- | -------- | ------------------- | ------ |
+| `2.1.x`           | `11.x` | `0.3.x` | `0.45.x` | `5.x \| 6.x \| 7.x` | `>=20` |
+| `2.0.x`           | `11.x` | `0.3.x` | `0.45.x` | —                   | `>=20` |
+| `1.x`             | `11.x` | `0.3.x` | —        | —                   | `>=20` |
 
 ## Adapters
 
@@ -61,7 +62,7 @@ pnpm add nestjs-rest-query
 npm install nestjs-rest-query
 ```
 
-Peer dependencies: `@nestjs/common`, `@nestjs/core`, `reflect-metadata`. Optionally `typeorm` (for TypeORM) or `drizzle-orm` (for Drizzle). Add `@nestjs/swagger` for OpenAPI integration (optional).
+Peer dependencies: `@nestjs/common`, `@nestjs/core`, `reflect-metadata`. Optionally `typeorm` (for TypeORM), `drizzle-orm` (for Drizzle), or `@prisma/client` (for Prisma). Add `@nestjs/swagger` for OpenAPI integration (optional).
 
 ### Choose your ORM
 
@@ -77,6 +78,14 @@ import { DrizzleAdapter } from 'nestjs-rest-query/drizzle';
 
 DynamicQueryBuilderModule.forRoot({
   adapter: new DrizzleAdapter(),
+});
+
+// Prisma
+import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
+import { PrismaAdapter } from 'nestjs-rest-query/prisma';
+
+DynamicQueryBuilderModule.forRoot({
+  adapter: new PrismaAdapter(),
 });
 ```
 
