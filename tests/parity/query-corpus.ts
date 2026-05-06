@@ -99,9 +99,7 @@ export const PARITY_CORPUS: ParityCase[] = [
     masterLine: 2,
     rules: { ...FULL_RULES, filters: ['name'] },
     query: 'filter[secret][eq]=x',
-    expected: err(
-      'Filter field(s) not allowed: secret. Allowed fields: name'
-    ),
+    expected: err('Filter field(s) not allowed: secret. Allowed fields: name'),
   },
 
   // --- #3 dotted path on `'one'` relation -----------------------------
@@ -189,7 +187,8 @@ export const PARITY_CORPUS: ParityCase[] = [
   // --- #14 paginate=false -------------------------------------------
   {
     id: 'P-14',
-    description: 'returns { data } without page/perPage/total when paginate=false',
+    description:
+      'returns { data } without page/perPage/total when paginate=false',
     masterLine: 14,
     rules: FULL_RULES,
     query: 'name=alice',

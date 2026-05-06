@@ -25,7 +25,10 @@ function validateSearchTokens(tokens: string[]): void {
 }
 
 function escapeSearchTerm(term: string): string {
-  return term.replace(/%/g, '\\%').replace(/_/g, '\\_');
+  // Escape the escape character first, otherwise the % / _ replacements
+  // below introduce new backslashes that an attacker could subvert by
+  // sneaking a literal backslash into the input.
+  return term.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
 }
 
 function getJoinAttributes(qb: SelectQueryBuilder<any>): JoinAttribute[] {

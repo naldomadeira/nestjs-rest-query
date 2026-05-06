@@ -202,22 +202,19 @@ async function assertOutcome(
 const ADAPTERS: AdapterId[] = ['typeorm', 'drizzle', 'prisma'];
 
 describe('Cross-adapter parity matrix', () => {
-  describe.each(PARITY_CORPUS)(
-    '$id $description',
-    (testCase: ParityCase) => {
-      it.each(ADAPTERS)('%s', async (adapter) => {
-        const skip = testCase.skip?.[adapter];
-        if (skip) {
-          // Pending until the gap is closed. The test passes but the
-          // skip is documented; remove the entry to re-enable.
-          // eslint-disable-next-line jest/no-conditional-expect
-          expect(skip.gap).toBeTruthy();
-          return;
-        }
-        await assertOutcome(adapter, testCase);
-      });
-    }
-  );
+  describe.each(PARITY_CORPUS)('$id $description', (testCase: ParityCase) => {
+    it.each(ADAPTERS)('%s', async (adapter) => {
+      const skip = testCase.skip?.[adapter];
+      if (skip) {
+        // Pending until the gap is closed. The test passes but the
+        // skip is documented; remove the entry to re-enable.
+        // eslint-disable-next-line jest/no-conditional-expect
+        expect(skip.gap).toBeTruthy();
+        return;
+      }
+      await assertOutcome(adapter, testCase);
+    });
+  });
 
   it('every skip entry references a known gap', () => {
     for (const testCase of PARITY_CORPUS) {

@@ -2,7 +2,7 @@
 'nestjs-rest-query': patch
 ---
 
-fix(drizzle): escape % and _ in search terms (G1, parity gap)
+fix(drizzle): escape % and \_ in search terms (G1, parity gap)
 
 The Drizzle adapter previously interpolated the user's search term into
 the ILIKE pattern without escaping `%` or `_`, so `?search=50%25` would

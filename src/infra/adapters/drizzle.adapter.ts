@@ -560,8 +560,14 @@ export class DrizzleAdapter implements RestQueryAdapter<
       throw new BadRequestException(INVALID_FIELD_FORMAT('search', unsafe));
 
     // Escape ILIKE metacharacters so the term is treated literally.
-    // Parity with the TypeORM handler at search.handler.ts.
-    const escapedTerm = term.replace(/%/g, '\\%').replace(/_/g, '\\_');
+    // Parity with the TypeORM handler at search.handler.ts. Backslash
+    // must be replaced first; otherwise the % / _ replacements below
+    // introduce new backslashes that an attacker could subvert by
+    // sneaking a literal backslash into the input.
+    const escapedTerm = term
+      .replace(/\\/g, '\\\\')
+      .replace(/%/g, '\\%')
+      .replace(/_/g, '\\_');
 
     log.debug('applying search', { count: fields.length });
     const clauses = fields.map((f) =>

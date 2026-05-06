@@ -2,7 +2,7 @@
 'nestjs-rest-query': patch
 ---
 
-fix(prisma): treat filter[*][in]= and filter[*][notIn]= (empty) as a no-op (G2, parity gap)
+fix(prisma): treat filter[\*][in]= and filter[\*][notIn]= (empty) as a no-op (G2, parity gap)
 
 The Prisma adapter previously rejected empty `in` / `notIn` arrays with
 a 400, while TypeORM and Drizzle silently dropped the predicate. Prisma
