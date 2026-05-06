@@ -45,7 +45,7 @@ Decorator de **parâmetro** que lê o `RulesConfig` armazenado pelo `@ApiDynamic
 ```typescript
 async findAll(
   @Query() query: DynamicQueryDto,
-  @QueryRules() rules: RulesConfig,  // lê a whitelist do decorator do método
+  @QueryRules() rules: RulesConfig,  // reads the whitelist from the method decorator
 ) {}
 ```
 

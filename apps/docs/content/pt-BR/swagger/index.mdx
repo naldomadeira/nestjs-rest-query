@@ -29,7 +29,7 @@ import { dqbSwaggerRequestInterceptor } from 'nestjs-rest-query';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Necessário para que filter[field][op]=value seja interpretado como objeto aninhado
+  // Required so filter[field][op]=value is parsed as a nested object
   app.set('query parser', 'extended');
 
   app.useGlobalPipes(
@@ -46,7 +46,7 @@ async function bootstrap() {
 
   SwaggerModule.setup('/', app, document, {
     swaggerOptions: {
-      // Necessário para testar filtros aninhados diretamente pelo Swagger UI
+      // Required to test nested filters directly in Swagger UI
       requestInterceptor: dqbSwaggerRequestInterceptor(document),
     },
   });

@@ -4,7 +4,7 @@
 
 **Declarative, whitelist-first REST query params for NestJS.**
 
-Turn `?filter[email][like]=acme&sorts=-createdAt&page=2` into safe, typed database queries — without writing a single `WHERE` clause.
+Turn `?filter[email][like]=acme&sort=-createdAt&page=2` into safe, typed database queries — without writing a single `WHERE` clause.
 
 [![npm version](https://img.shields.io/npm/v/nestjs-rest-query.svg?style=flat-square&logo=npm)](https://www.npmjs.com/package/nestjs-rest-query)
 [![npm downloads](https://img.shields.io/npm/dm/nestjs-rest-query.svg?style=flat-square)](https://www.npmjs.com/package/nestjs-rest-query)
@@ -156,7 +156,7 @@ export class UsersController {
 GET /users
   ?filter[email][ilike]=%@acme.com
   &filter[createdAt][gte]=2025-01-01
-  &sorts=-createdAt,name
+  &sort=-createdAt,name
   &includes=company
   &fields=id,name,email
   &search=ana
@@ -209,7 +209,7 @@ Restrict the available operators globally via `forRoot({ operators: { allowed: [
 ## Sorting, fields, includes, search, pagination
 
 ```http
-?sorts=name,-createdAt          # name ASC, createdAt DESC
+?sort=name,-createdAt           # name ASC, createdAt DESC
 ?fields=id,name,email           # SELECT id, name, email
 ?includes=company,company.owner # LEFT JOIN company; LEFT JOIN owner
 ?search=keyword                 # against rules.search columns

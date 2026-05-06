@@ -87,7 +87,7 @@ export const posts = pgTable('posts', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
-// Relations (opcional, para o ORM — não diretamente usado pelo adapter)
+// Relations (optional, for the ORM - not used directly by the adapter)
 export const usersRelations = relations(users, ({ one, many }) => ({
   company: one(companies, {
     fields: [users.companyId],
@@ -159,12 +159,12 @@ export class UsersController {
 
 ## The relations map is required for dotted paths
 
-Unlike TypeORM, which auto-discovers relations via `@OneToOne` and `@OneToMany`, **Drizzle will not discover relations automatically**. If your query string includes a dotted path (for example, `?filters[company.name][eq]=Acme`), you **must** register the relation in the `relations` map.
+Unlike TypeORM, which auto-discovers relations via `@OneToOne` and `@OneToMany`, **Drizzle will not discover relations automatically**. If your query string includes a dotted path (for example, `?filter[company.name][eq]=Acme`), you **must** register the relation in the `relations` map.
 
 If you try to use an unregistered path:
 
 ```http
-GET /users?filters[company.name][eq]=Acme
+GET /users?filter[company.name][eq]=Acme
 ```
 
 And `relations` does not contain `company`, the adapter will throw:
@@ -183,7 +183,7 @@ relations: {
     cardinality: 'one',
   },
   'company.owner': {
-    table: ownerUsers, // a tabela User novamente, para owner
+    table: ownerUsers, // the User table again, for owner
     on: eq(companies.ownerId, ownerUsers.id),
     cardinality: 'one',
   },
@@ -224,7 +224,7 @@ relations: {
     table: posts,
     on: eq(posts.userId, users.id),
     cardinality: 'many',
-    primaryKey: posts.id,  // obrigatório para 'many'
+    primaryKey: posts.id, // required for 'many'
   },
 }
 ```
@@ -242,7 +242,7 @@ This is checked at **compile time** (the TypeScript discriminated union prevents
 If you try to sort by a column from a 1:N relation:
 
 ```http
-GET /users?sorts=-posts.createdAt
+GET /users?sort=-posts.createdAt
 ```
 
 The adapter will throw:
@@ -278,7 +278,7 @@ return result;
 `DrizzleAdapter` returns rows in the same flat shape as `TypeOrmAdapter`. Root columns stay at the top level; relations are keys at the same level (object for `'one'`, array for `'many'`).
 
 ```http
-GET /users?filters[email][ilike]=%@acme.com&includes=company,posts&page=1&perPage=2
+GET /users?filter[email][ilike]=%@acme.com&includes=company,posts&page=1&perPage=2
 ```
 
 ```json
@@ -356,8 +356,8 @@ Sometimes you want to apply Drizzle operations that the adapter does not expose:
 
 ```typescript
 return this.qb.execute(drizzleSource, query, rules, (qb) => {
-  // qb é o query builder Drizzle acumulado
-  // Você pode chamar métodos customizados aqui
+  // qb is the accumulated Drizzle query builder
+  // You can call custom methods here
 });
 ```
 
