@@ -559,9 +559,13 @@ export class DrizzleAdapter implements RestQueryAdapter<
     if (unsafe.length)
       throw new BadRequestException(INVALID_FIELD_FORMAT('search', unsafe));
 
+    // Escape ILIKE metacharacters so the term is treated literally.
+    // Parity with the TypeORM handler at search.handler.ts.
+    const escapedTerm = term.replace(/%/g, '\\%').replace(/_/g, '\\_');
+
     log.debug('applying search', { count: fields.length });
     const clauses = fields.map((f) =>
-      ilike(resolveDottedField(qb, f, 'where'), `%${term}%`)
+      ilike(resolveDottedField(qb, f, 'where'), `%${escapedTerm}%`)
     );
     const orClause = or(...clauses);
     if (orClause) qb.whereClauses.push(orClause);

@@ -144,7 +144,7 @@ export const PARITY_CORPUS: ParityCase[] = [
     expected: ok(),
   },
 
-  // --- #8 search literal `%` / `_` (G1 still open in Drizzle) -------
+  // --- #8 search literal `%` / `_` -----------------------------------
   {
     id: 'P-08',
     description:
@@ -153,15 +153,9 @@ export const PARITY_CORPUS: ParityCase[] = [
     rules: FULL_RULES,
     query: 'search=50%25',
     expected: ok(),
-    skip: {
-      drizzle: {
-        gap: 'G1',
-        note: 'Drizzle does not escape %/_ in search terms yet',
-      },
-    },
   },
 
-  // --- #9 in: [] no-op (G2 still open in Prisma) ---------------------
+  // --- #9 in: [] no-op ----------------------------------------------
   {
     id: 'P-09',
     description: 'treats filter[id][in]= (empty) as a no-op, not 400',
@@ -169,12 +163,6 @@ export const PARITY_CORPUS: ParityCase[] = [
     rules: FULL_RULES,
     query: 'filter[id][in]=',
     expected: ok(),
-    skip: {
-      prisma: {
-        gap: 'G2',
-        note: 'Prisma rejects in:[] with 400 instead of no-op',
-      },
-    },
   },
 
   // --- #10 isNull boolean-coerced -----------------------------------
