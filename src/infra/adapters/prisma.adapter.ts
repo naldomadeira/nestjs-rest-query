@@ -531,6 +531,18 @@ export class PrismaAdapter implements RestQueryAdapter<
     }
 
     const value = coerceValueForOperator(operator, rawValue);
+
+    // Empty in/notIn is a no-op, matching TypeORM and Drizzle. Bail
+    // before validateOperatorValue so the empty array doesn't trip the
+    // non-empty-array guard.
+    if (
+      (operator === 'in' || operator === 'notIn') &&
+      Array.isArray(value) &&
+      value.length === 0
+    ) {
+      return;
+    }
+
     validateOperatorValue(fieldPath, operator, value);
 
     const resolved = walkPath(qb.source, fieldPath);

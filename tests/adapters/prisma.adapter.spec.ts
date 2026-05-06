@@ -174,20 +174,22 @@ describe('applyFilters: operatorsConfig.allowed', () => {
 
 describe('applyFilters: value validation', () => {
   const source = userSource(makePrisma('user').prisma);
-  it('throws BadRequest when in / notIn resolve to an empty array', () => {
+  it('treats empty in / notIn as a no-op (parity with TypeORM and Drizzle)', () => {
     const qb = makeQB(adapter, source);
     expect(() =>
       adapter.applyFilters(qb, { filter: { name: { in: '' } } }, 'user', [
         'name',
       ])
-    ).toThrow(/filter\[name\]\[in\] requires a non-empty array/);
+    ).not.toThrow();
+    expect(qb.where.AND).toEqual([]);
 
     const qb2 = makeQB(adapter, source);
     expect(() =>
       adapter.applyFilters(qb2, { filter: { name: { notIn: [] } } }, 'user', [
         'name',
       ])
-    ).toThrow(/filter\[name\]\[notIn\] requires a non-empty array/);
+    ).not.toThrow();
+    expect(qb2.where.AND).toEqual([]);
   });
   it('throws BadRequest when isNull is not boolean-like', () => {
     const qb = makeQB(adapter, source);
