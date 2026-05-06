@@ -106,11 +106,22 @@ function setDeep(
 // Per-adapter runners
 // ----------------------------------------------------------------------
 
+interface RunOutcome {
+  result: unknown;
+  customizeCalls: number;
+}
+
 async function runCase(
   adapter: AdapterId,
   testCase: ParityCase
-): Promise<void> {
+): Promise<RunOutcome> {
   const queryInput = parseQueryString(testCase.query) as QueryInput;
+
+  // Honor `paginate: false` declared on the case. The lib reads
+  // `query.paginate` via toBool(), so passing the string is enough.
+  if (testCase.paginate === false) {
+    (queryInput as Record<string, unknown>).paginate = 'false';
+  }
 
   let service: QueryBuilderService;
   let source: any;
@@ -126,24 +137,35 @@ async function runCase(
     source = makePrismaFixture().source;
   }
 
-  // Use execute() so the full path (validation + pagination) runs.
-  await service.execute(
+  let customizeCalls = 0;
+  const customize =
+    testCase.customize === 'extra-where'
+      ? (qb: any) => {
+          customizeCalls += 1;
+          // Adapter-specific accumulator mutation. The matrix only
+          // verifies that the hook is invoked exactly once per execute;
+          // semantic validation (does the WHERE reach the count query?)
+          // belongs to Phase C/D (HTTP integration with a real database).
+          if (qb && typeof qb.andWhere === 'function') {
+            qb.andWhere('1 = 1');
+          } else if (qb && Array.isArray(qb.whereClauses)) {
+            // DrizzleQB accumulator
+            qb.whereClauses.push({ __parityMarker: true } as any);
+          } else if (qb && qb.where && Array.isArray(qb.where.AND)) {
+            // PrismaQB accumulator
+            qb.where.AND.push({ __parityMarker: true });
+          }
+        }
+      : undefined;
+
+  const result = await service.execute(
     source,
     queryInput,
     testCase.rules,
-    testCase.customize === 'extra-where'
-      ? (qb: any) => {
-          // The mutation is adapter-specific; for matrix purposes we only
-          // require that the customize hook is invoked without throwing.
-          // Fase C/D (HTTP integration) verifies it actually changes data
-          // and count. Drizzle / Prisma accumulators expose mutation
-          // surfaces; TypeORM accepts a SelectQueryBuilder.
-          if (qb && typeof qb.andWhere === 'function') {
-            qb.andWhere('1 = 1');
-          }
-        }
-      : undefined
+    customize
   );
+
+  return { result, customizeCalls };
 }
 
 // ----------------------------------------------------------------------
@@ -154,11 +176,13 @@ async function assertOutcome(
   adapter: AdapterId,
   testCase: ParityCase
 ): Promise<void> {
-  const expected = testCase.expected;
+  // Conscious deviations declared per-adapter override the canonical contract.
+  const expected = testCase.accept?.[adapter] ?? testCase.expected;
   let thrown: unknown = undefined;
+  let outcome: RunOutcome | undefined = undefined;
 
   try {
-    await runCase(adapter, testCase);
+    outcome = await runCase(adapter, testCase);
   } catch (e) {
     thrown = e;
   }
@@ -168,6 +192,12 @@ async function assertOutcome(
       const msg = thrown instanceof Error ? thrown.message : String(thrown);
       throw new Error(
         `[${adapter}] expected success, got: ${thrown instanceof Error ? thrown.constructor.name : 'value'} "${msg}"`
+      );
+    }
+    assertSuccessShape(adapter, expected, outcome!);
+    if (testCase.customize === 'extra-where' && outcome!.customizeCalls !== 1) {
+      throw new Error(
+        `[${adapter}] customize hook should be invoked exactly once, was invoked ${outcome!.customizeCalls} time(s)`
       );
     }
     return;
@@ -195,6 +225,47 @@ async function assertOutcome(
   }
 }
 
+function assertSuccessShape(
+  adapter: AdapterId,
+  expected: { kind: 'success' } & {
+    dataLength?: number;
+    hasFields?: ReadonlyArray<string>;
+    lacksFields?: ReadonlyArray<string>;
+  },
+  outcome: RunOutcome
+): void {
+  const result = outcome.result as Record<string, unknown> | undefined;
+  if (!result || typeof result !== 'object') {
+    throw new Error(
+      `[${adapter}] expected object result, got: ${typeof result}`
+    );
+  }
+  if (expected.dataLength !== undefined) {
+    const data = result.data as unknown[] | undefined;
+    if (!Array.isArray(data) || data.length !== expected.dataLength) {
+      throw new Error(
+        `[${adapter}] expected data.length === ${expected.dataLength}, got ${
+          Array.isArray(data) ? data.length : 'not-an-array'
+        }`
+      );
+    }
+  }
+  if (expected.hasFields) {
+    for (const key of expected.hasFields) {
+      if (!(key in result)) {
+        throw new Error(`[${adapter}] expected key "${key}" present in result`);
+      }
+    }
+  }
+  if (expected.lacksFields) {
+    for (const key of expected.lacksFields) {
+      if (key in result) {
+        throw new Error(`[${adapter}] expected key "${key}" ABSENT in result`);
+      }
+    }
+  }
+}
+
 // ----------------------------------------------------------------------
 // Matrix
 // ----------------------------------------------------------------------
@@ -216,14 +287,27 @@ describe('Cross-adapter parity matrix', () => {
     });
   });
 
-  it('every skip entry references a known gap', () => {
+  it('every skip entry references a gap catalogued in the parity docs', () => {
+    // Known-gap allowlist mirrors the open-gaps section of
+    // `plans/adapters-parity/05-summary-and-open-gaps.md`. When a gap
+    // closes, remove its label here and from the doc in the same PR.
+    const KNOWN_GAPS = new Set<string>([
+      'G4', // Prisma mode:'insensitive' provider awareness — backlog
+      'G5', // Prisma temporal coercion — backlog
+      'G6', // matrix infrastructure — partially landed (C/D pending)
+      'G8', // OperatorsConfig per-endpoint — backlog
+    ]);
     for (const testCase of PARITY_CORPUS) {
       if (!testCase.skip) continue;
       for (const [adapter, skip] of Object.entries(testCase.skip)) {
         if (!skip) continue;
-        expect(skip.gap).toMatch(/^[A-Za-z][A-Za-z0-9-]+$/);
-        expect(skip.note).toBeTruthy();
         expect(['typeorm', 'drizzle', 'prisma']).toContain(adapter);
+        expect(skip.note).toBeTruthy();
+        if (!KNOWN_GAPS.has(skip.gap)) {
+          throw new Error(
+            `[${testCase.id}/${adapter}] skip.gap "${skip.gap}" is not in the KNOWN_GAPS allowlist. Add it to plans/adapters-parity/05-summary-and-open-gaps.md and to KNOWN_GAPS in matrix.spec.ts.`
+          );
+        }
       }
     }
   });

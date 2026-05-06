@@ -72,11 +72,9 @@ The Drizzle adapter has explicit, runtime-enforced constraints. None of these af
 
 2. **ORDER BY a column reached through a `'many'` relation is not supported.** Calling the adapter with `?sorts=posts.createdAt` (where `posts` is `cardinality: 'many'`) throws:
 
-   > DrizzleAdapter: ORDER BY a column from 'many' relation "posts" is not supported.
-   > Sort by root or 'one' relation columns. To order presented relation arrays,
-   > use the customize hook to add per-relation ORDER BY in your application layer.
+   > Cannot sort by 'posts.createdAt': sorting through to-many relations is not supported.
 
-   This rules out a sort pattern that has no well-defined SQL semantics under the two-phase pagination strategy. Workaround: use the `customize` hook to add ordering of relation arrays in your application layer after the adapter has produced its rows.
+   This rules out a sort pattern that has no well-defined SQL semantics under the two-phase pagination strategy. Workaround: use the `customize` hook to add ordering of relation arrays in your application layer after the adapter has produced its rows. See ["Intentional adapter divergences"](#intentional-adapter-divergences-parity) below for the cross-adapter view.
 
 3. **Result shape is flat — TypeORM-compatible.** Root columns are at the top level; relations are nested as keys at the same level: object for `cardinality: 'one'` (or `null` if the LEFT JOIN found no match) and array for `cardinality: 'many'` (deduplicated by `relation.primaryKey`, possibly empty). No deep nesting of relations-of-relations — for that, wait for a future `DrizzleRelationalAdapter` based on `db.query.<table>.findMany({ with })`.
 
@@ -102,3 +100,21 @@ The Drizzle adapter has explicit, runtime-enforced constraints. None of these af
 ### No code changes required (TypeORM users)
 
 If you were using TypeORM with the default `forRoot()`, no application code changes. The default adapter is still TypeORM. The `paginate=false` branch keeps returning `{ data }` exactly as before.
+
+## Intentional adapter divergences (parity)
+
+The library aims for behavioral parity across TypeORM, Drizzle, and Prisma. A few spots are documented divergences — same input, different observable outcome by adapter — because the underlying SQL/ORM model makes "the same as TypeORM" either ambiguous or unsafe. The cross-adapter parity matrix in `tests/parity/matrix.spec.ts` encodes each one explicitly so it is impossible to introduce a new silent divergence.
+
+### `?sort=<many-rel>.<column>` — sort through a to-many relation
+
+| Adapter | Behavior                                                                                            | Why                                                                                                                                                                                                                       |
+| ------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| TypeORM | **Accepts.** Result is the first arbitrary row of the join under DISTINCT-like collapse.            | Historical: TypeORM's query builder does not consult cardinality at sort time. Preserved for backward compatibility.                                                                                                      |
+| Drizzle | **Rejects 400** with `Cannot sort by '<path>': sorting through to-many relations is not supported.` | The two-phase pagination (root IDs first, then data) uses `selectDistinct(id, sortColumn)` — including a column from a `'many'` relation lets the same root id appear multiple times before `LIMIT`, breaking pagination. |
+| Prisma  | **Rejects 400** with the same message.                                                              | Prisma's nested `orderBy` has no defined semantics for ordering a parent by a key inside a child collection.                                                                                                              |
+
+**Recommendation.** For deterministic results, sort by a root column or a column on a `'one'` relation. To order the relation array within each row, use the `customize` hook (`execute(..., (qb) => { ... })`) to apply per-relation ordering in the application layer after the adapter has produced its rows. The TypeORM behavior here should be treated as legacy — relying on it produces non-deterministic output across rows.
+
+### Adapters table
+
+The remaining behaviors (filter operators, search, pagination shape, `paginate=false`, customize hook, `isNull` on a `'one'` or `'many'` relation, repeated filters, whitelist rejection, dotted-path filters) are exercised by the parity matrix and produce identical outcomes across all three adapters, including byte-for-byte 400 messages. See `plans/adapters-parity/05-summary-and-open-gaps.md` for the master table and the audit trail.

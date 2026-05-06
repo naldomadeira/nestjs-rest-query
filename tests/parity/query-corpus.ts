@@ -30,7 +30,17 @@ import type { RulesConfig } from '@contracts/rules-config.interface';
 export type AdapterId = 'typeorm' | 'drizzle' | 'prisma';
 
 export type ExpectedOutcome =
-  | { kind: 'success' }
+  | {
+      kind: 'success';
+      /** Asserts result.data has exactly this length. */
+      dataLength?: number;
+      /** Asserts these top-level keys are present on the result envelope. */
+      hasFields?: ReadonlyArray<
+        'data' | 'page' | 'perPage' | 'total' | 'lastPage'
+      >;
+      /** Asserts these top-level keys are absent. Used for paginate=false. */
+      lacksFields?: ReadonlyArray<'page' | 'perPage' | 'total' | 'lastPage'>;
+    }
   | { kind: 'error'; status: 400; message: string };
 
 /**
@@ -62,6 +72,13 @@ export interface ParityCase {
   paginate?: boolean;
   /** The single canonical outcome — every adapter must agree. */
   expected: ExpectedOutcome;
+  /**
+   * Per-adapter conscious deviation from the canonical contract. Used only
+   * for behaviors documented in `MIGRATION.md` as intentional (e.g. #18
+   * sort-through-many: TypeORM permits, others reject). Distinct from
+   * `skip`, which is a *temporary* gap waiting on a fix.
+   */
+  accept?: Partial<Record<AdapterId, ExpectedOutcome>>;
   /** Per-adapter pending gaps. The aim is to keep this map empty. */
   skip?: Partial<Record<AdapterId, Skip>>;
 }
@@ -176,34 +193,43 @@ export const PARITY_CORPUS: ParityCase[] = [
   // --- #12/13 pagination 1:N ----------------------------------------
   {
     id: 'P-12',
-    description:
-      'paginates with a 1:N include and returns root-distinct total/data',
+    description: 'paginates with a 1:N include and returns the full envelope',
     masterLine: 12,
     rules: FULL_RULES,
     query: 'includes=posts&page=1&perPage=10',
-    expected: ok(),
+    expected: {
+      kind: 'success',
+      hasFields: ['data', 'page', 'perPage', 'total', 'lastPage'],
+    },
   },
 
   // --- #14 paginate=false -------------------------------------------
   {
     id: 'P-14',
     description:
-      'returns { data } without page/perPage/total when paginate=false',
+      'returns { data } without page/perPage/total/lastPage when paginate=false',
     masterLine: 14,
     rules: FULL_RULES,
-    query: 'name=alice',
+    query: 'filter[name][eq]=alice',
     paginate: false,
-    expected: ok(),
+    expected: {
+      kind: 'success',
+      hasFields: ['data'],
+      lacksFields: ['page', 'perPage', 'total', 'lastPage'],
+    },
   },
 
   // --- #15 result shape ---------------------------------------------
   {
     id: 'P-15',
-    description: 'returns flat root with relations as sub-keys',
+    description: 'returns the paginated envelope with both relations included',
     masterLine: 15,
     rules: FULL_RULES,
     query: 'includes=company,posts',
-    expected: ok(),
+    expected: {
+      kind: 'success',
+      hasFields: ['data', 'page', 'perPage', 'total', 'lastPage'],
+    },
   },
 
   // --- #16 customize affects data AND count -------------------------
@@ -230,33 +256,31 @@ export const PARITY_CORPUS: ParityCase[] = [
   },
 
   // --- #18 sort by `'many'` relation column -------------------------
-  // The contract: reject with 400. Drizzle and Prisma do this; TypeORM
-  // currently permits silently (returns the first arbitrary row of the
-  // join). TypeORM is skipped until alignment lands.
+  // **Intentional adapter divergence**, documented in `MIGRATION.md`
+  // under "Intentional adapter divergences". TypeORM permits the sort
+  // (legacy: returns the first arbitrary row of the join), Drizzle and
+  // Prisma reject 400 because their query model does not have a
+  // well-defined semantics for ordering a parent by a column on a
+  // to-many child.
   {
     id: 'P-18',
     description:
-      'rejects sort through a many-relation with the same 400 message',
+      'sort through a many-relation: TypeORM accepts (legacy), Drizzle/Prisma reject 400',
     masterLine: 18,
     rules: FULL_RULES,
     query: 'sort=posts.title',
     expected: err(
       "Cannot sort by 'posts.title': sorting through to-many relations is not supported."
     ),
-    skip: {
-      typeorm: {
-        gap: 'parity-sort-many',
-        note: 'TypeORM permits sort through many silently; alignment with Drizzle/Prisma 400 pending',
-      },
+    accept: {
+      typeorm: { kind: 'success' },
     },
   },
 
   // --- #19 isNull on `'one'` relation -------------------------------
-  // TypeORM resolves `company` as a relation via metadata; Prisma uses
-  // `walkPath` to detect single-segment relations. Drizzle currently
-  // tries to resolve `company` as a root-table column and 400s. Real
-  // gap: Drizzle needs to consult `source.relations` for single-segment
-  // tokens before falling back to columnMap/table lookup.
+  // All three adapters resolve filter[<one-rel>][isNull]. TypeORM via
+  // metadata, Prisma via `walkPath`, Drizzle via the explicit
+  // `nullProbeColumn` declared on the relation (LEFT JOIN + IS NULL).
   {
     id: 'P-19',
     description: 'accepts filter[company][isNull]=true on a one-relation',
@@ -264,31 +288,30 @@ export const PARITY_CORPUS: ParityCase[] = [
     rules: FULL_RULES,
     query: 'filter[company][isNull]=true',
     expected: ok(),
-    skip: {
-      drizzle: {
-        gap: 'parity-drizzle-isnull-on-one',
-        note: 'Drizzle does not resolve single-segment relations on filter; alignment with TypeORM/Prisma pending',
-      },
-    },
   },
 
-  // --- #20 isNull on `'many'` relation (G3 pending) -----------------
-  // All three adapters skipped until G3 is decided (Caminho A or B).
+  // --- #20 isNull on `'many'` relation (G3 → Caminho B) -------------
+  // All three adapters accept and produce equivalent results:
+  // - TypeORM: LEFT JOIN ... WHERE rel.id IS NULL (legacy gambiarra)
+  // - Drizzle: LEFT JOIN ... WHERE primaryKey IS NULL
+  // - Prisma:  where: { posts: { none: {} } }  (none/some)
   {
-    id: 'P-20',
-    description: 'isNull on a many-relation: behavior pending G3 decision',
+    id: 'P-20-isnull-true',
+    description:
+      'filter[posts][isNull]=true returns roots with no related posts',
     masterLine: 20,
     rules: FULL_RULES,
     query: 'filter[posts][isNull]=true',
-    expected: ok(), // placeholder; the real outcome is part of G3.
-    skip: {
-      typeorm: {
-        gap: 'G3',
-        note: 'TypeORM permits silently; semantics ambiguous',
-      },
-      drizzle: { gap: 'G3', note: 'Drizzle silently runs without test' },
-      prisma: { gap: 'G3', note: 'Prisma rejects with 400' },
-    },
+    expected: ok(),
+  },
+  {
+    id: 'P-20-isnull-false',
+    description:
+      'filter[posts][isNull]=false returns roots with at least one related post',
+    masterLine: 20,
+    rules: FULL_RULES,
+    query: 'filter[posts][isNull]=false',
+    expected: ok(),
   },
 
   // --- #22 repeated filters AND -------------------------------------
