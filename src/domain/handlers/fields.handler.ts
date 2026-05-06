@@ -1,5 +1,9 @@
 import { BadRequestException } from '@nestjs/common';
 import { QueryInput } from '@contracts/query-input.interface';
+import {
+  FIELD_NOT_ALLOWED,
+  INVALID_FIELD_FORMAT,
+} from '@contracts/error-messages';
 import { isSafeFieldPath, parseCSV } from '@domain/normalizers/normalizers';
 import { DQBLogger } from '@infra/logger';
 import { ObjectLiteral, SelectQueryBuilder } from 'typeorm';
@@ -19,14 +23,12 @@ function validateFieldTokens(tokens: string[], allowedFields: string[]): void {
   }
 
   if (unsafePaths.length > 0) {
-    throw new BadRequestException(
-      `Invalid field name format: "${unsafePaths.join('", "')}". Only alphanumeric, underscore, and dots are allowed.`
-    );
+    throw new BadRequestException(INVALID_FIELD_FORMAT('fields', unsafePaths));
   }
 
   if (notAllowed.length > 0) {
     throw new BadRequestException(
-      `Field(s) not allowed: ${notAllowed.join(', ')}. Allowed fields: ${allowedFields.join(', ')}`
+      FIELD_NOT_ALLOWED('fields', notAllowed, allowedFields)
     );
   }
 }

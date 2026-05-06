@@ -4,7 +4,7 @@
 
 **Declarative, whitelist-first REST query params for NestJS.**
 
-Turn `?filter[email][like]=acme&sorts=-createdAt&page=2` into safe, typed database queries — without writing a single `WHERE` clause.
+Turn `?filter[email][like]=acme&sort=-createdAt&page=2` into safe, typed database queries — without writing a single `WHERE` clause.
 
 [![npm version](https://img.shields.io/npm/v/nestjs-rest-query.svg?style=flat-square&logo=npm)](https://www.npmjs.com/package/nestjs-rest-query)
 [![npm downloads](https://img.shields.io/npm/dm/nestjs-rest-query.svg?style=flat-square)](https://www.npmjs.com/package/nestjs-rest-query)
@@ -38,10 +38,11 @@ NestJS has controllers. TypeORM has a query builder. The boilerplate between the
 
 ## Compatibility
 
-| nestjs-rest-query | NestJS | TypeORM | Drizzle  | Node   |
-| ----------------- | ------ | ------- | -------- | ------ |
-| `2.x`             | `11.x` | `0.3.x` | `0.45.x` | `>=20` |
-| `1.x`             | `11.x` | `0.3.x` | —        | `>=20` |
+| nestjs-rest-query | NestJS | TypeORM | Drizzle  | Prisma              | Node   |
+| ----------------- | ------ | ------- | -------- | ------------------- | ------ |
+| `2.1.x`           | `11.x` | `0.3.x` | `0.45.x` | `5.x \| 6.x \| 7.x` | `>=20` |
+| `2.0.x`           | `11.x` | `0.3.x` | `0.45.x` | —                   | `>=20` |
+| `1.x`             | `11.x` | `0.3.x` | —        | —                   | `>=20` |
 
 ## Adapters
 
@@ -61,7 +62,7 @@ pnpm add nestjs-rest-query
 npm install nestjs-rest-query
 ```
 
-Peer dependencies: `@nestjs/common`, `@nestjs/core`, `reflect-metadata`. Optionally `typeorm` (for TypeORM) or `drizzle-orm` (for Drizzle). Add `@nestjs/swagger` for OpenAPI integration (optional).
+Peer dependencies: `@nestjs/common`, `@nestjs/core`, `reflect-metadata`. Optionally `typeorm` (for TypeORM), `drizzle-orm` (for Drizzle), or `@prisma/client` (for Prisma). Add `@nestjs/swagger` for OpenAPI integration (optional).
 
 ### Choose your ORM
 
@@ -77,6 +78,14 @@ import { DrizzleAdapter } from 'nestjs-rest-query/drizzle';
 
 DynamicQueryBuilderModule.forRoot({
   adapter: new DrizzleAdapter(),
+});
+
+// Prisma
+import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
+import { PrismaAdapter } from 'nestjs-rest-query/prisma';
+
+DynamicQueryBuilderModule.forRoot({
+  adapter: new PrismaAdapter(),
 });
 ```
 
@@ -147,7 +156,7 @@ export class UsersController {
 GET /users
   ?filter[email][ilike]=%@acme.com
   &filter[createdAt][gte]=2025-01-01
-  &sorts=-createdAt,name
+  &sort=-createdAt,name
   &includes=company
   &fields=id,name,email
   &search=ana
@@ -200,7 +209,7 @@ Restrict the available operators globally via `forRoot({ operators: { allowed: [
 ## Sorting, fields, includes, search, pagination
 
 ```http
-?sorts=name,-createdAt          # name ASC, createdAt DESC
+?sort=name,-createdAt           # name ASC, createdAt DESC
 ?fields=id,name,email           # SELECT id, name, email
 ?includes=company,company.owner # LEFT JOIN company; LEFT JOIN owner
 ?search=keyword                 # against rules.search columns

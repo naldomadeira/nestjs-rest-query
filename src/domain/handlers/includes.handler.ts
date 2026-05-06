@@ -1,5 +1,9 @@
 import { BadRequestException } from '@nestjs/common';
 import { QueryInput } from '@contracts/query-input.interface';
+import {
+  FIELD_NOT_ALLOWED,
+  INVALID_FIELD_FORMAT,
+} from '@contracts/error-messages';
 import { isSafeFieldPath, parseCSV } from '@domain/normalizers/normalizers';
 import { DQBLogger } from '@infra/logger';
 import { ObjectLiteral, SelectQueryBuilder } from 'typeorm';
@@ -23,13 +27,13 @@ function validateIncludeTokens(
 
   if (unsafePaths.length > 0) {
     throw new BadRequestException(
-      `Invalid include format: "${unsafePaths.join('", "')}". Only alphanumeric, underscore, and dots are allowed.`
+      INVALID_FIELD_FORMAT('includes', unsafePaths)
     );
   }
 
   if (notAllowed.length > 0) {
     throw new BadRequestException(
-      `Include(s) not allowed: ${notAllowed.join(', ')}. Allowed includes: ${allowedIncludes.join(', ')}`
+      FIELD_NOT_ALLOWED('includes', notAllowed, allowedIncludes)
     );
   }
 }

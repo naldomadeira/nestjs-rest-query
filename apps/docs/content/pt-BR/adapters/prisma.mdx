@@ -86,8 +86,8 @@ export class UsersBusiness {
         posts: { cardinality: 'many' },
       },
     };
-    // `as never`: QueryBuilderService está tipado contra ObjectLiteral (TypeORM)
-    // por compatibilidade. Em runtime o adapter é agnóstico.
+    // `as never`: QueryBuilderService is typed against ObjectLiteral (TypeORM)
+    // for compatibility. At runtime the adapter is agnostic.
     return this.qb.execute(source as never, query, rules);
   }
 }
@@ -194,7 +194,7 @@ GET /users?fields=id,name&includes=company
   select: {
     id: true,
     name: true,
-    company: { select: { id: true } }, // só PK
+    company: { select: { id: true } }, // PK only
   },
 }
 ```
@@ -257,7 +257,7 @@ A mesma query string pode produzir comportamento ligeiramente diferente entre ad
 
 ```typescript
 this.qb.execute(prismaSource as never, query, rules, (qb) => {
-  // `qb` é o accumulator interno PrismaQB:
+  // `qb` is the internal PrismaQB accumulator:
   //   { source, alias, where: { AND: [] }, orderBy, include?, select? }
   qb.where.AND.push({ tenantId: 'tenant-1' });
 });

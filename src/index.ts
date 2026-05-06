@@ -54,3 +54,6 @@ export type { QueryOperator } from './domain/operators/operator.types';
 
 // API — Swagger
 export { dqbSwaggerRequestInterceptor } from './api/swagger/swagger.interceptor';
+
+// Contracts — Error message templates (G7 parity)
+export * as ErrorMessages from './contracts/error-messages';

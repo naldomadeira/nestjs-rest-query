@@ -174,20 +174,22 @@ describe('applyFilters: operatorsConfig.allowed', () => {
 
 describe('applyFilters: value validation', () => {
   const source = userSource(makePrisma('user').prisma);
-  it('throws BadRequest when in / notIn resolve to an empty array', () => {
+  it('treats empty in / notIn as a no-op (parity with TypeORM and Drizzle)', () => {
     const qb = makeQB(adapter, source);
     expect(() =>
       adapter.applyFilters(qb, { filter: { name: { in: '' } } }, 'user', [
         'name',
       ])
-    ).toThrow(/filter\[name\]\[in\] requires a non-empty array/);
+    ).not.toThrow();
+    expect(qb.where.AND).toEqual([]);
 
     const qb2 = makeQB(adapter, source);
     expect(() =>
       adapter.applyFilters(qb2, { filter: { name: { notIn: [] } } }, 'user', [
         'name',
       ])
-    ).toThrow(/filter\[name\]\[notIn\] requires a non-empty array/);
+    ).not.toThrow();
+    expect(qb2.where.AND).toEqual([]);
   });
   it('throws BadRequest when isNull is not boolean-like', () => {
     const qb = makeQB(adapter, source);
@@ -265,7 +267,7 @@ describe('applyFilters: value validation', () => {
         'user',
         ['name']
       )
-    ).toThrow(/Invalid filter field name/);
+    ).toThrow(/Invalid filter field format/);
   });
   it('throws BadRequest when field is not whitelisted', () => {
     const qb = makeQB(adapter, source);
@@ -348,16 +350,25 @@ describe('applyFilters: relation traversal', () => {
     );
     expect(qb2.where.AND[0]).toEqual({ company: { isNot: null } });
   });
-  it('isNull on a many relation throws BadRequest', () => {
+  it('isNull=true on a many relation maps to none:{} (parity Caminho B)', () => {
     const qb = makeQB(adapter, source);
-    expect(() =>
-      adapter.applyFilters(
-        qb,
-        { filter: { posts: { isNull: 'true' } } },
-        'user',
-        ['posts']
-      )
-    ).toThrow(/not supported on to-many/);
+    adapter.applyFilters(
+      qb,
+      { filter: { posts: { isNull: 'true' } } },
+      'user',
+      ['posts']
+    );
+    expect(qb.where.AND[0]).toEqual({ posts: { none: {} } });
+  });
+  it('isNull=false on a many relation maps to some:{}', () => {
+    const qb = makeQB(adapter, source);
+    adapter.applyFilters(
+      qb,
+      { filter: { posts: { isNull: 'false' } } },
+      'user',
+      ['posts']
+    );
+    expect(qb.where.AND[0]).toEqual({ posts: { some: {} } });
   });
 });
 
@@ -446,7 +457,7 @@ describe('applyIncludes', () => {
     const qb = makeQB(adapter, source);
     expect(() =>
       adapter.applyIncludes(qb, { includes: 'posts' }, 'user', ['company'])
-    ).toThrow(/Include path\(s\) not allowed/);
+    ).toThrow(/Include\(s\) not allowed/);
   });
 });
 

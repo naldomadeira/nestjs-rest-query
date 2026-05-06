@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { QueryInput } from '@contracts/query-input.interface';
+import { INVALID_FIELD_FORMAT } from '@contracts/error-messages';
 import { isSafeFieldPath } from '@domain/normalizers/normalizers';
 import { DQBLogger } from '@infra/logger';
 import { ObjectLiteral, SelectQueryBuilder } from 'typeorm';
@@ -19,14 +20,15 @@ function validateSearchTokens(tokens: string[]): void {
   }
 
   if (unsafePaths.length > 0) {
-    throw new BadRequestException(
-      `Invalid search field format: "${unsafePaths.join('", "')}". Only alphanumeric, underscore, and dots are allowed.`
-    );
+    throw new BadRequestException(INVALID_FIELD_FORMAT('search', unsafePaths));
   }
 }
 
 function escapeSearchTerm(term: string): string {
-  return term.replace(/%/g, '\\%').replace(/_/g, '\\_');
+  // Escape the escape character first, otherwise the % / _ replacements
+  // below introduce new backslashes that an attacker could subvert by
+  // sneaking a literal backslash into the input.
+  return term.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
 }
 
 function getJoinAttributes(qb: SelectQueryBuilder<any>): JoinAttribute[] {

@@ -1,3 +1,5 @@
+// Order intentionally matches `operatorRegistry` so any list rendered
+// from either source is identical byte-for-byte (parity G7).
 export const Operator = {
   EQ: 'eq',
   NE: 'ne',
@@ -11,8 +13,8 @@ export const Operator = {
   LTE: 'lte',
   IN: 'in',
   NOT_IN: 'notIn',
-  IS_NULL: 'isNull',
   BETWEEN: 'between',
+  IS_NULL: 'isNull',
 } as const;
 
 // Derivado automaticamente do objeto — nunca sai de sincronia

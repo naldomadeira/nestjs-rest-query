@@ -1,5 +1,10 @@
 import { BadRequestException } from '@nestjs/common';
 import { QueryInput } from '@contracts/query-input.interface';
+import {
+  FIELD_NOT_ALLOWED,
+  INVALID_FIELD_FORMAT,
+  SORT_NOT_IN_FIELDS,
+} from '@contracts/error-messages';
 import { isSafeFieldPath, parseCSV } from '@domain/normalizers/normalizers';
 import { DQBLogger } from '@infra/logger';
 import { ObjectLiteral, SelectQueryBuilder } from 'typeorm';
@@ -32,14 +37,12 @@ function validateSortTokens(tokens: SortToken[], allowedSorts: string[]): void {
   }
 
   if (unsafePaths.length > 0) {
-    throw new BadRequestException(
-      `Invalid sort field format: "${unsafePaths.join('", "')}". Only alphanumeric, underscore, and dots are allowed.`
-    );
+    throw new BadRequestException(INVALID_FIELD_FORMAT('sort', unsafePaths));
   }
 
   if (notAllowed.length > 0) {
     throw new BadRequestException(
-      `Sort field(s) not allowed: ${notAllowed.join(', ')}. Allowed sorts: ${allowedSorts.join(', ')}`
+      FIELD_NOT_ALLOWED('sort', notAllowed, allowedSorts)
     );
   }
 }
@@ -65,7 +68,7 @@ function validateSortConsistency(
 
   if (outsideFields.length > 0) {
     throw new BadRequestException(
-      `Cannot sort by field(s) not in the allowed fields list: ${outsideFields.join(', ')}. Allowed fields: ${fieldsRule.join(', ')}`
+      SORT_NOT_IN_FIELDS(outsideFields, fieldsRule)
     );
   }
 }

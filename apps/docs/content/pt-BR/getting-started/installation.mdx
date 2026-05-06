@@ -78,7 +78,7 @@ import { dqbSwaggerRequestInterceptor } from 'nestjs-rest-query';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Necessário para expandir filter[field][op]=value em objetos aninhados
+  // Required to expand filter[field][op]=value into nested objects
   app.set('query parser', 'extended');
 
   app.useGlobalPipes(
@@ -117,7 +117,7 @@ import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
 @Module({
   imports: [
     DynamicQueryBuilderModule.forRoot({
-      // todas as opções são opcionais
+      // all options are optional
     }),
   ],
 })

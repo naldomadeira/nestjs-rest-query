@@ -87,7 +87,7 @@ export const posts = pgTable('posts', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
-// Relations (opcional, para o ORM — não diretamente usado pelo adapter)
+// Relations (optional, for the ORM - not used directly by the adapter)
 export const usersRelations = relations(users, ({ one, many }) => ({
   company: one(companies, {
     fields: [users.companyId],
@@ -159,12 +159,12 @@ export class UsersController {
 
 ## Relations map é obrigatório para caminhos com pontos
 
-Diferente de TypeORM (que auto-descobre relações via `@OneToOne`, `@OneToMany`), **Drizzle não descobrirá relações automaticamente**. Se sua query string inclui um dotted path (ex: `?filters[company.name][eq]=Acme`), você **deve** registrar a relação no mapa `relations`.
+Diferente de TypeORM (que auto-descobre relações via `@OneToOne`, `@OneToMany`), **Drizzle não descobrirá relações automaticamente**. Se sua query string inclui um dotted path (ex: `?filter[company.name][eq]=Acme`), você **deve** registrar a relação no mapa `relations`.
 
 Se você tentar usar um caminho não registrado:
 
 ```http
-GET /users?filters[company.name][eq]=Acme
+GET /users?filter[company.name][eq]=Acme
 ```
 
 E `relations` não contém `company`, o adapter lançará:
@@ -183,7 +183,7 @@ relations: {
     cardinality: 'one',
   },
   'company.owner': {
-    table: ownerUsers, // a tabela User novamente, para owner
+    table: ownerUsers, // the User table again, for owner
     on: eq(companies.ownerId, ownerUsers.id),
     cardinality: 'one',
   },
@@ -224,7 +224,7 @@ relations: {
     table: posts,
     on: eq(posts.userId, users.id),
     cardinality: 'many',
-    primaryKey: posts.id,  // obrigatório para 'many'
+    primaryKey: posts.id, // required for 'many'
   },
 }
 ```
@@ -242,7 +242,7 @@ Isso é verificado em **tempo de compilação** (o TypeScript discriminated unio
 Se você tentar ordenar por uma coluna de uma relação 1:N:
 
 ```http
-GET /users?sorts=-posts.createdAt
+GET /users?sort=-posts.createdAt
 ```
 
 O adapter lançará:
@@ -257,8 +257,8 @@ DrizzleAdapter: ORDER BY a column from 'many' relation "posts" is not supported.
 
 ```typescript
 return this.qb.execute(drizzleSource, query, rules, (qb) => {
-  // qb é o query builder do Drizzle — você pode fazer operações customizadas
-  // Após o adapter rodar, você pode transformar os dados na aplicação
+  // qb is the Drizzle query builder - you can perform custom operations
+  // After the adapter runs, you can transform the data in the application
 });
 ```
 
@@ -278,7 +278,7 @@ return result;
 `DrizzleAdapter` retorna linhas no mesmo formato flat que `TypeOrmAdapter`. Colunas da raiz ficam no nível superior; relações são chaves no mesmo nível (objeto para `'one'`, array para `'many'`).
 
 ```http
-GET /users?filters[email][ilike]=%@acme.com&includes=company,posts&page=1&perPage=2
+GET /users?filter[email][ilike]=%@acme.com&includes=company,posts&page=1&perPage=2
 ```
 
 ```json
@@ -356,8 +356,8 @@ Quando uma relação `'many'` está presente, o adapter ativa a **paginação em
 
 ```typescript
 return this.qb.execute(drizzleSource, query, rules, (qb) => {
-  // qb é o query builder Drizzle acumulado
-  // Você pode chamar métodos customizados aqui
+  // qb is the accumulated Drizzle query builder
+  // You can call custom methods here
 });
 ```
 

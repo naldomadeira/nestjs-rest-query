@@ -9,3 +9,4 @@ export type {
 export type { RulesConfig } from './rules-config.interface';
 export type { RestQueryAdapter } from './rest-query-adapter.interface';
 export type { PrismaSource, PrismaRelation } from './prisma-source.interface';
+export * as ErrorMessages from './error-messages';

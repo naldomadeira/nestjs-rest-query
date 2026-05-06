@@ -110,7 +110,7 @@ describe('applyFilters — security & whitelist', () => {
       ).toThrow(BadRequestException);
     });
 
-    it('error message contains "Invalid filter field name"', () => {
+    it('error message contains "Invalid filter field format"', () => {
       const qb = createMockQb();
       expect(() =>
         applyFilters(
@@ -119,7 +119,7 @@ describe('applyFilters — security & whitelist', () => {
           'root',
           ALLOWED
         )
-      ).toThrow(/Invalid filter field name/);
+      ).toThrow(/Invalid filter field format/);
     });
 
     it('throws for a field starting with a number', () => {

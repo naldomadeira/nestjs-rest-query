@@ -342,6 +342,56 @@ describe('DrizzleAdapter', () => {
       const dialect = new PgDialect();
       expect(() => dialect.sqlToQuery(qb.whereClauses[0]!)).not.toThrow();
     });
+
+    it('accepts isNull on a one-relation when nullProbeColumn is declared', () => {
+      const adapter = new DrizzleAdapter();
+      const stub = makeStubDb();
+      const qb = adapter.createQueryBuilder(
+        baseSource(stub.db, {
+          relations: {
+            company: {
+              table: companies,
+              on: {} as any,
+              nullProbeColumn: companiesCols.id,
+            },
+          },
+        }),
+        'user'
+      );
+      expect(() =>
+        adapter.applyFilters(
+          qb,
+          { filter: { company: { isNull: 'true' } } } as any,
+          'user',
+          ['company']
+        )
+      ).not.toThrow();
+      expect(qb.whereJoins.has('company')).toBe(true);
+      expect(qb.whereClauses).toHaveLength(1);
+    });
+
+    it('throws RELATION_NULL_PROBE_REQUIRED when isNull on one-rel without nullProbeColumn', () => {
+      const adapter = new DrizzleAdapter();
+      const stub = makeStubDb();
+      const qb = adapter.createQueryBuilder(
+        baseSource(stub.db, {
+          relations: {
+            company: { table: companies, on: {} as any },
+          },
+        }),
+        'user'
+      );
+      expect(() =>
+        adapter.applyFilters(
+          qb,
+          { filter: { company: { isNull: 'true' } } } as any,
+          'user',
+          ['company']
+        )
+      ).toThrow(
+        /Cannot apply isNull on relation "company" without a nullProbeColumn/
+      );
+    });
   });
 
   describe('applySorts', () => {
@@ -376,7 +426,7 @@ describe('DrizzleAdapter', () => {
         adapter.applySorts(qb, { sort: '-posts.title' } as any, 'user', [
           'posts',
         ])
-      ).toThrow(/ORDER BY a column from 'many' relation "posts"/);
+      ).toThrow(/sorting through to-many relations is not supported/);
     });
 
     it('accepts sort through a "one" relation column and adds a presentation join', () => {

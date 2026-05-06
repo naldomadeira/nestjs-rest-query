@@ -11,6 +11,29 @@ import type {
   PrismaSource,
   PrismaRelation,
 } from '@contracts/prisma-source.interface';
+import {
+  FIELDS_ON_RELATION,
+  FIELD_NOT_ALLOWED,
+  INVALID_FIELD_FORMAT,
+  INVALID_FILTER_FORMAT,
+  INVALID_PRISMA_SOURCE,
+  OPERATOR_BETWEEN_VALUES,
+  OPERATOR_ISNULL_BOOLEAN,
+  OPERATOR_NOT_ALLOWED,
+  OPERATOR_NOT_IMPLEMENTED,
+  OPERATOR_ON_RELATION,
+  OPERATOR_VALUE_ARRAY_REQUIRED,
+  OPERATOR_VALUE_REQUIRED,
+  PAGE_MUST_BE_POSITIVE,
+  PER_PAGE_MUST_BE_POSITIVE,
+  PRISMA_SOURCE_MISSING_CLIENT,
+  PRISMA_SOURCE_MISSING_MODEL,
+  SEARCH_ON_RELATION,
+  SORT_ON_RELATION_DIRECT,
+  SORT_THROUGH_MANY,
+  UNKNOWN_RELATION,
+  UNSUPPORTED_OPERATOR,
+} from '@contracts/error-messages';
 import type { QueryOperator } from '@domain/operators/operator.types';
 import { operatorRegistry } from '@domain/operators/operator.registry';
 import {
@@ -55,12 +78,6 @@ interface ResolvedPath {
   /** Cardinality of the leaf relation when `leafIsRelation` is true. */
   leafCardinality?: 'one' | 'many';
 }
-
-const SORT_THROUGH_MANY = (path: string) =>
-  `Cannot sort by '${path}': sorting through to-many relations is not supported.`;
-
-const UNKNOWN_RELATION = (hop: string, fullPath: string) =>
-  `Unknown relation '${hop}' in path '${fullPath}'. Declare it in PrismaSource.relations.`;
 
 function walkPath(source: PrismaSource, fieldPath: string): ResolvedPath {
   const segments = fieldPath.split('.');
@@ -142,9 +159,7 @@ function translateOperator(
       return value === true ? null : { not: null };
     default: {
       const _exhaustive: never = operator;
-      throw new BadRequestException(
-        `Operator "${_exhaustive}" is not implemented`
-      );
+      throw new BadRequestException(OPERATOR_NOT_IMPLEMENTED(_exhaustive));
     }
   }
 }
@@ -178,20 +193,18 @@ function validateOperatorValue(
   value: unknown
 ): void {
   if (value === undefined) {
-    throw new BadRequestException(
-      `filter[${fieldPath}][${operator}] requires a value`
-    );
+    throw new BadRequestException(OPERATOR_VALUE_REQUIRED(fieldPath, operator));
   }
 
   if (operator === 'in' || operator === 'notIn') {
     if (!Array.isArray(value) || value.length === 0) {
       throw new BadRequestException(
-        `filter[${fieldPath}][${operator}] requires a non-empty array`
+        OPERATOR_VALUE_ARRAY_REQUIRED(fieldPath, operator)
       );
     }
     if (value.some((item) => item === undefined)) {
       throw new BadRequestException(
-        `filter[${fieldPath}][${operator}] requires a value`
+        OPERATOR_VALUE_REQUIRED(fieldPath, operator)
       );
     }
   }
@@ -202,9 +215,7 @@ function validateOperatorValue(
       value.length !== 2 ||
       value.some((item) => item === undefined)
     ) {
-      throw new BadRequestException(
-        `filter[${fieldPath}][between] requires exactly two values`
-      );
+      throw new BadRequestException(OPERATOR_BETWEEN_VALUES(fieldPath));
     }
   }
 }
@@ -232,14 +243,15 @@ function buildRelationLeafWhere(
   value: unknown
 ): Record<string, unknown> {
   if (operator !== 'isNull') {
-    throw new BadRequestException(
-      `Operator "${operator}" cannot be applied directly to relation "${fieldPath}". Use a dotted path to a scalar field on the relation.`
-    );
+    throw new BadRequestException(OPERATOR_ON_RELATION(operator, fieldPath));
   }
+  // many-rel: filter[<rel>][isNull]=true   → roots with NO related row
+  //           filter[<rel>][isNull]=false  → roots with at least one
+  // Equivalent to TypeORM's `LEFT JOIN ... WHERE rel.id IS [NOT] NULL`.
   if (cardinality === 'many') {
-    throw new BadRequestException(
-      `Operator "isNull" is not supported on to-many relation "${fieldPath}".`
-    );
+    return value === true
+      ? { [fieldPath]: { none: {} } }
+      : { [fieldPath]: { some: {} } };
   }
   const fragment = translateOperator('isNull', value, true);
   return { [fieldPath]: fragment };
@@ -418,17 +430,13 @@ export class PrismaAdapter implements RestQueryAdapter<
 
   createQueryBuilder(source: PrismaSource<any>, alias: string): PrismaQB {
     if (!source || typeof source !== 'object') {
-      throw new BadRequestException(
-        'PrismaAdapter requires a PrismaSource: { prisma, model, ... }'
-      );
+      throw new BadRequestException(INVALID_PRISMA_SOURCE);
     }
     if (!source.prisma) {
-      throw new BadRequestException('PrismaSource.prisma is required.');
+      throw new BadRequestException(PRISMA_SOURCE_MISSING_CLIENT);
     }
     if (!source.model || typeof source.model !== 'string') {
-      throw new BadRequestException(
-        'PrismaSource.model is required and must be a string (the delegate key).'
-      );
+      throw new BadRequestException(PRISMA_SOURCE_MISSING_MODEL);
     }
     return {
       source,
@@ -460,9 +468,7 @@ export class PrismaAdapter implements RestQueryAdapter<
 
     for (const [field, valueOrOps] of entries) {
       if (!isSafeFieldPath(field)) {
-        throw new BadRequestException(
-          `Invalid filter field name: "${field}". Only alphanumeric, underscore, and dots are allowed.`
-        );
+        throw new BadRequestException(INVALID_FIELD_FORMAT('filter', [field]));
       }
 
       const rootField = field.includes('.') ? field.split('.')[0] : field;
@@ -484,7 +490,7 @@ export class PrismaAdapter implements RestQueryAdapter<
         for (const [op, value] of Object.entries(valueOrOps)) {
           if (!operatorRegistry[op as QueryOperator]) {
             throw new BadRequestException(
-              `Unsupported operator "${op}" for field "${field}". Supported: ${Object.keys(operatorRegistry).join(', ')}`
+              UNSUPPORTED_OPERATOR(op, field, Object.keys(operatorRegistry))
             );
           }
           this.applySingleFilter(
@@ -498,15 +504,13 @@ export class PrismaAdapter implements RestQueryAdapter<
         continue;
       }
 
-      throw new BadRequestException(
-        `Invalid filter format for field "${field}". Expected string, number, or object with operators.`
-      );
+      throw new BadRequestException(INVALID_FILTER_FORMAT(field));
     }
 
     if (invalidFields.length > 0) {
       const unique = Array.from(new Set(invalidFields));
       throw new BadRequestException(
-        `Filter field(s) not allowed: ${unique.join(', ')}. Allowed fields: ${allowedFilters.join(', ')}`
+        FIELD_NOT_ALLOWED('filter', unique, allowedFilters)
       );
     }
   }
@@ -521,18 +525,28 @@ export class PrismaAdapter implements RestQueryAdapter<
     if (operatorsConfig?.allowed !== undefined) {
       if (!operatorsConfig.allowed.includes(operator)) {
         throw new BadRequestException(
-          `Operator "${operator}" is not allowed. Allowed operators: ${operatorsConfig.allowed.join(', ')}`
+          OPERATOR_NOT_ALLOWED(operator, operatorsConfig.allowed)
         );
       }
     }
 
     if (operator === 'isNull' && !isBooleanLike(rawValue)) {
-      throw new BadRequestException(
-        `filter[${fieldPath}][isNull] requires a boolean`
-      );
+      throw new BadRequestException(OPERATOR_ISNULL_BOOLEAN(fieldPath));
     }
 
     const value = coerceValueForOperator(operator, rawValue);
+
+    // Empty in/notIn is a no-op, matching TypeORM and Drizzle. Bail
+    // before validateOperatorValue so the empty array doesn't trip the
+    // non-empty-array guard.
+    if (
+      (operator === 'in' || operator === 'notIn') &&
+      Array.isArray(value) &&
+      value.length === 0
+    ) {
+      return;
+    }
+
     validateOperatorValue(fieldPath, operator, value);
 
     const resolved = walkPath(qb.source, fieldPath);
@@ -579,9 +593,7 @@ export class PrismaAdapter implements RestQueryAdapter<
       const path = token.startsWith('-') ? token.slice(1) : token;
 
       if (!isSafeFieldPath(path)) {
-        throw new BadRequestException(
-          `Invalid sort field: "${path}". Only alphanumeric, underscore, and dots are allowed.`
-        );
+        throw new BadRequestException(INVALID_FIELD_FORMAT('sort', [path]));
       }
 
       const rootField = path.includes('.') ? path.split('.')[0] : path;
@@ -601,9 +613,7 @@ export class PrismaAdapter implements RestQueryAdapter<
         throw new BadRequestException(SORT_THROUGH_MANY(path));
       }
       if (resolved.leafIsRelation) {
-        throw new BadRequestException(
-          `Cannot sort by relation '${path}' directly. Sort by a scalar field on the relation.`
-        );
+        throw new BadRequestException(SORT_ON_RELATION_DIRECT(path));
       }
 
       qb.orderBy.push(
@@ -614,7 +624,7 @@ export class PrismaAdapter implements RestQueryAdapter<
     if (invalid.length > 0) {
       const unique = Array.from(new Set(invalid));
       throw new BadRequestException(
-        `Sort field(s) not allowed: ${unique.join(', ')}. Allowed sorts: ${allowedSorts.join(', ')}`
+        FIELD_NOT_ALLOWED('sort', unique, allowedSorts)
       );
     }
   }
@@ -644,9 +654,7 @@ export class PrismaAdapter implements RestQueryAdapter<
 
     for (const path of sorted) {
       if (!isSafeFieldPath(path)) {
-        throw new BadRequestException(
-          `Invalid include path: "${path}". Only alphanumeric, underscore, and dots are allowed.`
-        );
+        throw new BadRequestException(INVALID_FIELD_FORMAT('includes', [path]));
       }
 
       const rootField = path.includes('.') ? path.split('.')[0] : path;
@@ -677,7 +685,7 @@ export class PrismaAdapter implements RestQueryAdapter<
     if (invalid.length > 0) {
       const unique = Array.from(new Set(invalid));
       throw new BadRequestException(
-        `Include path(s) not allowed: ${unique.join(', ')}. Allowed includes: ${allowedIncludes.join(', ')}`
+        FIELD_NOT_ALLOWED('includes', unique, allowedIncludes)
       );
     }
   }
@@ -699,15 +707,11 @@ export class PrismaAdapter implements RestQueryAdapter<
     const orFragments: Record<string, unknown>[] = [];
     for (const field of searchFields) {
       if (!isSafeFieldPath(field)) {
-        throw new BadRequestException(
-          `Invalid search field: "${field}". Only alphanumeric, underscore, and dots are allowed.`
-        );
+        throw new BadRequestException(INVALID_FIELD_FORMAT('search', [field]));
       }
       const resolved = walkPath(qb.source, field);
       if (resolved.leafIsRelation) {
-        throw new BadRequestException(
-          `Search field "${field}" cannot be a relation. Use a dotted path to a scalar field on the relation.`
-        );
+        throw new BadRequestException(SEARCH_ON_RELATION(field));
       }
       const leaf = { contains: term, mode: 'insensitive' };
       orFragments.push(
@@ -743,9 +747,7 @@ export class PrismaAdapter implements RestQueryAdapter<
 
     for (const path of tokens) {
       if (!isSafeFieldPath(path)) {
-        throw new BadRequestException(
-          `Invalid field name: "${path}". Only alphanumeric, underscore, and dots are allowed.`
-        );
+        throw new BadRequestException(INVALID_FIELD_FORMAT('fields', [path]));
       }
 
       const rootField = path.includes('.') ? path.split('.')[0] : path;
@@ -761,9 +763,7 @@ export class PrismaAdapter implements RestQueryAdapter<
       if (!path.includes('.')) {
         const resolved = walkPath(qb.source, path);
         if (resolved.leafIsRelation) {
-          throw new BadRequestException(
-            `Field "${path}" cannot be a relation. Use scalar field paths.`
-          );
+          throw new BadRequestException(FIELDS_ON_RELATION(path));
         }
         select[path] = true;
         continue;
@@ -771,9 +771,7 @@ export class PrismaAdapter implements RestQueryAdapter<
 
       const resolved = walkPath(qb.source, path);
       if (resolved.leafIsRelation) {
-        throw new BadRequestException(
-          `Field "${path}" cannot be a relation. Use scalar field paths.`
-        );
+        throw new BadRequestException(FIELDS_ON_RELATION(path));
       }
       setNestedSelect(select, resolved.hops, resolved.leafField);
     }
@@ -781,7 +779,7 @@ export class PrismaAdapter implements RestQueryAdapter<
     if (invalid.length > 0) {
       const unique = Array.from(new Set(invalid));
       throw new BadRequestException(
-        `Field(s) not allowed: ${unique.join(', ')}. Allowed fields: ${allowedFields.join(', ')}`
+        FIELD_NOT_ALLOWED('fields', unique, allowedFields)
       );
     }
 
@@ -809,8 +807,8 @@ export class PrismaAdapter implements RestQueryAdapter<
     const page = parseIntParam(query.page, 'page', 1);
     const requested = parseIntParam(query.perPage, 'perPage', defaultPerPage);
     const perPage = Math.min(requested, maxPerPage);
-    if (page < 1) throw new BadRequestException('"page" must be >= 1');
-    if (perPage < 1) throw new BadRequestException('"perPage" must be >= 1');
+    if (page < 1) throw new BadRequestException(PAGE_MUST_BE_POSITIVE);
+    if (perPage < 1) throw new BadRequestException(PER_PAGE_MUST_BE_POSITIVE);
 
     const skip = (page - 1) * perPage;
     log.debug('executing paginated query', { page, perPage, skip });
