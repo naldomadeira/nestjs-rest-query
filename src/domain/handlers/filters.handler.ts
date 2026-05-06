@@ -3,6 +3,14 @@ import { ObjectLiteral, SelectQueryBuilder } from 'typeorm';
 import { BadRequestException } from '@nestjs/common';
 import { QueryInput } from '@contracts/query-input.interface';
 import { OperatorsConfig } from '@contracts/query-builder-config.interface';
+import {
+  FIELD_NOT_ALLOWED,
+  INVALID_FIELD_FORMAT,
+  INVALID_FILTER_FORMAT,
+  OPERATOR_NOT_ALLOWED,
+  OPERATOR_NOT_IMPLEMENTED,
+  UNSUPPORTED_OPERATOR,
+} from '@contracts/error-messages';
 import { QueryOperator } from '@domain/operators/operator.types';
 import { operatorRegistry } from '../operators/operator.registry';
 import {
@@ -55,14 +63,14 @@ function applyOperator(
   if (operatorsConfig?.allowed !== undefined) {
     if (!operatorsConfig.allowed.includes(operator as any)) {
       throw new BadRequestException(
-        `Operator "${operator}" is not allowed. Allowed operators: ${operatorsConfig.allowed.join(', ')}`
+        OPERATOR_NOT_ALLOWED(operator, operatorsConfig.allowed)
       );
     }
   }
 
   const handler = operatorRegistry[operator];
   if (!handler) {
-    throw new BadRequestException(`Operator "${operator}" is not implemented`);
+    throw new BadRequestException(OPERATOR_NOT_IMPLEMENTED(operator));
   }
 
   const { finalAlias, finalField } = resolveFieldPath(fieldPath);
@@ -104,9 +112,7 @@ export function applyFilters<T extends ObjectLiteral>(
 
   for (const [field, valueOrOps] of entries) {
     if (!isSafeFieldPath(field)) {
-      throw new BadRequestException(
-        `Invalid filter field name: "${field}". Only alphanumeric, underscore, and dots are allowed.`
-      );
+      throw new BadRequestException(INVALID_FIELD_FORMAT('filter', [field]));
     }
 
     const rootField = field.includes('.') ? field.split('.')[0] : field;
@@ -138,7 +144,7 @@ export function applyFilters<T extends ObjectLiteral>(
       for (const [op, value] of Object.entries(valueOrOps)) {
         if (!operatorRegistry[op as QueryOperator]) {
           throw new BadRequestException(
-            `Unsupported operator "${op}" for field "${field}". Supported: ${Object.keys(operatorRegistry).join(', ')}`
+            UNSUPPORTED_OPERATOR(op, field, Object.keys(operatorRegistry))
           );
         }
 
@@ -154,15 +160,13 @@ export function applyFilters<T extends ObjectLiteral>(
       continue;
     }
 
-    throw new BadRequestException(
-      `Invalid filter format for field "${field}". Expected string, number, or object with operators.`
-    );
+    throw new BadRequestException(INVALID_FILTER_FORMAT(field));
   }
 
   if (invalidFields.length > 0) {
     const unique = Array.from(new Set(invalidFields));
     throw new BadRequestException(
-      `Filter field(s) not allowed: ${unique.join(', ')}. Allowed fields: ${allowedFilters.join(', ')}`
+      FIELD_NOT_ALLOWED('filter', unique, allowedFilters)
     );
   }
 }

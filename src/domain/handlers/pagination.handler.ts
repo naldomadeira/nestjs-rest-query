@@ -2,6 +2,10 @@ import { BadRequestException } from '@nestjs/common';
 import { QueryInput } from '@contracts/query-input.interface';
 import { QueryResult } from '@contracts/query-result.interface';
 import { PaginationConfig } from '@contracts/query-builder-config.interface';
+import {
+  PAGE_MUST_BE_POSITIVE,
+  PER_PAGE_MUST_BE_POSITIVE,
+} from '@contracts/error-messages';
 import { parseIntParam } from '@domain/normalizers/normalizers';
 import { DQBLogger } from '@infra/logger';
 import { ObjectLiteral, SelectQueryBuilder } from 'typeorm';
@@ -23,11 +27,11 @@ function parsePaginationParams(
 
 function validatePaginationParams(page: number, perPage: number): void {
   if (page < 1) {
-    throw new BadRequestException('"page" must be >= 1');
+    throw new BadRequestException(PAGE_MUST_BE_POSITIVE);
   }
 
   if (perPage < 1) {
-    throw new BadRequestException('"perPage" must be >= 1');
+    throw new BadRequestException(PER_PAGE_MUST_BE_POSITIVE);
   }
 }
 

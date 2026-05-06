@@ -1,5 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { BadRequestException } from '@nestjs/common';
+import {
+  BETWEEN_REQUIRES_ARRAY,
+  BETWEEN_REQUIRES_TWO,
+  INVALID_INTEGER,
+  MULTIVALUE_FORBIDDEN,
+} from '@contracts/error-messages';
 
 export function parseCSV(value: string): string[] {
   return value
@@ -18,15 +24,13 @@ export function parseIntParam(
   }
 
   if (Array.isArray(value)) {
-    throw new BadRequestException(`"${paramName}" cannot have multiple values`);
+    throw new BadRequestException(MULTIVALUE_FORBIDDEN(paramName));
   }
 
   const num = parseInt(String(value), 10);
 
   if (isNaN(num)) {
-    throw new BadRequestException(
-      `"${paramName}" must be a valid integer, got "${value}"`
-    );
+    throw new BadRequestException(INVALID_INTEGER(paramName, value));
   }
 
   return num;
@@ -86,15 +90,11 @@ export function coerceForBetween(value: any): [any, any] {
   } else if (typeof value === 'string') {
     arr = parseCSV(value).map(coerceValue);
   } else {
-    throw new BadRequestException(
-      `Operator "between" expects array or comma-separated string with 2 values`
-    );
+    throw new BadRequestException(BETWEEN_REQUIRES_ARRAY);
   }
 
   if (arr.length !== 2) {
-    throw new BadRequestException(
-      `Operator "between" expects exactly 2 values, got ${arr.length}`
-    );
+    throw new BadRequestException(BETWEEN_REQUIRES_TWO(arr.length));
   }
 
   return [coerceValue(arr[0]), coerceValue(arr[1])];

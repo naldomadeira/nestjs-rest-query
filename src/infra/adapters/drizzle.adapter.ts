@@ -38,7 +38,22 @@ import type {
   PaginationConfig,
 } from '@contracts/query-builder-config.interface';
 import type { RestQueryAdapter } from '@contracts/rest-query-adapter.interface';
-import { QueryOperator } from '@domain/operators/operator.types';
+import {
+  FIELD_NOT_ALLOWED,
+  INVALID_DATE_VALUE,
+  INVALID_FIELD_FORMAT,
+  INVALID_FILTER_FORMAT,
+  NO_RELATION_REGISTERED,
+  OPERATOR_NOT_ALLOWED,
+  PAGE_MUST_BE_POSITIVE,
+  PER_PAGE_MUST_BE_POSITIVE,
+  SORT_NOT_IN_FIELDS,
+  SORT_THROUGH_MANY,
+  UNKNOWN_COLUMN_RELATION,
+  UNKNOWN_COLUMN_ROOT,
+  UNSUPPORTED_OPERATOR,
+} from '@contracts/error-messages';
+import { ALL_OPERATORS, QueryOperator } from '@domain/operators/operator.types';
 import {
   coerceForBetween,
   coerceForIn,
@@ -132,10 +147,7 @@ function ensureJoin(
 ): void {
   const rel = relationFor(qb, joinPath);
   if (!rel) {
-    throw new BadRequestException(
-      `DrizzleAdapter: no relation registered for "${joinPath}". ` +
-        `Add it to DrizzleSource.relations.`
-    );
+    throw new BadRequestException(NO_RELATION_REGISTERED(joinPath));
   }
   const entry: JoinEntry = {
     table: rel.table,
@@ -179,9 +191,7 @@ function resolveDottedField(
   if (!fieldPath.includes('.')) {
     const col = (qb.source.table as any)[fieldPath];
     if (!col) {
-      throw new BadRequestException(
-        `DrizzleAdapter: column "${fieldPath}" not found on root table.`
-      );
+      throw new BadRequestException(UNKNOWN_COLUMN_ROOT(fieldPath));
     }
     return col as AnyColumn;
   }
@@ -196,8 +206,7 @@ function resolveDottedField(
   const col = (rel.table as any)[last];
   if (!col) {
     throw new BadRequestException(
-      `DrizzleAdapter: column "${last}" not found on relation "${joinPath}". ` +
-        `Map it explicitly via DrizzleSource.columnMap["${fieldPath}"].`
+      UNKNOWN_COLUMN_RELATION(last, joinPath, fieldPath)
     );
   }
   return col as AnyColumn;
@@ -238,7 +247,7 @@ function coerceTemporalValue(raw: unknown): Date | unknown {
   if (typeof raw === 'string' || typeof raw === 'number') {
     const date = new Date(raw);
     if (Number.isNaN(date.getTime())) {
-      throw new BadRequestException(`Invalid date value: "${raw}"`);
+      throw new BadRequestException(INVALID_DATE_VALUE(String(raw)));
     }
     return date;
   }
@@ -379,9 +388,7 @@ export class DrizzleAdapter implements RestQueryAdapter<
 
     for (const [field, valueOrOps] of entries) {
       if (!isSafeFieldPath(field)) {
-        throw new BadRequestException(
-          `Invalid filter field name: "${field}". Only alphanumeric, underscore, and dots are allowed.`
-        );
+        throw new BadRequestException(INVALID_FIELD_FORMAT('filter', [field]));
       }
       const rootField = field.includes('.') ? field.split('.')[0] : field;
       const isAllowed = field.includes('.')
@@ -401,7 +408,7 @@ export class DrizzleAdapter implements RestQueryAdapter<
         for (const [op, raw] of Object.entries(valueOrOps)) {
           if (!this.isKnownOperator(op)) {
             throw new BadRequestException(
-              `Unsupported operator "${op}" for field "${field}".`
+              UNSUPPORTED_OPERATOR(op, field, ALL_OPERATORS)
             );
           }
           this.pushFilter(qb, field, op as QueryOperator, raw, operatorsConfig);
@@ -409,15 +416,13 @@ export class DrizzleAdapter implements RestQueryAdapter<
         continue;
       }
 
-      throw new BadRequestException(
-        `Invalid filter format for field "${field}".`
-      );
+      throw new BadRequestException(INVALID_FILTER_FORMAT(field));
     }
 
     if (invalidFields.length > 0) {
       const unique = Array.from(new Set(invalidFields));
       throw new BadRequestException(
-        `Filter field(s) not allowed: ${unique.join(', ')}. Allowed: ${allowedFilters.join(', ')}`
+        FIELD_NOT_ALLOWED('filter', unique, allowedFilters)
       );
     }
   }
@@ -456,12 +461,10 @@ export class DrizzleAdapter implements RestQueryAdapter<
       }
     }
     if (unsafe.length)
-      throw new BadRequestException(
-        `Invalid sort field format: "${unsafe.join('", "')}".`
-      );
+      throw new BadRequestException(INVALID_FIELD_FORMAT('sort', unsafe));
     if (notAllowed.length)
       throw new BadRequestException(
-        `Sort field(s) not allowed: ${notAllowed.join(', ')}. Allowed: ${allowedSorts.join(', ')}`
+        FIELD_NOT_ALLOWED('sort', notAllowed, allowedSorts)
       );
 
     // Optional consistency vs allowedFields.
@@ -471,7 +474,7 @@ export class DrizzleAdapter implements RestQueryAdapter<
         .filter((f) => !f.includes('.') && !allowedFields.includes(f));
       if (outside.length)
         throw new BadRequestException(
-          `Cannot sort by field(s) not in fields: ${outside.join(', ')}. Allowed: ${allowedFields.join(', ')}`
+          SORT_NOT_IN_FIELDS(outside, allowedFields)
         );
     }
 
@@ -485,11 +488,7 @@ export class DrizzleAdapter implements RestQueryAdapter<
         const joinPath = field.split('.').slice(0, -1).join('.');
         const rel = qb.source.relations?.[joinPath];
         if (rel?.cardinality === 'many') {
-          throw new BadRequestException(
-            `DrizzleAdapter: ORDER BY a column from 'many' relation "${joinPath}" is not supported. ` +
-              `Sort by root or 'one' relation columns. To order presented relation arrays, ` +
-              `use the customize hook to add per-relation ORDER BY in your application layer.`
-          );
+          throw new BadRequestException(SORT_THROUGH_MANY(field));
         }
       }
 
@@ -525,12 +524,10 @@ export class DrizzleAdapter implements RestQueryAdapter<
       }
     }
     if (unsafe.length)
-      throw new BadRequestException(
-        `Invalid include format: "${unsafe.join('", "')}".`
-      );
+      throw new BadRequestException(INVALID_FIELD_FORMAT('includes', unsafe));
     if (notAllowed.length)
       throw new BadRequestException(
-        `Include(s) not allowed: ${notAllowed.join(', ')}. Allowed: ${allowedIncludes.join(', ')}`
+        FIELD_NOT_ALLOWED('includes', notAllowed, allowedIncludes)
       );
 
     const unique = Array.from(new Set(tokens));
@@ -560,9 +557,7 @@ export class DrizzleAdapter implements RestQueryAdapter<
 
     const unsafe = fields.filter((f) => !isSafeFieldPath(f));
     if (unsafe.length)
-      throw new BadRequestException(
-        `Invalid search field format: "${unsafe.join('", "')}".`
-      );
+      throw new BadRequestException(INVALID_FIELD_FORMAT('search', unsafe));
 
     log.debug('applying search', { count: fields.length });
     const clauses = fields.map((f) =>
@@ -598,12 +593,10 @@ export class DrizzleAdapter implements RestQueryAdapter<
       }
     }
     if (unsafe.length)
-      throw new BadRequestException(
-        `Invalid field name format: "${unsafe.join('", "')}".`
-      );
+      throw new BadRequestException(INVALID_FIELD_FORMAT('fields', unsafe));
     if (notAllowed.length)
       throw new BadRequestException(
-        `Field(s) not allowed: ${notAllowed.join(', ')}. Allowed: ${allowedFields.join(', ')}`
+        FIELD_NOT_ALLOWED('fields', notAllowed, allowedFields)
       );
 
     const unique = Array.from(new Set(tokens));
@@ -741,7 +734,7 @@ export class DrizzleAdapter implements RestQueryAdapter<
       !operatorsConfig.allowed.includes(operator)
     ) {
       throw new BadRequestException(
-        `Operator "${operator}" is not allowed. Allowed: ${operatorsConfig.allowed.join(', ')}`
+        OPERATOR_NOT_ALLOWED(operator, operatorsConfig.allowed)
       );
     }
 
@@ -993,7 +986,7 @@ function parsePagination(
   const page = parseIntParam(query.page, 'page', 1);
   const requested = parseIntParam(query.perPage, 'perPage', defaultPerPage);
   const perPage = Math.min(requested, maxPerPage);
-  if (page < 1) throw new BadRequestException('"page" must be >= 1');
-  if (perPage < 1) throw new BadRequestException('"perPage" must be >= 1');
+  if (page < 1) throw new BadRequestException(PAGE_MUST_BE_POSITIVE);
+  if (perPage < 1) throw new BadRequestException(PER_PAGE_MUST_BE_POSITIVE);
   return { page, perPage, offset: (page - 1) * perPage };
 }

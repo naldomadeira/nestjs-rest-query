@@ -265,7 +265,7 @@ describe('applyFilters: value validation', () => {
         'user',
         ['name']
       )
-    ).toThrow(/Invalid filter field name/);
+    ).toThrow(/Invalid filter field format/);
   });
   it('throws BadRequest when field is not whitelisted', () => {
     const qb = makeQB(adapter, source);
@@ -446,7 +446,7 @@ describe('applyIncludes', () => {
     const qb = makeQB(adapter, source);
     expect(() =>
       adapter.applyIncludes(qb, { includes: 'posts' }, 'user', ['company'])
-    ).toThrow(/Include path\(s\) not allowed/);
+    ).toThrow(/Include\(s\) not allowed/);
   });
 });
 

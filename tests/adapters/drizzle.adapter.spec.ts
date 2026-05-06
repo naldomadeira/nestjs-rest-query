@@ -376,7 +376,7 @@ describe('DrizzleAdapter', () => {
         adapter.applySorts(qb, { sort: '-posts.title' } as any, 'user', [
           'posts',
         ])
-      ).toThrow(/ORDER BY a column from 'many' relation "posts"/);
+      ).toThrow(/sorting through to-many relations is not supported/);
     });
 
     it('accepts sort through a "one" relation column and adds a presentation join', () => {

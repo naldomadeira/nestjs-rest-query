@@ -3,6 +3,7 @@ import type { Config } from 'jest';
 const config: Config = {
   moduleFileExtensions: ['ts', 'js'],
   testRegex: '.*\\.(spec|test)\\.ts$',
+  testPathIgnorePatterns: ['/node_modules/', '/dist/', '/.claude/', '/apps/'],
   verbose: true,
   collectCoverage: true,
   coverageDirectory: 'coverage',
