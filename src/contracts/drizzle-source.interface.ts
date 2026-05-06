@@ -31,6 +31,18 @@ export interface DrizzleRelationOne {
   cardinality?: 'one';
   /** Ignored for `'one'`. Allowed for forward compatibility. */
   primaryKey?: AnyColumn;
+  /**
+   * Column on the related table used to detect "relation is null" in
+   * `filter[<rel>][isNull]`. Typically the relation's primary key — e.g.
+   * `companies.id` for the `company` relation. The adapter emits a
+   * `LEFT JOIN` plus `WHERE <nullProbeColumn> IS [NOT] NULL`.
+   *
+   * Required for `isNull` filters on a `'one'` relation; otherwise
+   * optional. If a consumer issues `filter[<rel>][isNull]=...` and this
+   * column is not declared, the adapter throws a 400 with a clear
+   * message pointing to this field.
+   */
+  nullProbeColumn?: AnyColumn;
 }
 
 export interface DrizzleRelationMany {

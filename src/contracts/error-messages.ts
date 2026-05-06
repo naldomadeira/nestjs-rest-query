@@ -109,8 +109,8 @@ export const OPERATOR_ISNULL_BOOLEAN = (field: string): string =>
 export const OPERATOR_ON_RELATION = (operator: string, path: string): string =>
   `Operator "${operator}" cannot be applied directly to relation "${path}". Use a dotted path to a scalar field on the relation.`;
 
-export const ISNULL_ON_MANY = (path: string): string =>
-  `Operator "isNull" is not supported on to-many relation "${path}".`;
+export const RELATION_NULL_PROBE_REQUIRED = (rel: string): string =>
+  `Cannot apply isNull on relation "${rel}" without a nullProbeColumn. Declare DrizzleSource.relations["${rel}"].nullProbeColumn (typically the relation's primary key).`;
 
 // --- Sort on relation ---
 

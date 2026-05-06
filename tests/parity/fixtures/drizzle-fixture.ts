@@ -92,7 +92,11 @@ export function makeDrizzleFixture(): DrizzleFixture {
     table: users,
     primaryKey: usersCols.id,
     relations: {
-      company: { table: companies, on: {} as any },
+      company: {
+        table: companies,
+        on: {} as any,
+        nullProbeColumn: companiesCols.id,
+      },
       posts: {
         table: posts,
         on: {} as any,

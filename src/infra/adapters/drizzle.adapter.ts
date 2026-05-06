@@ -29,6 +29,7 @@ import {
 
 import type {
   DrizzleRelation,
+  DrizzleRelationOne,
   DrizzleSource,
 } from '@contracts/drizzle-source.interface';
 import type { QueryInput } from '@contracts/query-input.interface';
@@ -47,6 +48,7 @@ import {
   OPERATOR_NOT_ALLOWED,
   PAGE_MUST_BE_POSITIVE,
   PER_PAGE_MUST_BE_POSITIVE,
+  RELATION_NULL_PROBE_REQUIRED,
   SORT_NOT_IN_FIELDS,
   SORT_THROUGH_MANY,
   UNKNOWN_COLUMN_RELATION,
@@ -746,6 +748,36 @@ export class DrizzleAdapter implements RestQueryAdapter<
       throw new BadRequestException(
         OPERATOR_NOT_ALLOWED(operator, operatorsConfig.allowed)
       );
+    }
+
+    // isNull on a single-segment relation: `?filter[<rel>][isNull]=true|false`.
+    // The lib emits LEFT JOIN + IS [NOT] NULL on a probe column,
+    // mirroring TypeORM's behavior:
+    //   - one-rel: probe is `nullProbeColumn` (declared by consumer).
+    //   - many-rel: probe is `primaryKey` (already required for 'many').
+    if (operator === 'isNull' && !field.includes('.')) {
+      const rel = qb.source.relations?.[field];
+      if (rel) {
+        const wantNull = toBool(raw, false);
+        if (rel.cardinality === 'many') {
+          ensureJoin(qb, field, 'where');
+          qb.whereClauses.push(
+            wantNull ? isNull(rel.primaryKey) : isNotNull(rel.primaryKey)
+          );
+          return;
+        }
+        const oneRel = rel as DrizzleRelationOne;
+        if (!oneRel.nullProbeColumn) {
+          throw new BadRequestException(RELATION_NULL_PROBE_REQUIRED(field));
+        }
+        ensureJoin(qb, field, 'where');
+        qb.whereClauses.push(
+          wantNull
+            ? isNull(oneRel.nullProbeColumn)
+            : isNotNull(oneRel.nullProbeColumn)
+        );
+        return;
+      }
     }
 
     const column = resolveDottedField(qb, field, 'where');

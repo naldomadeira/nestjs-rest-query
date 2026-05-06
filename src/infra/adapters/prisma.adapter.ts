@@ -17,7 +17,6 @@ import {
   INVALID_FIELD_FORMAT,
   INVALID_FILTER_FORMAT,
   INVALID_PRISMA_SOURCE,
-  ISNULL_ON_MANY,
   OPERATOR_BETWEEN_VALUES,
   OPERATOR_ISNULL_BOOLEAN,
   OPERATOR_NOT_ALLOWED,
@@ -246,8 +245,13 @@ function buildRelationLeafWhere(
   if (operator !== 'isNull') {
     throw new BadRequestException(OPERATOR_ON_RELATION(operator, fieldPath));
   }
+  // many-rel: filter[<rel>][isNull]=true   → roots with NO related row
+  //           filter[<rel>][isNull]=false  → roots with at least one
+  // Equivalent to TypeORM's `LEFT JOIN ... WHERE rel.id IS [NOT] NULL`.
   if (cardinality === 'many') {
-    throw new BadRequestException(ISNULL_ON_MANY(fieldPath));
+    return value === true
+      ? { [fieldPath]: { none: {} } }
+      : { [fieldPath]: { some: {} } };
   }
   const fragment = translateOperator('isNull', value, true);
   return { [fieldPath]: fragment };

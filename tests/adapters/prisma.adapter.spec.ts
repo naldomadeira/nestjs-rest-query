@@ -350,16 +350,25 @@ describe('applyFilters: relation traversal', () => {
     );
     expect(qb2.where.AND[0]).toEqual({ company: { isNot: null } });
   });
-  it('isNull on a many relation throws BadRequest', () => {
+  it('isNull=true on a many relation maps to none:{} (parity Caminho B)', () => {
     const qb = makeQB(adapter, source);
-    expect(() =>
-      adapter.applyFilters(
-        qb,
-        { filter: { posts: { isNull: 'true' } } },
-        'user',
-        ['posts']
-      )
-    ).toThrow(/not supported on to-many/);
+    adapter.applyFilters(
+      qb,
+      { filter: { posts: { isNull: 'true' } } },
+      'user',
+      ['posts']
+    );
+    expect(qb.where.AND[0]).toEqual({ posts: { none: {} } });
+  });
+  it('isNull=false on a many relation maps to some:{}', () => {
+    const qb = makeQB(adapter, source);
+    adapter.applyFilters(
+      qb,
+      { filter: { posts: { isNull: 'false' } } },
+      'user',
+      ['posts']
+    );
+    expect(qb.where.AND[0]).toEqual({ posts: { some: {} } });
   });
 });
 
