@@ -1,5 +1,60 @@
 # Changelog
 
+## 2.2.0
+
+### Minor Changes
+
+- [#33](https://github.com/naldomadeira/nestjs-rest-query/pull/33) [`102eb49`](https://github.com/naldomadeira/nestjs-rest-query/commit/102eb491feb1c8d611b53590cdef7ed3c09fe15a) Thanks [@naldomadeira](https://github.com/naldomadeira)! - feat(drizzle): support `?filter[<one-rel>][isNull]=true|false` via `nullProbeColumn`
+
+  `DrizzleRelationOne` gains a new optional `nullProbeColumn?: AnyColumn` field. When declared, the adapter can resolve `isNull` filters on a `'one'` relation by emitting `LEFT JOIN ... WHERE <nullProbeColumn> IS [NOT] NULL` — mirroring the behavior TypeORM has via metadata and Prisma has via `is`/`isNot`. If a consumer issues `filter[<rel>][isNull]` without declaring `nullProbeColumn`, the adapter throws a 400 with a clear message pointing to the missing config.
+
+  Migration: zero changes required for existing consumers. Add `nullProbeColumn: <table>.<pk>` to relations where you want to support the new filter.
+
+- [#33](https://github.com/naldomadeira/nestjs-rest-query/pull/33) [`102eb49`](https://github.com/naldomadeira/nestjs-rest-query/commit/102eb491feb1c8d611b53590cdef7ed3c09fe15a) Thanks [@naldomadeira](https://github.com/naldomadeira)! - feat(drizzle,prisma): accept `?filter[<many-rel>][isNull]=true|false` (G3, Caminho B)
+
+  Both adapters now accept `isNull` on a `'many'` relation, with semantics equivalent to TypeORM's existing behavior:
+  - `=true` → roots with **zero** related rows.
+  - `=false` → roots with **at least one** related row.
+
+  Drizzle emits `LEFT JOIN <rel> ON ... WHERE <rel>.<primaryKey> IS [NOT] NULL`. Prisma uses `where: { <rel>: { none: {} } }` for `true` and `{ some: {} }` for `false`. The result set is identical across the three adapters; the previous 400 emitted by Prisma is gone, and Drizzle's previously untested path is now part of the parity matrix.
+
+  Migration: no consumer changes required. The previously thrown error message `Operator "isNull" is not supported on to-many relation "..."` is no longer emitted by any adapter. The associated `ErrorMessages.ISNULL_ON_MANY` template has been removed.
+
+- [#33](https://github.com/naldomadeira/nestjs-rest-query/pull/33) [`102eb49`](https://github.com/naldomadeira/nestjs-rest-query/commit/102eb491feb1c8d611b53590cdef7ed3c09fe15a) Thanks [@naldomadeira](https://github.com/naldomadeira)! - refactor(adapters): centralize 400 error messages (G7, parity gap)
+
+  All `BadRequestException` messages emitted by adapters, handlers, and normalizers now come from a single source of truth in `src/contracts/error-messages.ts` (also exposed as `ErrorMessages` namespace from the package root). The same logical error now produces the same byte-for-byte message regardless of which adapter (TypeORM, Drizzle, or Prisma) is wired up.
+
+  User-visible wording changes:
+  - Drizzle adapter messages no longer carry the `DrizzleAdapter:` prefix.
+  - The Drizzle "ORDER BY a column from 'many' relation" message is now the shorter `Cannot sort by '<path>': sorting through to-many relations is not supported.`, matching the Prisma adapter.
+  - `Invalid filter field name:` becomes `Invalid filter field format:` to align with the existing `Invalid <scope> field format:` wording used elsewhere.
+  - Prisma's `Include path(s) not allowed` becomes `Include(s) not allowed` to match the handler form.
+  - The `Unknown relation '<hop>'` message no longer mentions a specific adapter (e.g. `PrismaSource.relations`); it now says `Declare it in source.relations.`
+
+  Consumers parsing `error.message` should switch to importing the templates from `import { ErrorMessages } from 'nestjs-rest-query'` (or compare against well-known substrings).
+
+### Patch Changes
+
+- [#33](https://github.com/naldomadeira/nestjs-rest-query/pull/33) [`102eb49`](https://github.com/naldomadeira/nestjs-rest-query/commit/102eb491feb1c8d611b53590cdef7ed3c09fe15a) Thanks [@naldomadeira](https://github.com/naldomadeira)! - docs(parity): mark `?sort=<many-rel>.<col>` as an intentional adapter divergence
+
+  TypeORM permits sorting through a `'many'` relation (legacy: returns the first arbitrary row of the join), while Drizzle and Prisma reject with 400. The behavior is now explicitly documented in `MIGRATION.md` under "Intentional adapter divergences", and the parity matrix encodes it via the new `accept` field on each test case so a future regression in any direction surfaces immediately. No code change in this entry — only docs and test infrastructure.
+
+- [#33](https://github.com/naldomadeira/nestjs-rest-query/pull/33) [`102eb49`](https://github.com/naldomadeira/nestjs-rest-query/commit/102eb491feb1c8d611b53590cdef7ed3c09fe15a) Thanks [@naldomadeira](https://github.com/naldomadeira)! - fix(drizzle): escape % and \_ in search terms (G1, parity gap)
+
+  The Drizzle adapter previously interpolated the user's search term into
+  the ILIKE pattern without escaping `%` or `_`, so `?search=50%25` would
+  match more rows than the literal string `50%`. The TypeORM handler has
+  always escaped these characters, and the Prisma adapter is unaffected
+  because it uses Prisma's literal `contains` operator. Drizzle now
+  matches both: the term is escaped before being wrapped with `%...%`.
+
+- [#33](https://github.com/naldomadeira/nestjs-rest-query/pull/33) [`102eb49`](https://github.com/naldomadeira/nestjs-rest-query/commit/102eb491feb1c8d611b53590cdef7ed3c09fe15a) Thanks [@naldomadeira](https://github.com/naldomadeira)! - fix(prisma): treat filter[\*][in]= and filter[\*][notIn]= (empty) as a no-op (G2, parity gap)
+
+  The Prisma adapter previously rejected empty `in` / `notIn` arrays with
+  a 400, while TypeORM and Drizzle silently dropped the predicate. Prisma
+  now matches: an empty `in` / `notIn` is a no-op, returning the same
+  result set as if the filter had not been provided.
+
 ## 2.1.0
 
 ### Minor Changes
