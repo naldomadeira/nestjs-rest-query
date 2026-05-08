@@ -55,10 +55,12 @@ export class QueryBuilderService {
     this.logger.debug('[buildQuery] building query', { alias, rules, query });
 
     if (rules.filters?.length) {
-      const operatorsConfig =
-        Object.prototype.hasOwnProperty.call(rules, 'operators')
-          ? rules.operators
-          : this.config?.operators;
+      const operatorsConfig = Object.prototype.hasOwnProperty.call(
+        rules,
+        'operators'
+      )
+        ? rules.operators
+        : this.config?.operators;
 
       this.adapter.applyFilters(
         qb,
