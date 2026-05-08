@@ -161,19 +161,30 @@ The module is `@Global()` — register only once in AppModule.
 
 ### Operator not recognized / 400 error on valid operator
 
-**Cause:** Global operator restriction via `forRoot` configuration.
+**Cause:** Operator restriction via global `forRoot({ operators })` or endpoint `RulesConfig.operators`.
 
-**Fix:** Check your `operators.allowed` config:
+**Fix:** Check both places. Endpoint rules have priority over the global config.
+
+Global config:
 
 ```typescript
 DynamicQueryBuilderModule.forRoot({
   operators: {
-    allowed: ['eq', 'ne', 'like', 'ilike', 'in', 'between'], // is operator listed?
+    allowed: ['eq', 'ne', 'like', 'ilike', 'in', 'between'],
   },
 });
 ```
 
-If `operators.allowed` is not set (undefined), all 14 operators are available.
+Endpoint override:
+
+```typescript
+@ApiDynamicQuery({
+  filters: ['name', 'status'],
+  operators: { allowed: ['eq', 'ilike'] },
+})
+```
+
+If `operators.allowed` is not set globally and the endpoint omits `operators`, all 14 operators are available. If the endpoint sets `operators: {}`, all 14 operators are available for that endpoint even when the global config is restricted.
 
 ---
 

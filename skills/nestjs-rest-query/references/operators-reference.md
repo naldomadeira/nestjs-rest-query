@@ -93,3 +93,25 @@ DynamicQueryBuilderModule.forRoot({
 ```
 
 Using a non-allowed operator returns **400 Bad Request**.
+
+## Endpoint Operator Restrictions
+
+Use `RulesConfig.operators` when one route needs a different operator whitelist than the global default:
+
+```typescript
+@ApiDynamicQuery({
+  filters: ['name', 'status'],
+  operators: {
+    allowed: ['eq', 'ilike'],
+  },
+})
+```
+
+Precedence is endpoint first, global second:
+
+- `operators` omitted in `RulesConfig` → use global config
+- `operators: { allowed: ['eq'] }` → only `eq` for this endpoint
+- `operators: { allowed: [] }` → no operators for this endpoint
+- `operators: {}` → all 14 operators for this endpoint
+
+Using a non-allowed operator returns **400 Bad Request**.
