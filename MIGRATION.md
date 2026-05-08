@@ -24,7 +24,7 @@ In the **first 1.0.0 release** the package name changes but the public API ident
 
 ### Behavior
 
-Behavior is preserved 1:1. Whitelist semantics, all 15 operators, pagination shape, sort/field/include/search handlers, Swagger integration — all unchanged.
+Behavior is preserved 1:1. Whitelist semantics, all 14 operators, pagination shape, sort/field/include/search handlers, Swagger integration — all unchanged.
 
 ### Public API rename (planned)
 

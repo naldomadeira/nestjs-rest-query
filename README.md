@@ -25,7 +25,7 @@ NestJS has controllers. TypeORM has a query builder. The boilerplate between the
 
 ## Features
 
-- 🎯 **Whitelist-first** — unknown query params are silently ignored. Defense by default.
+- 🎯 **Whitelist-first** — unauthorized fields are rejected with `400 Bad Request`. Defense by default.
 - 🔍 **14 comparison operators** — `eq`, `ne`, `like`, `ilike`, `notLike`, `notIlike`, `gt`, `gte`, `lt`, `lte`, `in`, `notIn`, `between`, `isNull`.
 - 📑 **Pagination** with `{ data, page, perPage, total, lastPage }`.
 - ↕️ **Multi-field sorting** with `+`/`-` prefix.
@@ -204,7 +204,16 @@ All operators target a whitelisted column and use the `filter[<column>][<operato
 | `between`    | `filter[createdAt][between]=2025-01-01,2025-12-31` | `createdAt BETWEEN ... AND ...` |
 | `isNull`     | `filter[deletedAt][isNull]=true`                   | `deletedAt IS NULL`             |
 
-Restrict the available operators globally via `forRoot({ operators: { allowed: ['eq', 'in', 'gte'] } })`.
+Restrict the available operators globally via `forRoot({ operators: { allowed: ['eq', 'in', 'gte'] } })`, or per endpoint with `RulesConfig.operators`.
+
+```typescript
+const rules: RulesConfig = {
+  filters: ['name', 'status'],
+  operators: { allowed: ['eq', 'ilike'] },
+};
+```
+
+Endpoint rules take precedence over the global `forRoot` setting. Use `operators: {}` on a route to reset that route to all operators allowed.
 
 ## Sorting, fields, includes, search, pagination
 
@@ -216,7 +225,7 @@ Restrict the available operators globally via `forRoot({ operators: { allowed: [
 ?page=2&perPage=50              # offset/limit
 ```
 
-Anything not declared in `RulesConfig` is ignored — clients can't sort by `password_hash` even if they try.
+Anything not declared in `RulesConfig` is rejected with `400 Bad Request` for filters, sorts, and includes — clients can't sort by `password_hash` even if they try. Field selection stays restricted to the declared `fields` list.
 
 ## Swagger / OpenAPI
 
