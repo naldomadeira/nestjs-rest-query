@@ -1,21 +1,22 @@
 ---
 name: nestjs-rest-query
 description: |
-  Setting up, configuring, and using nestjs-rest-query in NestJS projects with TypeORM or Drizzle.
+  Setting up, configuring, and using nestjs-rest-query in NestJS projects with TypeORM, Drizzle, or Prisma.
   Use when: installing the library, configuring filters/sorting/pagination, creating dynamic
-  endpoints, defining whitelist rules, switching between TypeORM and Drizzle adapters,
-  adding Swagger support for dynamic queries, troubleshooting query parsing errors.
+  endpoints, defining whitelist rules, restricting operators globally or per endpoint,
+  switching between TypeORM, Drizzle, and Prisma adapters, adding Swagger support for dynamic queries,
+  troubleshooting query parsing or operator errors.
   Keywords: nestjs-rest-query, REST query, dynamic query, filter, sort, pagination, TypeORM,
-  Drizzle, NestJS, whitelist, RulesConfig, DynamicQueryDto, ApiDynamicQuery, QueryRules,
-  TypeOrmAdapter, DrizzleAdapter.
+  Drizzle, Prisma, NestJS, whitelist, operators, RulesConfig, DynamicQueryDto, ApiDynamicQuery,
+  QueryRules, TypeOrmAdapter, DrizzleAdapter, PrismaAdapter.
 ---
 
 # nestjs-rest-query
 
-A NestJS library that turns REST query parameters into safe, whitelisted database queries against TypeORM or Drizzle. Handles filtering, sorting, pagination, field selection, relation includes, and optional full-text search.
+A NestJS library that turns REST query parameters into safe, whitelisted database queries against TypeORM, Drizzle, or Prisma. Handles filtering, sorting, pagination, field selection, relation includes, and optional full-text search.
 
 **Package:** `nestjs-rest-query` (public on npm)
-**Requires:** NestJS `^11`, Node `>= 20`, TypeORM `^0.3.26` or Drizzle `^0.45`
+**Requires:** NestJS `^11`, Node `>= 20`, and one ORM: TypeORM `^0.3.26`, Drizzle `^0.45`, or Prisma Client `^5 || ^6 || ^7`
 **Repo & docs:** https://github.com/naldomadeira/nestjs-rest-query · https://naldomadeira.github.io/nestjs-rest-query/
 
 ---
@@ -33,7 +34,7 @@ npm install nestjs-rest-query
 Peer dependencies you must already have installed in your project:
 
 - `@nestjs/common`, `@nestjs/core`, `reflect-metadata`
-- One ORM: `typeorm` (default) **or** `drizzle-orm`
+- One ORM: `typeorm` (default), `drizzle-orm`, **or** `@prisma/client`
 - Optional: `@nestjs/swagger` (only if using `@ApiDynamicQuery`)
 
 ### 2. Bootstrap configuration (`main.ts`)
@@ -97,16 +98,34 @@ import { DrizzleAdapter } from 'nestjs-rest-query/drizzle';
 export class AppModule {}
 ```
 
-Optional configuration (works with either adapter):
+**Prisma:**
+
+```typescript
+import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
+import { PrismaAdapter } from 'nestjs-rest-query/prisma';
+
+@Module({
+  imports: [
+    DynamicQueryBuilderModule.forRoot({
+      adapter: new PrismaAdapter(),
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+Optional configuration (works with any adapter):
 
 ```typescript
 DynamicQueryBuilderModule.forRoot({
   pagination: { defaultPerPage: 10, maxPerPage: 100 },
   operators: { allowed: ['eq', 'ne', 'like', 'ilike', 'in', 'between'] },
   logging: { enabled: false, level: 'info' },
-  // adapter: new DrizzleAdapter(), // omit for TypeORM
+  // adapter: new DrizzleAdapter(), // or new PrismaAdapter(); omit for TypeORM
 });
 ```
+
+Global `operators.allowed` is the default for every endpoint. A route can override it with `RulesConfig.operators`; `operators: {}` on the route resets that endpoint to all operators allowed.
 
 → Full setup details: [references/setup-reference.md](references/setup-reference.md)
 
@@ -252,6 +271,7 @@ Every endpoint MUST declare which fields are queryable. This is the security mod
   fields: ['id', 'name', 'email'], // Allowed SELECT columns
   includes: ['company'],           // Allowed relations
   search: ['name', 'email'],       // Optional text search fields for ?search=
+  operators: { allowed: ['eq', 'ilike', 'in'] }, // Optional endpoint operator whitelist
 })
 ```
 
@@ -259,6 +279,8 @@ Every endpoint MUST declare which fields are queryable. This is the security mod
 
 - Fields NOT in whitelist → **400 Bad Request** (never silently ignored).
 - When `fields` is set, every entry in `sorts` MUST also be in `fields`.
+- `RulesConfig.operators` overrides global `forRoot({ operators })` for that endpoint only.
+- `operators: {}` on an endpoint means all operators are allowed for that route.
 - Use entity/repository property names, not raw database column names. Prefer `camelCase` when your entities follow that convention.
 - Nested filtering uses dot notation — `filter[user.firstName][ilike]=ana`.
 - Nested fields require the parent relation in `includes`.
@@ -325,6 +347,7 @@ SwaggerModule.setup('/', app, document, {
 - Use entity property names from the TypeORM `Repository`/entity class, usually `camelCase`.
 - Use native `search` when the endpoint needs simple text search across one or more allowed fields.
 - For Drizzle, build your `DrizzleSource` once per module and reuse — it describes table + relations.
+- Restrict `operators.allowed` globally for broad policy, then use `RulesConfig.operators` for endpoint-specific exceptions.
 
 ### DON'T
 
@@ -337,6 +360,7 @@ SwaggerModule.setup('/', app, document, {
 - Don't assume every endpoint needs `search` — keep it optional and explicit in `RulesConfig`.
 - Don't use raw `snake_case` database column names in rules unless that is the actual entity property name.
 - Don't try to mutate query rules dynamically per request through the decorator — use the controller-level `customize` callback for runtime logic.
+- Don't assume global operator restrictions always apply — endpoint `RulesConfig.operators` has priority when present.
 
 ---
 
@@ -400,10 +424,10 @@ import {
   QueryBuilderService,
 } from 'nestjs-rest-query';
 
-// Adapters (default is TypeORM; bring DrizzleAdapter explicitly)
-import { TypeOrmAdapter, DrizzleAdapter } from 'nestjs-rest-query';
-// Or import the Drizzle adapter via subpath when you only need that one
+// Adapters (default is TypeORM; bring DrizzleAdapter/PrismaAdapter explicitly)
+import { TypeOrmAdapter, DrizzleAdapter, PrismaAdapter } from 'nestjs-rest-query';
 import { DrizzleAdapter } from 'nestjs-rest-query/drizzle';
+import { PrismaAdapter } from 'nestjs-rest-query/prisma';
 
 // Decorators
 import {
@@ -422,6 +446,7 @@ import {
   QueryResult,
   QueryBuilderConfig,
   type DrizzleSource,
+  type PrismaSource,
 } from 'nestjs-rest-query';
 
 // Operators (constants you can use to restrict allowed operators)

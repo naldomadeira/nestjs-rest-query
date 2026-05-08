@@ -1,6 +1,6 @@
 # nestjs-rest-query skill
 
-Esta skill orienta a instalação, configuração, uso e troubleshooting da biblioteca [`nestjs-rest-query`](https://www.npmjs.com/package/nestjs-rest-query) em projetos NestJS com TypeORM ou Drizzle.
+Esta skill orienta a instalação, configuração, uso e troubleshooting da biblioteca [`nestjs-rest-query`](https://www.npmjs.com/package/nestjs-rest-query) em projetos NestJS com TypeORM, Drizzle ou Prisma.
 
 ## Propósito
 
@@ -14,6 +14,7 @@ Serve como guia operacional para criar endpoints dinâmicos com filtros, ordena�
 - Definição segura de `RulesConfig` (whitelist-first)
 - Busca nativa opcional com `search`, inclusive aninhada
 - Diferença entre propriedades da entidade (`camelCase`) e SQL manual em `customize` (TypeORM)
+- Restrição de operadores global e por endpoint com `RulesConfig.operators`
 - Troubleshooting dos erros mais comuns
 
 ## Estrutura

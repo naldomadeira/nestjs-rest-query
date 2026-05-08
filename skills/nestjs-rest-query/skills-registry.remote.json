@@ -6,6 +6,8 @@
     "nestjs",
     "typeorm",
     "drizzle",
+    "prisma",
+    "operators",
     "typescript",
     "backend",
     "rest-query",
