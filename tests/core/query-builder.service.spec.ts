@@ -120,6 +120,38 @@ describe('QueryBuilderService', () => {
         )
       ).not.toThrow();
     });
+
+    it('prefers endpoint operators over global config when rules.operators is set', () => {
+      const service = new QueryBuilderService({
+        operators: { allowed: ['eq'] },
+      });
+      const qb = createMockQb();
+      const repo = makeRepo(qb);
+
+      expect(() =>
+        service.buildQuery(
+          repo,
+          { filter: { name: { like: 'Acme' } } },
+          { filters: ['name'], operators: { allowed: ['eq', 'like'] } }
+        )
+      ).not.toThrow();
+    });
+
+    it('can block operators per endpoint even when global config allows them', () => {
+      const service = new QueryBuilderService({
+        operators: { allowed: ['eq', 'like'] },
+      });
+      const qb = createMockQb();
+      const repo = makeRepo(qb);
+
+      expect(() =>
+        service.buildQuery(
+          repo,
+          { filter: { name: { like: 'Acme' } } },
+          { filters: ['name'], operators: { allowed: ['eq'] } }
+        )
+      ).toThrow(BadRequestException);
+    });
   });
 
   describe('execute', () => {

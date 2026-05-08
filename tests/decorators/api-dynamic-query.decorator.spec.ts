@@ -1,6 +1,10 @@
 import 'reflect-metadata';
+import { DynamicQueryBuilderModule } from '@src/core/dynamic-query-builder.module';
 import { QUERY_RULES_METADATA_KEY } from '@src/core/constants';
-import { ApiDynamicQuery } from '@src/api/decorators/api-dynamic-query.decorator';
+import {
+  ApiDynamicQuery,
+  resolveAllowedOperators,
+} from '@src/api/decorators/api-dynamic-query.decorator';
 import { buildDQBSwaggerDecorators } from '@src/api/swagger/dqb-swagger.builder';
 import { RulesConfig } from '@src/contracts/rules-config.interface';
 import { ALL_OPERATORS } from '@src/domain/operators/operator.types';
@@ -88,6 +92,10 @@ describe('buildDQBSwaggerDecorators', () => {
 });
 
 describe('@ApiDynamicQuery', () => {
+  beforeEach(() => {
+    DynamicQueryBuilderModule.forRoot({});
+  });
+
   it('stores RulesConfig metadata on the handler function', () => {
     const fn = jest.fn();
     ApiDynamicQuery(RULES)({}, 'method', { value: fn });
@@ -130,5 +138,39 @@ describe('@ApiDynamicQuery', () => {
     expect(() =>
       ApiDynamicQuery(RULES)({}, 'method', { value: fn })
     ).not.toThrow();
+  });
+
+  it('prefers endpoint operators over global config', () => {
+    DynamicQueryBuilderModule.forRoot({
+      operators: { allowed: ['eq', 'like'] },
+    });
+
+    expect(
+      resolveAllowedOperators({
+        filters: ['name'],
+        operators: { allowed: ['eq'] },
+      })
+    ).toEqual(['eq']);
+  });
+
+  it('uses global operators when endpoint does not define operators', () => {
+    DynamicQueryBuilderModule.forRoot({
+      operators: { allowed: ['eq', 'like'] },
+    });
+
+    expect(resolveAllowedOperators({ filters: ['name'] })).toEqual([
+      'eq',
+      'like',
+    ]);
+  });
+
+  it('allows all operators when endpoint sets an empty operators object', () => {
+    DynamicQueryBuilderModule.forRoot({
+      operators: { allowed: ['eq'] },
+    });
+
+    expect(resolveAllowedOperators({ filters: ['name'], operators: {} })).toBe(
+      ALL_OPERATORS
+    );
   });
 });

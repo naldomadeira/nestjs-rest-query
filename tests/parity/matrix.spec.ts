@@ -289,13 +289,12 @@ describe('Cross-adapter parity matrix', () => {
 
   it('every skip entry references a gap catalogued in the parity docs', () => {
     // Known-gap allowlist mirrors the open-gaps section of
-    // `plans/adapters-parity/05-summary-and-open-gaps.md`. When a gap
+    // `plans/completed/adapters-parity/05-summary-and-open-gaps.md`. When a gap
     // closes, remove its label here and from the doc in the same PR.
     const KNOWN_GAPS = new Set<string>([
       'G4', // Prisma mode:'insensitive' provider awareness — backlog
       'G5', // Prisma temporal coercion — backlog
       'G6', // matrix infrastructure — partially landed (C/D pending)
-      'G8', // OperatorsConfig per-endpoint — backlog
     ]);
     for (const testCase of PARITY_CORPUS) {
       if (!testCase.skip) continue;
@@ -305,7 +304,7 @@ describe('Cross-adapter parity matrix', () => {
         expect(skip.note).toBeTruthy();
         if (!KNOWN_GAPS.has(skip.gap)) {
           throw new Error(
-            `[${testCase.id}/${adapter}] skip.gap "${skip.gap}" is not in the KNOWN_GAPS allowlist. Add it to plans/adapters-parity/05-summary-and-open-gaps.md and to KNOWN_GAPS in matrix.spec.ts.`
+            `[${testCase.id}/${adapter}] skip.gap "${skip.gap}" is not in the KNOWN_GAPS allowlist. Add it to plans/completed/adapters-parity/05-summary-and-open-gaps.md and to KNOWN_GAPS in matrix.spec.ts.`
           );
         }
       }

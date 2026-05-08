@@ -117,4 +117,4 @@ The library aims for behavioral parity across TypeORM, Drizzle, and Prisma. A fe
 
 ### Adapters table
 
-The remaining behaviors (filter operators, search, pagination shape, `paginate=false`, customize hook, `isNull` on a `'one'` or `'many'` relation, repeated filters, whitelist rejection, dotted-path filters) are exercised by the parity matrix and produce identical outcomes across all three adapters, including byte-for-byte 400 messages. See `plans/adapters-parity/05-summary-and-open-gaps.md` for the master table and the audit trail.
+The remaining behaviors (filter operators, search, pagination shape, `paginate=false`, customize hook, `isNull` on a `'one'` or `'many'` relation, repeated filters, whitelist rejection, dotted-path filters) are exercised by the parity matrix and produce identical outcomes across all three adapters, including byte-for-byte 400 messages. See `plans/completed/adapters-parity/05-summary-and-open-gaps.md` for the master table and the audit trail.

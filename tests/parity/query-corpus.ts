@@ -9,7 +9,7 @@
  *
  * The only escape hatch is `skip`, used temporarily for adapters whose
  * fix isn't in the same PR. Skips reference an entry in
- * `plans/adapters-parity/05-summary-and-open-gaps.md`. The end state of
+ * `plans/completed/adapters-parity/05-summary-and-open-gaps.md`. The end state of
  * the parity work is `skip` being empty everywhere.
  *
  * IDs follow the line numbers of the master table.
@@ -46,7 +46,7 @@ export type ExpectedOutcome =
 /**
  * An open gap that means the case can't run for an adapter yet. The gap
  * label (G1, G2, G3, ...) is free-form; convention is to reference an
- * entry in `plans/adapters-parity/05-summary-and-open-gaps.md`. Skips
+ * entry in `plans/completed/adapters-parity/05-summary-and-open-gaps.md`. Skips
  * are *temporary* — the long-term goal is zero skips (every adapter
  * agrees on every line of the contract).
  */

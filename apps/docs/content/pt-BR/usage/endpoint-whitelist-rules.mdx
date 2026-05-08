@@ -71,6 +71,21 @@ DynamicQueryBuilderModule.forRoot({
 
 Operadores fora da lista lançam `BadRequestException`.
 
+### Restringindo operadores por endpoint
+
+Se uma rota definir `operators` dentro do seu `RulesConfig`, essa whitelist específica do endpoint sobrescreve a configuração global do `forRoot` apenas naquela rota.
+
+```typescript
+const rules: RulesConfig = {
+  filters: ['name', 'status'],
+  operators: {
+    allowed: ['eq', 'like'],
+  },
+};
+```
+
+Use isso quando um endpoint precisar de uma whitelist mais restrita que o restante da aplicação. Um objeto vazio no endpoint, `operators: {}`, significa "permitir todos os operadores" para aquela rota, mesmo que a configuração global esteja restrita.
+
 ---
 
 ## Sorts

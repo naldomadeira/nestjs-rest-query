@@ -5,6 +5,21 @@ import { DynamicQueryBuilderModule } from '@core/dynamic-query-builder.module';
 import { DynamicQuery } from './dynamic-query.decorator';
 import { buildDQBSwaggerDecorators } from '../swagger/dqb-swagger.builder';
 
+export function resolveAllowedOperators<T = any>(
+  rules: RulesConfig<T>
+): typeof ALL_OPERATORS {
+  const hasEndpointOperators = Object.prototype.hasOwnProperty.call(
+    rules,
+    'operators'
+  );
+
+  if (hasEndpointOperators) {
+    return rules.operators?.allowed ?? ALL_OPERATORS;
+  }
+
+  return DynamicQueryBuilderModule.config?.operators?.allowed ?? ALL_OPERATORS;
+}
+
 /**
  * Registra as regras de query dinamica para o endpoint e gera documentacao Swagger.
  *
@@ -33,8 +48,7 @@ export function ApiDynamicQuery<T = any>(
   ) => {
     DynamicQuery(rules)(target, propertyKey, descriptor);
 
-    const operators =
-      DynamicQueryBuilderModule.config?.operators?.allowed ?? ALL_OPERATORS;
+    const operators = resolveAllowedOperators(rules);
 
     applyDecorators(...buildDQBSwaggerDecorators(rules, operators))(
       target,

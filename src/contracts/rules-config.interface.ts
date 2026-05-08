@@ -1,4 +1,5 @@
 import { EntityPaths } from './entity-paths.type';
+import { OperatorsConfig } from './query-builder-config.interface';
 
 export interface RulesConfig<T = any> {
   filters?: EntityPaths<T>[];
@@ -17,6 +18,14 @@ export interface RulesConfig<T = any> {
    * Campos permitidos para busca textual com ?search=.
    */
   search?: EntityPaths<T>[];
+  /**
+   * Restricao de operadores para o endpoint.
+   *
+   * Quando definido no `RulesConfig`, esse valor tem prioridade sobre
+   * `DynamicQueryBuilderModule.forRoot({ operators })` apenas para o endpoint
+   * atual.
+   */
+  operators?: OperatorsConfig;
   /**
    * Alias da entidade no QueryBuilder (ex: `FROM users u` → alias: 'u').
    * @default 'root'

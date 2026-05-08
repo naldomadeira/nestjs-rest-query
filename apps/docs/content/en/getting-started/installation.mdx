@@ -155,6 +155,8 @@ DynamicQueryBuilderModule.forRoot({
 });
 ```
 
+You can also override this per endpoint with `RulesConfig.operators`; when present, the endpoint value wins over the global `forRoot` setting for that route.
+
 ### `logging`
 
 Enables and configures internal query-building logs.
