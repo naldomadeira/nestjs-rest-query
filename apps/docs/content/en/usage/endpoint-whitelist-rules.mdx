@@ -7,7 +7,7 @@ description: Complete reference for supported query parameters — filters, oper
 
 Format: `filter[field][operator]=value`
 
-The field must be listed in the endpoint `RulesConfig.filters` — unauthorized fields are silently ignored.
+The field must be listed in the endpoint `RulesConfig.filters` — unauthorized fields throw `400 Bad Request`.
 
 ### Available operators
 
@@ -110,7 +110,7 @@ Format: `fields=id,name,email`
 
 Restricts the columns returned by the query (`SELECT`). When omitted, all entity columns are returned.
 
-The field must be listed in `RulesConfig.fields`. Unauthorized fields are ignored.
+The field must be listed in `RulesConfig.fields`; the response is constrained to the declared field whitelist.
 
 <Callout type="warn">
   Defining `fields` in `RulesConfig` also affects sorts — see the warning above.
@@ -122,7 +122,7 @@ The field must be listed in `RulesConfig.fields`. Unauthorized fields are ignore
 
 Format: `includes=company,roles`
 
-Loads TypeORM relations via `leftJoinAndSelect`. Each relation must be listed in `RulesConfig.includes` — unauthorized relations are ignored.
+Loads relations through the configured adapter. Each relation must be listed in `RulesConfig.includes` — unauthorized relations throw `400 Bad Request`.
 
 There is no implicit eager load: includes are only applied when the `includes` parameter is present in the query string.
 

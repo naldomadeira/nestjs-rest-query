@@ -157,6 +157,18 @@ DynamicQueryBuilderModule.forRoot({
 
 You can also override this per endpoint with `RulesConfig.operators`; when present, the endpoint value wins over the global `forRoot` setting for that route.
 
+```typescript
+@ApiDynamicQuery({
+  filters: ['name', 'status'],
+  operators: { allowed: ['eq', 'ilike'] },
+})
+list(@Query() query: DynamicQueryDto, @QueryRules() rules: RulesConfig) {
+  return this.service.list(query, rules);
+}
+```
+
+If the endpoint explicitly sets `operators: {}`, it resets that route to all operators allowed.
+
 ### `logging`
 
 Enables and configures internal query-building logs.

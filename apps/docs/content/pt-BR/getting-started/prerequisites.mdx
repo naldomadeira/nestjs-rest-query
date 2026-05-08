@@ -1,11 +1,11 @@
 ---
 title: Pré-requisito NestJS
-description: Requisitos para usar o nestjs-rest-query em uma aplicação NestJS com TypeORM ou Drizzle.
+description: Requisitos para usar o nestjs-rest-query em uma aplicação NestJS com TypeORM, Drizzle ou Prisma.
 ---
 
 Antes de instalar a biblioteca, confirme se o seu projeto NestJS já atende aos requisitos abaixo.
 
-Esta lib foi pensada para aplicações NestJS que usam TypeORM ou Drizzle e decorators habilitados. Se esse for o seu cenário, a configuração costuma ser simples.
+Esta lib foi pensada para aplicações NestJS que usam TypeORM, Drizzle ou Prisma e decorators habilitados. Se esse for o seu cenário, a configuração costuma ser simples.
 
 ## Aplicação NestJS
 
@@ -30,6 +30,7 @@ Esses pacotes devem estar presentes no seu projeto — **não** são incluídos 
 | `reflect-metadata` | `^0.2.0`      | Sim             |
 | `typeorm`          | `^0.3.26`     | Um dos adapters |
 | `drizzle-orm`      | `^0.45.0`     | Um dos adapters |
+| `@prisma/client`   | `^5 \|\| ^6 \|\| ^7` | Um dos adapters |
 | `@nestjs/swagger`  | `^11.0.0`     | Opcional        |
 
 Se o seu projeto ainda não está usando NestJS, comece por criar a aplicação com `nest new`. A biblioteca depende do ecossistema do framework para decorators, metadata e injeção de dependência.
@@ -58,9 +59,12 @@ Isso significa que:
 - Seu schema precisa ser declarado com Drizzle (`pgTable`, `mysqlTable`, etc.).
 - Ao usar `includes`, você precisa declarar o mapa de relations para o adapter resolvê-las com segurança.
 
-<Callout type="info">
-  **Roadmap — Prisma**
+### Prisma
 
-O suporte a Prisma está planejado para uma versão futura. A meta é manter a mesma API de decorators e o mesmo contrato de segurança por whitelist, trocando apenas o motor de query por baixo.
+O suporte a Prisma é estável e é ativado via `PrismaAdapter`. O adapter funciona com o Prisma Client e qualquer banco de dados suportado pelo Prisma.
 
-</Callout>
+Isso significa que:
+
+- Você precisa ter o Prisma configurado com um banco de dados suportado (PostgreSQL, MySQL, SQLite, etc.).
+- Seu schema precisa estar declarado no `schema.prisma` e o Prisma Client gerado.
+- Passe um `PrismaSource` descrevendo o client e o nome do modelo para `queryBuilderService.execute()`.

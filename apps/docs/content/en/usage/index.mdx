@@ -193,6 +193,17 @@ Each endpoint defines its own whitelist through `RulesConfig`. Fields not listed
   if you do not need to restrict column selection.
 </Callout>
 
+`RulesConfig.operators` can narrow the accepted filter operators for one endpoint:
+
+```typescript
+@ApiDynamicQuery({
+  filters: ['name', 'status'],
+  operators: { allowed: ['eq', 'ilike'] },
+})
+```
+
+This endpoint setting takes precedence over the global `DynamicQueryBuilderModule.forRoot({ operators })` config.
+
 ### How the whitelist protects the endpoint
 
 ```mermaid

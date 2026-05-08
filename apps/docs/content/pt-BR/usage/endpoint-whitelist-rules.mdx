@@ -7,7 +7,7 @@ description: Referência completa dos parâmetros de query suportados — filtro
 
 Formato: `filter[campo][operador]=valor`
 
-O campo deve estar listado em `filters` do `RulesConfig` do endpoint — campos não autorizados são silenciosamente ignorados.
+O campo deve estar listado em `filters` do `RulesConfig` do endpoint — campos não autorizados geram `400 Bad Request`.
 
 ### Operadores disponíveis
 
@@ -110,7 +110,7 @@ Formato: `fields=id,name,email`
 
 Restringe as colunas retornadas pela query (`SELECT`). Quando omitido, todas as colunas da entidade são retornadas.
 
-O campo deve estar listado em `fields` do `RulesConfig`. Campos não autorizados são ignorados.
+O campo deve estar listado em `fields` do `RulesConfig`; a resposta fica limitada à whitelist de campos declarada.
 
 <Callout type="warn">
   Definir `fields` no `RulesConfig` afeta também os sorts — veja o aviso acima.
@@ -122,7 +122,7 @@ O campo deve estar listado em `fields` do `RulesConfig`. Campos não autorizados
 
 Formato: `includes=company,roles`
 
-Carrega relações TypeORM via `leftJoinAndSelect`. Cada relação precisa estar listada em `includes` do `RulesConfig` — relações não autorizadas são ignoradas.
+Carrega relações pelo adapter configurado. Cada relação precisa estar listada em `includes` do `RulesConfig` — relações não autorizadas geram `400 Bad Request`.
 
 Não há eager load implícito: includes só são aplicados quando o parâmetro `includes` estiver presente na query string.
 
