@@ -277,7 +277,7 @@ Every endpoint MUST declare which fields are queryable. This is the security mod
 
 **Critical rules:**
 
-- Fields NOT in whitelist → **400 Bad Request** (never silently ignored).
+- Fields NOT in whitelist → **400 Bad Request** (always rejected, not passed through).
 - When `fields` is set, every entry in `sorts` MUST also be in `fields`.
 - `RulesConfig.operators` overrides global `forRoot({ operators })` for that endpoint only.
 - `operators: {}` on an endpoint means all operators are allowed for that route.
@@ -425,7 +425,11 @@ import {
 } from 'nestjs-rest-query';
 
 // Adapters (default is TypeORM; bring DrizzleAdapter/PrismaAdapter explicitly)
-import { TypeOrmAdapter, DrizzleAdapter, PrismaAdapter } from 'nestjs-rest-query';
+import {
+  TypeOrmAdapter,
+  DrizzleAdapter,
+  PrismaAdapter,
+} from 'nestjs-rest-query';
 import { DrizzleAdapter } from 'nestjs-rest-query/drizzle';
 import { PrismaAdapter } from 'nestjs-rest-query/prisma';
 

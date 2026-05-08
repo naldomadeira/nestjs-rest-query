@@ -46,7 +46,7 @@ app.useGlobalPipes(
 })
 ```
 
-This is intentional security behavior — fields are never silently ignored.
+This is intentional security behavior — unauthorized fields always produce a 400 Bad Request.
 
 ---
 

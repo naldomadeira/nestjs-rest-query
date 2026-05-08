@@ -22,7 +22,7 @@ interface OperatorsConfig {
 
 The whitelist is **deny by default**. Any field not explicitly listed causes a **400 Bad Request**.
 
-Fields are NEVER silently ignored — this is intentional to prevent clients from assuming a filter is active when it is not.
+Unauthorized fields always produce a **400 Bad Request** — this is intentional to prevent clients from assuming a filter is active when it is not.
 
 **Field naming rule:** use TypeORM entity property names, not raw database column names. In most projects this means `camelCase` (`createdAt`, `firstName`, `overallStatus`). Only use `snake_case` when the entity property itself is declared that way.
 
