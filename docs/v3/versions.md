@@ -55,7 +55,10 @@ provado por consumidor isolado em `verify:package`.
   `notIlike`, `search`). O Prisma não emite cláusula `ESCAPE` e o SQL Server não
   tem caractere de escape default, então `%` e `_` não podem ser literais como a
   §11 exige. O adapter recusa com `CAPABILITY_UNAVAILABLE` em vez de devolver o
-  conjunto errado de linhas. Ver
+  conjunto errado de linhas. A mesma recusa vale no SQLite, que tem o mesmo
+  vazio de escape default — não é célula, mas é o dialeto de referência, então
+  vale saber. Em `postgresql` e `mysql` os cinco operadores **funcionam** e `%`
+  e `_` são literais, porque `\` é o escape default do `LIKE` nos dois. Ver
   [ADR-001](../superpowers/specs/2026-09-04-v3-adr-001-matriz-e-escopo-da-3.0.0.md),
   emenda 2.
 - **Qualquer configuração de banco fora do perfil certificado** (§6.3). A
