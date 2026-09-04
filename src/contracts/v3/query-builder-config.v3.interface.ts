@@ -21,6 +21,15 @@ export interface LoggingConfigV3 {
   logger?: LoggerLike;
 }
 
+export interface PortabilityConfigV3 {
+  /**
+   * Exige que a source carregue fatos do profile certificado e que eles passem
+   * em `checkPortabilityProfile()` antes da compilação.
+   * @default false
+   */
+  readonly enforce?: boolean;
+}
+
 /**
  * Configuração global v3 (spec §8.2). Só políticas comuns: não existe adapter
  * default implícito — quem determina o adapter é a source.
@@ -31,5 +40,6 @@ export interface QueryBuilderConfigV3 {
   textProfile?: TextProfile;
   /** @default 'eventual' */
   consistency?: ConsistencyMode;
+  portability?: PortabilityConfigV3;
   logging?: LoggingConfigV3;
 }

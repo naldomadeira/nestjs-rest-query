@@ -22,6 +22,7 @@ import type {
   QuerySchema,
   RelationDescriptor,
 } from './schema';
+import { checkPortabilityProfile } from './portability';
 import type { QueryInputLike } from './query-parser';
 import { StructuredLogger } from '@infra/structured-logger';
 
@@ -88,6 +89,7 @@ export class QueryBuilderService {
       const plan = this.buildPlan(query, rules, options as ExecuteOptions);
 
       await this.assertSourceMatchesRules(source, plan);
+      this.assertPortabilityProfile(source, plan);
       this.assertConsistencySupported(source, plan);
       this.logPlan(source, plan);
 
@@ -125,6 +127,44 @@ export class QueryBuilderService {
         'CAPABILITY_UNAVAILABLE',
         `Adapter ${source.kind} cannot guarantee transactional consistency`,
         { adapter: source.kind }
+      );
+    }
+  }
+
+  private assertPortabilityProfile<TSource, TCompiled, TRow, TNative>(
+    source: QuerySource<TSource, TCompiled, TRow, TNative>,
+    plan: TypedQueryPlan
+  ): void {
+    if (!this.config.portability?.enforce) return;
+    if (plan.textProfile !== 'portable-strict') return;
+
+    if (!source.portabilityProfile) {
+      throw configurationError(
+        'PORTABILITY_PROFILE_MISMATCH',
+        `Source ${source.kind} has no portability profile facts`,
+        { adapter: source.kind }
+      );
+    }
+
+    const capabilities = source.adapter.capabilities(source.input);
+    if (capabilities.dialect !== source.portabilityProfile.dialect) {
+      throw configurationError(
+        'PORTABILITY_PROFILE_MISMATCH',
+        `Source dialect ${capabilities.dialect} does not match portability profile ${source.portabilityProfile.dialect}`,
+        {
+          adapter: source.kind,
+          expected: capabilities.dialect,
+          actual: source.portabilityProfile.dialect,
+        }
+      );
+    }
+
+    const violations = checkPortabilityProfile(source.portabilityProfile);
+    if (violations.length > 0) {
+      throw configurationError(
+        'PORTABILITY_PROFILE_MISMATCH',
+        `Source ${source.kind} does not match the certified portability profile`,
+        { adapter: source.kind, violations }
       );
     }
   }

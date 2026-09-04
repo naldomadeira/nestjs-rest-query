@@ -7,6 +7,7 @@ import type {
   RestQueryAdapterV3,
   SqlDialect,
 } from '@contracts/v3';
+import type { ProfileFacts } from '@core/portability';
 import { configurationError } from '@core/errors';
 import type { QuerySchema } from '@core/schema';
 import type { TypedQueryPlan } from '@core/query-plan';
@@ -16,6 +17,10 @@ import { executeCompiled } from './typeorm-pagination';
 
 export interface TypeOrmSourceInput<T extends ObjectLiteral> {
   readonly repository: Repository<T>;
+}
+
+export interface TypeOrmSourceOptions {
+  readonly portabilityProfile?: ProfileFacts;
 }
 
 /**
@@ -126,7 +131,8 @@ const sharedAdapter = new TypeOrmAdapter<ObjectLiteral>();
  * ```
  */
 export function typeormSource<T extends ObjectLiteral>(
-  repository: Repository<T>
+  repository: Repository<T>,
+  options: TypeOrmSourceOptions = {}
 ): QuerySource<
   TypeOrmSourceInput<T>,
   CompiledTypeOrmQuery<T>,
@@ -142,5 +148,6 @@ export function typeormSource<T extends ObjectLiteral>(
       SelectQueryBuilder<T>
     >,
     input: { repository },
+    portabilityProfile: options.portabilityProfile,
   };
 }

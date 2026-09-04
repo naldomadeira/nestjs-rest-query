@@ -11,5 +11,6 @@ export type { AnyQuerySource, QuerySource } from './query-source.interface';
 export type {
   LoggingConfigV3,
   PaginationConfigV3,
+  PortabilityConfigV3,
   QueryBuilderConfigV3,
 } from './query-builder-config.v3.interface';
