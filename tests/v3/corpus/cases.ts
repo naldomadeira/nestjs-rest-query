@@ -158,6 +158,26 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     expect: { kind: 'error', status: 400, code: 'FILTER_VALUE_INVALID' },
   },
 
+  {
+    /**
+     * Coluna nula não sai por `notIn`: vale a lógica de três valores do SQL.
+     *
+     * `nickname NOT IN ('Zed')` é `UNKNOWN` nas dez linhas de `nickname` nulo,
+     * então elas ficam de fora mesmo sem casar nenhum item da lista; sobra a
+     * única linha com valor, que não está listada. É a outra metade de "null
+     * só é consultado por isNull" (§10.1) — quem quer as nulas pede `isNull`,
+     * não `notIn`. As três famílias de banco concordam nisso, e o caso trava a
+     * semântica nos três adapters: nenhum pode "consertar" o NULL por conta
+     * própria acrescentando um `OR nickname IS NULL`, porque isso mudaria o
+     * conjunto de linhas conforme o ORM.
+     */
+    id: 'null/not-in-keeps-only-non-null-unlisted',
+    description: 'notIn não devolve linha de coluna nula',
+    tags: ['null', 'csv-escape'],
+    rules: 'user.default',
+    query: { filter: { nickname: { notIn: 'Zed' } } },
+    expect: { kind: 'rows', ids: [2], total: 1, lastPage: 1 },
+  },
   // --- Padrões literais (spec §11) ---
   {
     id: 'like/percent-is-literal',
@@ -223,6 +243,32 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     divergences: { prisma: PRISMA_PATTERN_REFUSAL },
   },
   {
+    /**
+     * Busca por uma folha através de `many` é existencial (spec §11.1 e §12).
+     *
+     * A promessa medida aqui é a da §5: os três adapters devolvem a mesma
+     * página **e** o mesmo total. O termo `co` casa `cobol` e `the compiler`
+     * (dois posts do usuário 2), `on computable numbers` (um post do 3), e as
+     * colunas de root de `comma@nimbus.test` (6) e `under_score` (10) — ou
+     * seja, um alvo existencial e dois alvos escalares no mesmo OR, com um
+     * root casando por dois itens.
+     *
+     * `perPage=3` é o que torna a divergência observável: compilado como join
+     * de predicado, o `LIMIT 3` cai sobre as 5 linhas duplicadas pelo join e
+     * consome duas delas no mesmo root, devolvendo 2 linhas numa página de 3 —
+     * com `total` 4, porque a contagem sempre contou roots distintos. Página
+     * curta com total certo é o sintoma exato que este caso proíbe.
+     */
+    id: 'search/through-many-is-existential',
+    description:
+      'search por folha através de many não duplica nem encurta a página',
+    tags: ['relation-many', 'case-fold', 'pagination'],
+    rules: 'user.deep',
+    query: { search: 'co', page: '1', perPage: '3' },
+    expect: { kind: 'rows', ids: [2, 3, 6], total: 4, lastPage: 2 },
+    divergences: { prisma: PRISMA_PATTERN_REFUSAL },
+  },
+  {
     id: 'search/not-configured',
     description: 'search em endpoint sem campos de busca é rejeitado',
     tags: ['case-fold'],
@@ -270,6 +316,46 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     },
   },
   {
+    /**
+     * O caminho de `NOT IN` com valores — que `notIn=[]` não exercita.
+     *
+     * `notIn=[]` é sempre-verdadeiro e é elidido do `AND`: por causa dele
+     * nenhum adapter chega a emitir `NOT IN`. Este caso é o que obriga os três
+     * a compilar a lista de verdade e a concordar sobre a §11 (`notIn` é
+     * "pertinência após coerção item a item", negada): as três linhas `Ada` e
+     * a `Grace` saem do conjunto e todo o resto continua, sem depender de
+     * ordem de itens nem de quantos itens a lista tem.
+     */
+    id: 'list/not-in-with-values-excludes-listed',
+    description: 'notIn com valores remove exatamente os itens listados',
+    tags: ['csv-escape'],
+    rules: 'user.default',
+    query: { filter: { name: { notIn: 'Ada,Grace' } } },
+    expect: {
+      kind: 'rows',
+      ids: [3, 6, 7, 8, 9, 10, 11],
+      total: 7,
+      lastPage: 1,
+    },
+  },
+  {
+    /**
+     * `null` dentro da lista é recusado antes do compiler (spec §10.1).
+     *
+     * A promessa aqui é de portabilidade, não de conveniência: `x NOT IN (a,
+     * NULL)` é `UNKNOWN` para toda linha nas três famílias de banco, isto é,
+     * um `notIn` com `NULL` no conjunto devolveria sempre vazio. Recusar o
+     * item mantém "null só é consultado por isNull" e impede que o cliente
+     * escreva, sem perceber, um filtro que nunca casa nada.
+     */
+    id: 'list/not-in-rejects-null-item',
+    description: 'null dentro da lista de notIn é inválido',
+    tags: ['csv-escape', 'null'],
+    rules: 'user.default',
+    query: { filter: { name: { notIn: ['Ada', null] } } },
+    expect: { kind: 'error', status: 400, code: 'FILTER_VALUE_INVALID' },
+  },
+  {
     id: 'list/between-requires-two-values',
     description: 'between exige exatamente dois valores',
     tags: ['csv-escape'],
@@ -294,6 +380,26 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     rules: 'user.default',
     query: { filter: { 'company.name': { eq: 'Acme' } } },
     expect: { kind: 'rows', ids: [1, 2], total: 2, lastPage: 1 },
+  },
+  {
+    /**
+     * Relação ausente também não sai por `notIn` — o mesmo NULL, outra origem.
+     *
+     * Nas linhas 8 a 11 não existe `company`, então a folha `company.name` não
+     * tem valor nenhum para comparar: o filtro por relação `one` é
+     * "a folha é comparada na relação associada" (§11.1), e sem relação
+     * associada não há associação a negar. O caso importa porque o NULL aqui
+     * não vem da coluna, e sim do join, e é exatamente onde os adapters
+     * poderiam divergir — quem resolve a relação com `LEFT JOIN` cai na lógica
+     * de três valores, quem resolve com `INNER JOIN` ou subconsulta descarta a
+     * linha antes; as duas rotas têm de devolver o mesmo conjunto.
+     */
+    id: 'relation-one/not-in-through-absent-relation',
+    description: 'notIn por relação one exige a relação presente',
+    tags: ['relation-one', 'null', 'csv-escape'],
+    rules: 'user.default',
+    query: { filter: { 'company.name': { notIn: 'Acme' } } },
+    expect: { kind: 'rows', ids: [3, 4, 5, 6, 7], total: 5, lastPage: 1 },
   },
   {
     id: 'relation-one/is-null-true-means-absent',
