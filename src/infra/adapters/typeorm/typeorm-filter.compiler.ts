@@ -1,0 +1,298 @@
+import {
+  Brackets,
+  type SelectQueryBuilder,
+  type WhereExpressionBuilder,
+} from 'typeorm';
+import type { ObjectLiteral } from 'typeorm';
+import { configurationError } from '@core/errors';
+import { CivilDate, DecimalValue } from '@core/coercion';
+import type { PlanFilter } from '@core/semantic-validator';
+import type { TypedQueryPlan } from '@core/query-plan';
+import { containsPattern } from './escape-pattern';
+import {
+  correlationColumns,
+  ROOT_ALIAS,
+  type JoinPlan,
+} from './typeorm-join-planner';
+
+export interface FilterCompilerContext {
+  readonly plan: TypedQueryPlan;
+  readonly joins: JoinPlan;
+  readonly escapeCharacter: string;
+}
+
+/** Contador de parâmetros por query, para nomes estáveis e sem colisão. */
+class ParameterBag {
+  private index = 0;
+  readonly values: Record<string, unknown> = {};
+
+  add(value: unknown): string {
+    const key = `dqb_${this.index++}`;
+    this.values[key] = value;
+    return key;
+  }
+}
+
+/**
+ * Compila filtros e busca para o `SelectQueryBuilder` (spec §11).
+ *
+ * Nenhum valor é interpolado no SQL: tudo vira parâmetro nomeado. Padrões
+ * literais passam pelo escape do dialeto e emitem a cláusula ESCAPE explícita.
+ */
+export function compileFilters<T extends ObjectLiteral>(
+  qb: SelectQueryBuilder<T>,
+  context: FilterCompilerContext
+): void {
+  const bag = new ParameterBag();
+
+  for (const filter of context.plan.filters) {
+    qb.andWhere(
+      new Brackets((where) => applyFilter(qb, where, filter, context, bag))
+    );
+  }
+
+  const search = context.plan.search;
+  if (search && search.targets.length > 0) {
+    // Search combina seus campos com OR e entra como mais um termo do AND.
+    qb.andWhere(
+      new Brackets((where) => {
+        for (const target of search.targets) {
+          const key = bag.add(
+            containsPattern(search.foldedTerm, context.escapeCharacter)
+          );
+          where.orWhere(
+            `${columnRef(target.column, context)} LIKE :${key} ESCAPE '${context.escapeCharacter}'`
+          );
+        }
+      })
+    );
+  }
+
+  qb.setParameters(bag.values);
+}
+
+function applyFilter<T extends ObjectLiteral>(
+  qb: SelectQueryBuilder<T>,
+  where: WhereExpressionBuilder,
+  filter: PlanFilter,
+  context: FilterCompilerContext,
+  bag: ParameterBag
+): void {
+  if (filter.alwaysFalse) {
+    where.andWhere('1 = 0');
+    return;
+  }
+  if (filter.alwaysTrue) {
+    where.andWhere('1 = 1');
+    return;
+  }
+
+  if (filter.existential) {
+    where.andWhere(existentialCondition(qb, filter, context, bag));
+    return;
+  }
+
+  if (filter.target === 'relation') {
+    // Relação `one`: presença/ausência é a nulidade da chave estrangeira, que
+    // o join à esquerda expõe pela PK do alias juntado.
+    const node = context.joins.nodes.get(filter.path);
+    if (!node) {
+      throw configurationError(
+        'ADAPTER_CONTRACT_VIOLATION',
+        `Relation filter ${filter.path} has no planned join`,
+        { path: filter.path }
+      );
+    }
+    const targetModel = relationTargetModel(context.plan, filter.path);
+    const pk = context.plan.registry.get(targetModel)!.primaryKey[0];
+    where.andWhere(
+      `${node.alias}.${pk} IS ${filter.value === true ? '' : 'NOT '}NULL`
+    );
+    return;
+  }
+
+  const column = columnRef(filter.column, context);
+
+  switch (filter.operator) {
+    case 'isNull':
+      where.andWhere(`${column} IS ${filter.value === true ? '' : 'NOT '}NULL`);
+      return;
+
+    case 'in':
+    case 'notIn': {
+      const key = bag.add((filter.value as unknown[]).map(toDriverValue));
+      where.andWhere(
+        `${column} ${filter.operator === 'in' ? 'IN' : 'NOT IN'} (:...${key})`
+      );
+      return;
+    }
+
+    case 'between': {
+      const [from, to] = filter.value as unknown[];
+      const fromKey = bag.add(toDriverValue(from));
+      const toKey = bag.add(toDriverValue(to));
+      where.andWhere(`${column} BETWEEN :${fromKey} AND :${toKey}`);
+      return;
+    }
+
+    case 'like':
+    case 'notLike':
+    case 'ilike':
+    case 'notIlike': {
+      const key = bag.add(
+        containsPattern(filter.value as string, context.escapeCharacter)
+      );
+      const negated =
+        filter.operator === 'notLike' || filter.operator === 'notIlike';
+      where.andWhere(
+        `${column} ${negated ? 'NOT LIKE' : 'LIKE'} :${key} ESCAPE '${context.escapeCharacter}'`
+      );
+      return;
+    }
+
+    default: {
+      const key = bag.add(toDriverValue(filter.value));
+      where.andWhere(`${column} ${SQL_COMPARISON[filter.operator]} :${key}`);
+    }
+  }
+}
+
+const SQL_COMPARISON: Readonly<Record<string, string>> = {
+  eq: '=',
+  ne: '<>',
+  gt: '>',
+  gte: '>=',
+  lt: '<',
+  lte: '<=',
+};
+
+/**
+ * Filtro por relação `many`: "algum item corresponde" (spec §11.1).
+ *
+ * Um join inflaria os roots e quebraria `total`, então a condição vira uma
+ * subquery correlacionada pela PK do root.
+ */
+function existentialCondition<T extends ObjectLiteral>(
+  qb: SelectQueryBuilder<T>,
+  filter: PlanFilter,
+  context: FilterCompilerContext,
+  bag: ParameterBag
+): string {
+  const relationPath = filter.relationPath;
+  if (relationPath.length !== 1) {
+    throw configurationError(
+      'CAPABILITY_UNAVAILABLE',
+      `Existential filters through nested many relations are not supported yet: ${filter.path}`,
+      { path: filter.path }
+    );
+  }
+
+  const relation =
+    qb.expressionMap.mainAlias!.metadata.findRelationWithPropertyPath(
+      relationPath[0]
+    )!;
+  const { owner, pairs } = correlationColumns(relation);
+  const subAlias = `dqb_ex_${relationPath[0]}`;
+
+  const correlation = pairs
+    .map(
+      (pair) =>
+        `${subAlias}.${pair.ownerColumn} = ${ROOT_ALIAS}.${pair.referencedColumn}`
+    )
+    .join(' AND ');
+
+  const conditions = [correlation];
+
+  if (filter.target !== 'relation') {
+    const leaf = filter.column.split('.').pop()!;
+    const column = `${subAlias}.${leaf}`;
+    conditions.push(existentialLeafCondition(column, filter, context, bag));
+  }
+
+  const exists = `EXISTS (SELECT 1 FROM ${owner.tableName} ${subAlias} WHERE ${conditions.join(' AND ')})`;
+
+  // `isNull=true` numa relação many significa coleção vazia.
+  return filter.target === 'relation' && filter.value === true
+    ? `NOT ${exists}`
+    : exists;
+}
+
+function existentialLeafCondition(
+  column: string,
+  filter: PlanFilter,
+  context: FilterCompilerContext,
+  bag: ParameterBag
+): string {
+  switch (filter.operator) {
+    case 'isNull':
+      return `${column} IS ${filter.value === true ? '' : 'NOT '}NULL`;
+
+    case 'in':
+    case 'notIn': {
+      const key = bag.add((filter.value as unknown[]).map(toDriverValue));
+      return `${column} ${filter.operator === 'in' ? 'IN' : 'NOT IN'} (:...${key})`;
+    }
+
+    case 'between': {
+      const [from, to] = filter.value as unknown[];
+      const fromKey = bag.add(toDriverValue(from));
+      const toKey = bag.add(toDriverValue(to));
+      return `${column} BETWEEN :${fromKey} AND :${toKey}`;
+    }
+
+    case 'like':
+    case 'notLike':
+    case 'ilike':
+    case 'notIlike': {
+      const key = bag.add(
+        containsPattern(filter.value as string, context.escapeCharacter)
+      );
+      const negated =
+        filter.operator === 'notLike' || filter.operator === 'notIlike';
+      return `${column} ${negated ? 'NOT LIKE' : 'LIKE'} :${key} ESCAPE '${context.escapeCharacter}'`;
+    }
+
+    default: {
+      const key = bag.add(toDriverValue(filter.value));
+      return `${column} ${SQL_COMPARISON[filter.operator]} :${key}`;
+    }
+  }
+}
+
+/** Referência SQL de uma coluna lógica, resolvendo o alias do join. */
+export function columnRef(
+  column: string,
+  context: FilterCompilerContext
+): string {
+  if (!column.includes('.')) return `${ROOT_ALIAS}.${column}`;
+
+  const relationPath = column.slice(0, column.lastIndexOf('.'));
+  const leaf = column.slice(column.lastIndexOf('.') + 1);
+  const node = context.joins.nodes.get(relationPath);
+
+  if (!node) {
+    throw configurationError(
+      'ADAPTER_CONTRACT_VIOLATION',
+      `No planned join for relation path ${relationPath}`,
+      { path: column }
+    );
+  }
+  return `${node.alias}.${leaf}`;
+}
+
+function relationTargetModel(plan: TypedQueryPlan, path: string): string {
+  const segments = path.split('.');
+  let model = plan.model;
+  for (const segment of segments) {
+    model = plan.registry.get(model)!.relations.get(segment)!.target;
+  }
+  return model;
+}
+
+/** Valores lógicos viram o tipo que o driver entende. */
+function toDriverValue(value: unknown): unknown {
+  if (value instanceof CivilDate) return value.iso;
+  if (value instanceof DecimalValue) return value.value;
+  if (typeof value === 'bigint') return value.toString();
+  return value;
+}
