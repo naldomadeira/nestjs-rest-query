@@ -182,6 +182,39 @@ demais para a `3.0.0` e reabre a emenda 2.
 de migração foi exercido num projeto v2 de verdade; branches do TypeORM acima
 de 95%.
 
+## Emenda 1 (2026-09-04): cadeia existencial de mais de um salto no TypeORM
+
+Achado na execução do PR5, ao migrar o exemplo 02: a whitelist v2 dele
+declarava `search: ['items.company.name', 'items.company.cnpj']`, e os dois
+paths cruzam **duas** relações (`items`, que é `many`, e depois `company`).
+
+Medido nos três adapters:
+
+| adapter | `posts.author.name` (many → one)                     | `posts.tags.label` (many → many) |
+| ------- | ---------------------------------------------------- | -------------------------------- |
+| Prisma  | `{posts:{some:{author:{is:…}}}}` — compila           | compila                          |
+| Drizzle | join encadeado dentro de um único `EXISTS` — compila | compila                          |
+| TypeORM | `CAPABILITY_UNAVAILABLE`                             | `CAPABILITY_UNAVAILABLE`         |
+
+O guard está em `typeorm-filter.compiler.ts`, `existsThroughMany`, e recusa
+`relationPath.length !== 1`; a relação many-to-many é recusada por guard
+próprio, que substituiu um caminho que emitia SQL válido contra a **tabela
+errada**, em silêncio. Vale para filtro **e** para busca — não é regressão do
+PR5, é limite pré-existente que o PR5 tornou visível.
+
+**Não é violação da §5**, e é por isso que não bloqueia a `3.0.0`: a §5 define
+paridade sobre as queries do corpus, nenhum caso do corpus cruza mais de uma
+relação existencialmente, o §411 promete semântica existencial para "dotted path
+por relação `many`" — um salto, que os três cumprem —, e a recusa é alta, com
+código estável, nunca resultado aproximado.
+
+**Decisão (do owner, 2026-09-04): implementar no adapter TypeORM, junto com o
+many-to-many, e não agora.** Fica pendência para depois desta entrega, com o
+limite declarado em `docs/v3/status.md` e em `docs/v3/versions.md` enquanto não
+for fechado. O que a implementação exige: joins encadeados dentro da subquery
+`EXISTS` (a forma que o Drizzle já usa), travessia da tabela de junção para
+m2m, caso de corpus cobrindo as duas formas, e nova rodada das nove células.
+
 ## Releases
 
 `3.0.0-alpha.1` assim que o PR4b fechar as nove células → `3.0.0-rc.1` após o
