@@ -296,7 +296,7 @@ certificado como gate parcialmente implementado e não como selo automático.
 
 ## Diferenças em relação ao design aprovado
 
-O design (`docs/superpowers/specs/2026-09-03-v3-paridade-orm-bancos-design.md`)
+O design (`../superpowers/specs/2026-09-03-v3-paridade-orm-bancos-design.md`)
 lista `normalize()` no contrato do adapter (§15). A implementação o mantém
 **fora**: cada adapter hidrata e devolve `AdapterResult`, e a normalização
 canônica é do núcleo, comum aos três. Manter `normalize()` no adapter permitiria
