@@ -48,6 +48,7 @@ export interface CorpusPostRow {
 
 export interface CorpusTagRow {
   post_id: string;
+  post_id_order: string;
   label: string;
 }
 
@@ -243,10 +244,16 @@ const posts: CorpusPostRow[] = [
   post('66666666-6666-4666-8666-666666666666', 'On Computable Numbers', 3),
 ];
 
+const tag = (post_id: string, label: string): CorpusTagRow => ({
+  post_id,
+  post_id_order: post_id,
+  label,
+});
+
 const tags: CorpusTagRow[] = [
-  { post_id: '11111111-1111-4111-8111-111111111111', label: 'history' },
-  { post_id: '11111111-1111-4111-8111-111111111111', label: 'math' },
-  { post_id: '44444444-4444-4444-8444-444444444444', label: 'history' },
+  tag('11111111-1111-4111-8111-111111111111', 'history'),
+  tag('11111111-1111-4111-8111-111111111111', 'math'),
+  tag('44444444-4444-4444-8444-444444444444', 'history'),
 ];
 
 export const CORPUS_SEED = { users, companies, posts, tags } as const;

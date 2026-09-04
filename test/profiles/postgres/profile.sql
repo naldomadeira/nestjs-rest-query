@@ -39,8 +39,11 @@ CREATE TABLE posts (
 );
 
 CREATE TABLE tags (
-  post_id uuid NOT NULL REFERENCES posts (id),
-  label   text COLLATE "C" NOT NULL,
+  post_id       uuid NOT NULL REFERENCES posts (id),
+  -- portableOrderField de post_id: uuid nativo não tem ordem total idêntica
+  -- nas três famílias de banco.
+  post_id_order text COLLATE "C" NOT NULL,
+  label         text COLLATE "C" NOT NULL,
   PRIMARY KEY (post_id, label)
 );
 
@@ -54,3 +57,4 @@ CREATE INDEX users_code_idx         ON users (code);
 CREATE INDEX posts_user_id_idx      ON posts (user_id);
 CREATE INDEX posts_id_order_idx     ON posts (id_order);
 CREATE INDEX companies_name_folded_idx ON companies (name_folded);
+CREATE INDEX tags_post_id_order_idx ON tags (post_id_order, label);

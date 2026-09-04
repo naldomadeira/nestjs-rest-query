@@ -50,7 +50,7 @@ export const CORPUS_MODEL = {
     relations: { author: 'one', tags: 'many' },
   },
   tag: {
-    fields: { post_id: 'uuid', label: 'string' },
+    fields: { post_id: 'uuid', post_id_order: 'string', label: 'string' },
     primaryKey: ['post_id', 'label'],
     relations: {},
   },

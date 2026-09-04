@@ -40,8 +40,9 @@ CREATE TABLE posts (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin;
 
 CREATE TABLE tags (
-  post_id CHAR(36) COLLATE utf8mb4_bin NOT NULL,
-  label   VARCHAR(255) COLLATE utf8mb4_bin NOT NULL,
+  post_id       CHAR(36) COLLATE utf8mb4_bin NOT NULL,
+  post_id_order VARCHAR(64) COLLATE utf8mb4_bin NOT NULL,
+  label         VARCHAR(255) COLLATE utf8mb4_bin NOT NULL,
   PRIMARY KEY (post_id, label),
   CONSTRAINT tags_post_id_fkey FOREIGN KEY (post_id) REFERENCES posts (id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin;
@@ -56,3 +57,4 @@ CREATE INDEX users_code_idx            ON users (code);
 CREATE INDEX posts_user_id_idx         ON posts (user_id);
 CREATE INDEX posts_id_order_idx        ON posts (id_order);
 CREATE INDEX companies_name_folded_idx ON companies (name_folded);
+CREATE INDEX tags_post_id_order_idx ON tags (post_id_order, label);
