@@ -4,9 +4,12 @@ import type {
   RestQueryAdapterV3,
 } from '@contracts/v3';
 import type { TypedQueryPlan } from '@core/query-plan';
+import type { QuerySchema } from '@core/schema';
+import { userSchema } from './schemas';
 
 export interface FakeSourceInput {
   readonly capabilities: AdapterCapabilities;
+  readonly schema: QuerySchema;
 }
 
 export interface FakeCompiled {
@@ -19,6 +22,7 @@ export interface FakeRow {
 }
 
 export type AdapterCall =
+  | { kind: 'describe' }
   | { kind: 'compile'; plan: TypedQueryPlan }
   | { kind: 'customize'; scope: string }
   | { kind: 'execute' };
@@ -29,8 +33,9 @@ export const calls: AdapterCall[] = [];
 const fakeAdapter: RestQueryAdapterV3<FakeSourceInput, FakeCompiled, FakeRow> =
   {
     id: 'typeorm',
-    describe: async () => {
-      throw new Error('not used by these tests');
+    describe: async (source) => {
+      calls.push({ kind: 'describe' });
+      return source.schema;
     },
     capabilities: (source) => source.capabilities,
     compile: (plan) => {
@@ -48,7 +53,8 @@ const fakeAdapter: RestQueryAdapterV3<FakeSourceInput, FakeCompiled, FakeRow> =
   };
 
 export function fakeSource(
-  capabilities: Partial<AdapterCapabilities> = {}
+  capabilities: Partial<AdapterCapabilities> = {},
+  schema: QuerySchema = userSchema
 ): QuerySource<FakeSourceInput, FakeCompiled, FakeRow> {
   return {
     kind: 'typeorm',
@@ -60,6 +66,7 @@ export function fakeSource(
         escapeCharacter: '\\',
         ...capabilities,
       },
+      schema,
     },
   };
 }

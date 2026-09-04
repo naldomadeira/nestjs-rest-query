@@ -6,12 +6,22 @@ import type {
   QuerySource,
 } from '@contracts/v3';
 import type { CompiledQueryRules } from './authorization';
-import { inputError, RestQueryError, toHttpException } from './errors';
+import {
+  configurationError,
+  inputError,
+  RestQueryError,
+  toHttpException,
+} from './errors';
 import { buildQueryPlan, freezePlan, type TypedQueryPlan } from './query-plan';
 import {
   normalizeResult,
   type NormalizedQueryResult,
 } from './result-normalizer';
+import type {
+  FieldDescriptor,
+  QuerySchema,
+  RelationDescriptor,
+} from './schema';
 import type { QueryInputLike } from './query-parser';
 import { StructuredLogger } from '@infra/structured-logger';
 
@@ -41,6 +51,10 @@ export interface ExecuteOptions<TNative = unknown> {
 @Injectable()
 export class QueryBuilderService {
   private readonly logger: StructuredLogger;
+  private readonly sourceSchemaCache = new WeakMap<
+    object,
+    Promise<QuerySchema>
+  >();
 
   constructor(
     @Optional()
@@ -73,6 +87,7 @@ export class QueryBuilderService {
     try {
       const plan = this.buildPlan(query, rules, options as ExecuteOptions);
 
+      await this.assertSourceMatchesRules(source, plan);
       this.assertConsistencySupported(source, plan);
       this.logPlan(source, plan);
 
@@ -114,6 +129,66 @@ export class QueryBuilderService {
     }
   }
 
+  private async assertSourceMatchesRules<TSource, TCompiled, TRow, TNative>(
+    source: QuerySource<TSource, TCompiled, TRow, TNative>,
+    plan: TypedQueryPlan
+  ): Promise<void> {
+    const actual = await this.describeSource(source);
+    const expected = plan.schema;
+
+    if (actual.model !== expected.model) {
+      throw inputError(
+        'SOURCE_CONFIGURATION_INVALID',
+        `Source model ${actual.model} does not match query rules model ${expected.model}`,
+        { adapter: source.kind, expected: expected.model, actual: actual.model }
+      );
+    }
+
+    assertSameList(
+      source.kind,
+      'primaryKey',
+      expected.primaryKey,
+      actual.primaryKey
+    );
+
+    for (const field of expected.fields.values()) {
+      const actualField = actual.fields.get(field.path);
+      if (!actualField) {
+        throw sourceMismatch(
+          source.kind,
+          `Missing source field ${field.path}`,
+          {
+            path: field.path,
+          }
+        );
+      }
+      assertField(source.kind, field, actualField);
+    }
+
+    for (const relation of expected.relations.values()) {
+      const actualRelation = actual.relations.get(relation.path);
+      if (!actualRelation) {
+        throw sourceMismatch(
+          source.kind,
+          `Missing source relation ${relation.path}`,
+          { path: relation.path }
+        );
+      }
+      assertRelation(source.kind, relation, actualRelation);
+    }
+  }
+
+  private describeSource<TSource, TCompiled, TRow, TNative>(
+    source: QuerySource<TSource, TCompiled, TRow, TNative>
+  ): Promise<QuerySchema> {
+    const cached = this.sourceSchemaCache.get(source);
+    if (cached) return cached;
+
+    const description = source.adapter.describe(source.input);
+    this.sourceSchemaCache.set(source, description);
+    return description;
+  }
+
   /** Só metadados: paths, operadores e contagens, nunca valores. */
   private logPlan<TSource, TCompiled, TRow, TNative>(
     source: QuerySource<TSource, TCompiled, TRow, TNative>,
@@ -130,5 +205,83 @@ export class QueryBuilderService {
       perPage: plan.pagination.perPage,
       paginate: plan.pagination.paginate,
     });
+  }
+}
+
+function sourceMismatch(
+  adapter: string,
+  message: string,
+  details: Record<string, unknown>
+): never {
+  throw configurationError('SOURCE_CONFIGURATION_INVALID', message, {
+    adapter,
+    ...details,
+  });
+}
+
+function assertSameList(
+  adapter: string,
+  path: string,
+  expected: readonly string[],
+  actual: readonly string[]
+): void {
+  if (
+    expected.length === actual.length &&
+    expected.every((value, index) => value === actual[index])
+  ) {
+    return;
+  }
+
+  sourceMismatch(adapter, `Source ${path} does not match query rules`, {
+    path,
+    expected,
+    actual,
+  });
+}
+
+function assertField(
+  adapter: string,
+  expected: FieldDescriptor,
+  actual: FieldDescriptor
+): void {
+  for (const key of [
+    'kind',
+    'nullable',
+    'primaryKey',
+    'foldedField',
+    'portableOrderField',
+    'internal',
+  ] as const) {
+    if ((expected[key] ?? false) === (actual[key] ?? false)) continue;
+    sourceMismatch(
+      adapter,
+      `Source field ${expected.path} does not match query rules`,
+      {
+        path: expected.path,
+        property: key,
+        expected: expected[key],
+        actual: actual[key],
+      }
+    );
+  }
+}
+
+function assertRelation(
+  adapter: string,
+  expected: RelationDescriptor,
+  actual: RelationDescriptor
+): void {
+  for (const key of ['target', 'cardinality', 'nullable'] as const) {
+    if (expected[key] === actual[key]) continue;
+    sourceMismatch(
+      adapter,
+      `Source relation ${expected.path} does not match query rules`,
+      {
+        path: expected.path,
+        property: key,
+        expected: expected[key],
+        actual: actual[key],
+      }
+    );
   }
 }
