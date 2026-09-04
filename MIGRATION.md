@@ -109,7 +109,7 @@ Current implementation status:
 
 - TypeORM: the v3 corpus runs locally on SQLite with TypeORM `0.3.x`/`1.1.x`. Source schema mismatches fail as configuration errors, and to-many pagination applies `customize` constraints to the root-key phase.
 - Prisma: `prismaSource`, `PrismaAdapter`, and a manual manifest are implemented. The compiler emits filters, search, `one`/`many` relation predicates (`is`, `some`, `none`), recursive selects, sort, pagination, count, and `customize`. The portable strict profile uses folded fields and never emits Prisma `mode: 'insensitive'`.
-- Drizzle: `drizzleSource`, `DrizzleAdapter`, explicit table/relation metadata, and an abstract statement compiler are implemented. Relations are declared by dotted path (`{ company, 'company.owner', posts }`), so deep chains resolve; `one` chains become idempotent joins with a single alias each, and any `many` hop becomes a correlated `EXISTS` that never joins the root. MySQL/MSSQL search uses folded fields plus escaped `LIKE`, never `ILIKE`. Executing the compiled statement in each dialect is still supplied by the consumer through `DrizzleDatabase`.
+- Drizzle: `drizzleSource`, `DrizzleAdapter`, and `drizzleDatabase()` are implemented against `drizzle-orm` itself. Relations are declared by dotted path (`{ company, 'company.owner', posts }`), so deep chains resolve; `one` chains become idempotent joins with a single alias each, and any `many` hop becomes a correlated `EXISTS` that never joins the root. A `many` relation in the projection leaves the main statement and is hydrated by its own query, so `LIMIT` pages roots and `total` counts roots. Search and `like` use folded columns with an escaped `LIKE` and an explicit escape character; `ILIKE` is never emitted. The full parity corpus runs green against Drizzle on SQLite, through the same runner and the same expectations as TypeORM.
 
 Known blockers before stable `3.0.0`:
 
@@ -117,7 +117,9 @@ Known blockers before stable `3.0.0`:
 - SQL Server must be exercised on a Linux x64 runner; local ARM failures are tracked but are not a release substitute.
 - Prisma still needs the generated `schema.prisma` manifest path and real generated-client integration on Prisma `6.19.x` and `7.x`.
 - Drizzle `1.x` is still consumed as `1.0.0-rc.4` in this branch. Keep v3 as a prerelease until Drizzle GA and MSSQL support are stable.
-- The Drizzle adapter compiles to a `DrizzleStatement` but does not materialize it with `drizzle-orm` yet: the consumer implements `DrizzleDatabase`. It also fails closed with `ADAPTER_CONTRACT_VIOLATION` when a projection crosses a to-many relation, because two-phase hydration is not implemented there. Neither is a silent degradation, but neither is the finished phase-5 adapter.
+- The Drizzle adapter is exercised only against SQLite. SQLite is the reference dialect, not a matrix cell: PostgreSQL, MySQL and SQL Server have not run against it. Dialect-specific paths that SQLite cannot reach — `OFFSET ... FETCH` on SQL Server, native booleans on PostgreSQL — are unit-tested on the compiled SQL, not on a real server.
+- A collection nested under another relation (`company.staff`) still fails closed with `ADAPTER_CONTRACT_VIOLATION`: hydrating three levels is not implemented. Root-level collections (`posts`) are supported.
+- `tsconfig.json` now sets `skipLibCheck` (matching `tsconfig.build.json`, which already did) because `drizzle-orm@1.0.0-rc.4` emits 44 errors in its own `.d.cts` under TypeScript 6. Revisit at the Drizzle 1.x GA.
 - The portability profile checker validates facts supplied by the caller, but there is not yet a trusted adapter-level collector/cache for PostgreSQL, MySQL, and SQL Server. Do not market this as a certified profile gate yet.
 - Prisma/Drizzle examples, package-consumer smoke tests, and public matrix/docs must match the CI state exactly.
 
