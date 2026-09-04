@@ -3,12 +3,17 @@ import { buildQueryPlan } from '@core/query-plan';
 import { compilePlan, executeCompiled } from '@infra/adapters/typeorm';
 import { normalizeResult } from '@core/result-normalizer';
 import { RULES_PRESETS } from '../../fixtures/rules';
-import { closeSqlite, openSqlite, repositoryFor } from './helpers';
-import { seedCorpus } from './seed';
+import { seedCorpus } from '../../fixtures/corpus-runner';
+import {
+  closeSqlite,
+  corpusEntities,
+  openSqlite,
+  repositoryFor,
+} from './helpers';
 
 beforeAll(async () => {
   const dataSource = await openSqlite();
-  await seedCorpus(dataSource);
+  await seedCorpus(dataSource, corpusEntities());
 }, 60_000);
 
 afterAll(closeSqlite);

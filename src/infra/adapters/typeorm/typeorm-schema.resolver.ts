@@ -79,12 +79,27 @@ const TYPE_MAP: Readonly<Record<string, ScalarKind>> = {
 const FOLDED_SUFFIX = '_folded';
 const PORTABLE_ORDER_SUFFIX = '_order';
 
+export interface SchemaResolverOptions {
+  /**
+   * Sobrescreve o tipo lógico de campos específicos, por model e path.
+   *
+   * O tipo lógico pertence ao domínio, não ao banco: MySQL não tem `uuid`
+   * nativo, e um `char(36)` que guarda UUID deve ser tratado como UUID nas
+   * três células da matriz. É a "extensão explícita do schema" do spec §9 — e
+   * continua sendo declaração, não inferência.
+   */
+  readonly fieldKinds?: Readonly<
+    Record<string, Readonly<Record<string, ScalarKind>>>
+  >;
+}
+
 /**
  * Deriva o registry de schemas lógicos a partir da metadata do repositório,
  * percorrendo transitivamente as relações (spec §9.1).
  */
 export function buildSchemaRegistry<T extends ObjectLiteral>(
-  repository: Repository<T>
+  repository: Repository<T>,
+  options: SchemaResolverOptions = {}
 ): SchemaRegistry {
   const registry = new Map<string, QuerySchema>();
   const pending: EntityMetadata[] = [repository.metadata];
@@ -94,7 +109,7 @@ export function buildSchemaRegistry<T extends ObjectLiteral>(
     const model = modelName(metadata);
     if (registry.has(model)) continue;
 
-    registry.set(model, describeEntity(metadata));
+    registry.set(model, describeEntity(metadata, options));
 
     for (const relation of metadata.relations) {
       pending.push(relation.inverseEntityMetadata);
@@ -109,7 +124,10 @@ export function modelName(metadata: EntityMetadata): string {
   return metadata.name.replace(/Entity$/, '').toLowerCase();
 }
 
-function describeEntity(metadata: EntityMetadata): QuerySchema {
+function describeEntity(
+  metadata: EntityMetadata,
+  options: SchemaResolverOptions
+): QuerySchema {
   const columnNames = new Set(
     metadata.columns.map((column) => propertyPath(column))
   );
@@ -121,7 +139,9 @@ function describeEntity(metadata: EntityMetadata): QuerySchema {
 
     const folded = `${path}${FOLDED_SUFFIX}`;
     const order = `${path}${PORTABLE_ORDER_SUFFIX}`;
-    const kind = resolveKind(metadata, column);
+    const kind =
+      options.fieldKinds?.[modelName(metadata)]?.[path] ??
+      resolveKind(metadata, column);
 
     return {
       path,

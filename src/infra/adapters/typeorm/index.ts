@@ -1,4 +1,8 @@
-export { buildSchemaRegistry, modelName } from './typeorm-schema.resolver';
+export {
+  buildSchemaRegistry,
+  modelName,
+  type SchemaResolverOptions,
+} from './typeorm-schema.resolver';
 export {
   planJoins,
   ROOT_ALIAS,

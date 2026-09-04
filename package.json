@@ -37,7 +37,10 @@
     "docs:dev": "pnpm --filter docs dev",
     "docs:build": "pnpm --filter docs build",
     "docs:start": "pnpm --filter docs start",
-    "verify:package": "sh scripts/verify-package.sh"
+    "verify:package": "sh scripts/verify-package.sh",
+    "db:up": "docker compose -f test/profiles/docker-compose.yml up -d --wait",
+    "db:down": "docker compose -f test/profiles/docker-compose.yml down -v",
+    "test:integration": "jest --config jest.integration.config.ts --runInBand"
   },
   "type": "commonjs",
   "main": "dist/index.cjs",
