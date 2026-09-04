@@ -106,10 +106,15 @@ function nestSearchTarget(
  * aqui, quando o *dialeto* não serve. Mesma forma, mesmo status — e nenhum
  * código novo no contrato de erros (§17.1).
  *
- * A recusa é por requisição, não na inicialização, porque as regras do corpus
- * permitem operador de padrão em 60 dos 66 casos: falhar na construção da
- * source tornaria o dialeto de referência do Prisma inútil para provar tudo o
- * que não é padrão.
+ * A recusa é por requisição, não na inicialização, porque a grande maioria dos
+ * casos do corpus não usa operador de padrão: falhar na construção da source
+ * tornaria o dialeto de referência do Prisma inútil para provar tudo o que não
+ * é padrão.
+ *
+ * Sem número aqui de propósito — esta frase já citou "60 dos 66" e envelheceu
+ * duas vezes enquanto o corpus crescia. A contagem exata dos casos que caem na
+ * recusa é asseverada pelo inventário de divergências em `corpus.spec.ts`, que
+ * quebra o build quando muda sem que alguém a atualize.
  */
 function literalPattern(
   value: string,
