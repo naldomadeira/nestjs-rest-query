@@ -98,7 +98,30 @@ function restrictToKeys<T extends ObjectLiteral>(
   );
 }
 
-/** Reimpoe a ordem decidida na primeira fase (spec §14). */
+/**
+ * Rede de segurança para a ordem decidida na primeira fase (spec §14) — e é
+ * rede, não o mecanismo.
+ *
+ * Quem impõe a ordem de verdade é o `ORDER BY` que o clone de hidratação
+ * herda do plano. Esta função só reordena quando consegue casar chave crua com
+ * chave hidratada, e as duas vêm de representações **diferentes**: a fase 1 lê
+ * por `getRawMany`, então recebe o valor do driver (`'2020-01-01 00:00:00.000'`
+ * para um datetime), enquanto a fase 2 lê por `getMany` e recebe a entidade
+ * hidratada (um `Date`, cujo `String()` é
+ * `'Tue Dec 31 2019 21:00:00 GMT-0300'`). Para PK inteira, uuid ou texto as
+ * duas formas coincidem e a rede funciona; para PK `datetime` ou binária,
+ * nenhuma linha é encontrada no mapa, todas empatam em
+ * `MAX_SAFE_INTEGER` e o `sort` estável devolve a ordem que já veio do banco.
+ *
+ * Alinhar as duas representações exigiria reintroduzir conhecimento de fuso e
+ * de codec por dialeto **aqui** — precisamente o que o perfil certificado
+ * existe para concentrar num lugar só. Então a escolha é deliberada: a rede
+ * cobre o caso comum, o `ORDER BY` cobre todos, e
+ * `composite-pagination.spec.ts` trava a ordem observável inclusive para PK
+ * datetime. Se algum dia a rede passar a ser load-bearing — por exemplo se um
+ * `customize` puder remover o `ORDER BY` da hidratação — este comentário deixa
+ * de valer e o alinhamento vira obrigatório.
+ */
 function reorderByKeys<T extends ObjectLiteral>(
   rows: readonly T[],
   primaryKey: readonly string[],
