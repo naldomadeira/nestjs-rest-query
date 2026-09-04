@@ -1,9 +1,12 @@
 ---
-title: Prisma Adapter
-description: Usar nestjs-rest-query com Prisma — grafo aninhado nativo, integração aditiva, sem mudança de contrato.
+title: Adapter Prisma
+description: Use o nestjs-rest-query com o Prisma - o client gerado passado direto, um manifesto escrito à mão e os operadores que dois dialetos não conseguem atender.
 ---
 
-O Prisma adapter permite usar `nestjs-rest-query` com Prisma. É **aditivo**: nenhuma mudança de API pública, o mesmo formato de query string que os outros adapters aceitam, e o resultado vem no shape nativo de grafo aninhado do Prisma.
+O adapter Prisma compila o plano de query em argumentos de `findMany`/`count`.
+Relação `many` usa `some`/`none`, relação `one` usa `is`/`isNot`, e o perfil
+textual portável consulta colunas dobradas, então `mode: 'insensitive'` nunca é
+emitido.
 
 ## Instalação
 
@@ -12,261 +15,231 @@ pnpm add @prisma/client
 pnpm add -D prisma
 ```
 
-Depois instale `nestjs-rest-query`:
+A faixa suportada é `^6.19.0 || ^7.0.0`. O alvo da matriz é o Prisma `7.8.0`
+(CLI e client na mesma versão), com o driver adapter oficial por dialeto.
 
-```bash
-pnpm add nestjs-rest-query
+## Três artefatos
+
+Não existe ferramenta que os derive. O generator que leria o `schema.prisma` é
+**lacuna declarada para a `3.1.0`**, então os três são escritos à mão e mantidos
+em par com o schema por revisão.
+
+### 1. O schema lógico de todo model alcançável
+
+```typescript title="query/schemas.ts"
+import { defineQuerySchema } from 'nestjs-rest-query';
+import type { QuerySchema, SchemaRegistry } from 'nestjs-rest-query';
+
+const postSchema: QuerySchema = defineQuerySchema({
+  model: 'post',
+  primaryKey: ['id'],
+  fields: [
+    {
+      path: 'id',
+      kind: 'uuid',
+      nullable: false,
+      primaryKey: true,
+      // Sem isto o endpoint é recusado na subida com CAPABILITY_UNAVAILABLE: o
+      // desempate de paginação é sempre sobre a chave primária, e uuid não tem
+      // ordem total portável.
+      portableOrderField: 'idOrder',
+    },
+    {
+      path: 'idOrder',
+      kind: 'string',
+      nullable: false,
+      primaryKey: false,
+      internal: true,
+    },
+    {
+      path: 'title',
+      kind: 'string',
+      nullable: false,
+      primaryKey: false,
+      foldedField: 'titleFolded',
+    },
+    {
+      path: 'titleFolded',
+      kind: 'string',
+      nullable: false,
+      primaryKey: false,
+      internal: true,
+    },
+    { path: 'content', kind: 'string', nullable: true, primaryKey: false },
+    { path: 'userId', kind: 'integer', nullable: false, primaryKey: false },
+    { path: 'createdAt', kind: 'datetime', nullable: false, primaryKey: false },
+  ],
+  relations: [
+    { path: 'user', target: 'user', cardinality: 'one', nullable: false },
+  ],
+});
+
+export const APP_SCHEMAS: SchemaRegistry = new Map([
+  ['company', companySchema],
+  ['user', userSchema],
+  ['post', postSchema],
+]);
 ```
 
 <Callout type="info">
-  `@prisma/client` é uma **peer dependency opcional**. Se você usa só TypeORM ou
-  Drizzle, não precisa instalar Prisma.
+  O `path` do campo é o nome da **propriedade do client**, não o da coluna — é
+  ele que vai no `where`/`select`/`orderBy` que o adapter monta. Com
+  `@map("name_folded")` no `schema.prisma`, a API HTTP fica camelCase e o banco
+  segue o snake_case do perfil certificado.
 </Callout>
 
-## Configuração do módulo
+### 2. O manifesto
 
-```typescript title="app.module.ts"
-import { Module } from '@nestjs/common';
-import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
-import { PrismaAdapter } from 'nestjs-rest-query/prisma';
+```typescript title="query/manifest.ts"
+import { createPrismaManifest } from 'nestjs-rest-query/prisma';
+import type { PrismaManifest } from 'nestjs-rest-query/prisma';
+import { APP_SCHEMAS } from './schemas';
 
-@Module({
-  imports: [
-    DynamicQueryBuilderModule.forRoot({
-      adapter: new PrismaAdapter(),
-      pagination: { defaultPerPage: 20, maxPerPage: 100 },
-    }),
-  ],
-})
-export class AppModule {}
-```
-
-## Definindo `PrismaSource`
-
-Cada endpoint Prisma passa um objeto `PrismaSource` para `queryBuilderService.execute()`. Esse objeto descreve:
-
-- **`prisma`** — a instância `PrismaClient` (ou um facade compatível)
-- **`model`** — a chave do delegate no client (`'user'`, `'company'`, `'post'`)
-- **`primaryKeyField`** (opcional) — campo PK da raiz, default `'id'`
-- **`relations`** (opcional) — metadata de relações para validar dotted paths e escolher entre `'one'` e `'many'`
-
-Note o que **não** existe aqui:
-
-- Sem `columnMap` — Prisma resolve nomes de campo via o client gerado pelo schema.
-- Sem coluna PK por relação — `primaryKeyField: string` basta porque `findMany` do Prisma já retorna linhas raiz sem precisar de dedup no client.
-
-```typescript title="users.business.ts"
-import { Injectable } from '@nestjs/common';
-import {
-  DynamicQueryDto,
-  PrismaSource,
-  QueryBuilderService,
-  QueryResult,
-  RulesConfig,
-} from 'nestjs-rest-query';
-import { PrismaService } from './prisma/prisma.service';
-
-@Injectable()
-export class UsersBusiness {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly qb: QueryBuilderService
-  ) {}
-
-  list(
-    query: DynamicQueryDto,
-    rules: RulesConfig
-  ): Promise<QueryResult<unknown>> {
-    const source: PrismaSource = {
-      prisma: this.prisma,
-      model: 'user',
-      primaryKeyField: 'id',
-      relations: {
-        company: { cardinality: 'one' },
-        posts: { cardinality: 'many' },
-      },
-    };
-    // `as never`: QueryBuilderService is typed against ObjectLiteral (TypeORM)
-    // for compatibility. At runtime the adapter is agnostic.
-    return this.qb.execute(source as never, query, rules);
-  }
-}
-```
-
-## O `relations` map é obrigatório para dotted paths
-
-Prisma conhece seu schema, mas o adapter intencionalmente **não** introspecta DMMF nem APIs internas do Prisma. Se uma query referencia um dotted path (`?filter[company.name][eq]=Acme`, `?includes=posts`), o hop precisa estar declarado em `PrismaSource.relations`.
-
-Se faltar:
-
-```
-Unknown relation 'company' in path 'company.name'. Declare it in PrismaSource.relations.
-```
-
-Use a forma aninhada para paths mais profundos:
-
-```typescript
-relations: {
-  company: {
-    cardinality: 'one',
-    relations: {
-      owner: { cardinality: 'one' },
-    },
+export const APP_MANIFEST: PrismaManifest = createPrismaManifest({
+  // Decide o dialeto e, com ele, o escape de padrão.
+  provider: 'postgresql',
+  registry: APP_SCHEMAS,
+  models: {
+    company: { delegate: 'company' }, // liga o model a prisma.company
+    user: { delegate: 'user' },
+    post: { delegate: 'post' },
   },
-  posts: { cardinality: 'many' },
-}
-```
-
-`primaryKeyField` por relação só é necessário quando o PK do model relacionado **não** é `'id'`. Default é `'id'`.
-
-## Semântica de dotted path: `'one'` vs `'many'`
-
-Por uma relação `'one'`, o adapter aninha um objeto simples:
-
-```http
-GET /users?filter[company.name][eq]=Acme
-```
-
-```ts
-where: {
-  company: {
-    name: {
-      equals: 'Acme';
-    }
-  }
-}
-```
-
-Por uma relação `'many'`, o adapter envolve cada hop `'many'` em `some` para preservar a semântica ("qualquer linha relacionada combina") que os outros adapters já têm:
-
-```http
-GET /users?filter[posts.title][ilike]=hello
-```
-
-```ts
-where: { posts: { some: { title: { contains: 'hello', mode: 'insensitive' } } } }
-```
-
-Cadeias profundas envolvem cada hop `'many'` independentemente:
-
-```http
-GET /users?filter[posts.tags.label][eq]=urgent
-```
-
-```ts
-where: {
-  posts: {
-    some: {
-      tags: {
-        some: {
-          label: {
-            equals: 'urgent';
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-## ORDER BY através de relação `'many'` é rejeitado
-
-```http
-GET /users?sort=-posts.createdAt
-```
-
-```
-Cannot sort by 'posts.createdAt': sorting through to-many relations is not supported.
-```
-
-Idêntico ao adapter Drizzle. Para ordenar arrays de relação, ordene-os na camada de aplicação depois do retorno do adapter.
-
-## `fields + includes` é constrained de propósito
-
-Prisma rejeita `select` e `include` no mesmo nível. Quando `fields` aparece, o adapter monta uma árvore `select` e reconcilia o estado de `include` para dentro dela — **sem** auto-expandir colunas escalares de relação:
-
-```http
-GET /users?fields=id,name&includes=company
-```
-
-```ts
-{
-  select: {
-    id: true,
-    name: true,
-    company: { select: { id: true } }, // PK only
-  },
-}
-```
-
-Para incluir `company.name`, opte explicitamente:
-
-```http
-GET /users?fields=id,name,company.name&includes=company
-```
-
-```ts
-{
-  select: {
-    id: true,
-    name: true,
-    company: { select: { id: true, name: true } },
-  },
-}
-```
-
-Isso evita qualquer dependência da metadata interna do Prisma e mantém o contrato previsível.
-
-## Forma do resultado — grafo aninhado nativo
-
-```http
-GET /users?includes=company,posts&page=1&perPage=2
-```
-
-```json
-{
-  "data": [
-    {
-      "id": "f1c4...",
-      "name": "Ana",
-      "email": "ana@acme.com",
-      "createdAt": "2024-01-15T10:00:00Z",
-      "company": { "id": "c1...", "name": "Acme" },
-      "posts": [{ "id": "p1...", "title": "Hello", "userId": "f1c4..." }]
-    }
-  ],
-  "page": 1,
-  "perPage": 2,
-  "total": 17,
-  "lastPage": 9
-}
-```
-
-Prisma hidrata arrays de relação nativamente — não há paginação em duas fases. `total` vem de `prisma.<model>.count({ where })` usando o mesmo `where` que `findMany`.
-
-## Diferenças em relação aos adapters TypeORM e Drizzle
-
-A mesma query string pode produzir comportamento ligeiramente diferente entre adapters. São diferenças documentadas, não bugs:
-
-- **`like` / `ilike` são literais.** Prisma `contains` não interpreta `%` ou `_` como wildcards SQL. O adapter não re-introduz wildcard parsing porque isso acoplaria o contrato a um dialeto SQL.
-- **`ilike` exige um provider Prisma que suporte `mode: 'insensitive'`.** Postgres e MongoDB suportam; **SQLite não**. Restrinja `OperatorsConfig.allowed` para excluir `ilike`/`notIlike` se você usa SQLite, ou espere erro em runtime do Prisma.
-- **`isNull` traduz diferente por tipo de leaf.** Campos escalares usam `{ not: null }`/`null`; campos de relação usam `{ isNot: null }`/`{ is: null }`. O adapter escolhe o shape correto automaticamente com base em `PrismaSource.relations` — mas se um hop está faltando, o adapter lança (em vez de gerar shape inválido em silêncio).
-- **Containers `AND: [...]` aparecem no `where` gerado.** Filtros repetidos sempre empilham sob um array `AND` no top-level. Equivalente a objetos mesclados na maioria dos casos, mas visualmente diferente no log do Prisma.
-
-## `customize` recebe o accumulator interno
-
-```typescript
-this.qb.execute(prismaSource as never, query, rules, (qb) => {
-  // `qb` is the internal PrismaQB accumulator:
-  //   { source, alias, where: { AND: [] }, orderBy, include?, select? }
-  qb.where.AND.push({ tenantId: 'tenant-1' });
 });
 ```
 
-Mutações são visíveis tanto para `findMany` quanto para `count` porque o adapter monta os argumentos **depois** do `customize` rodar. Use isso para escopo de tenant, filtros de soft-delete, ou flags nativas do Prisma que a query grammar REST não expõe.
+O `createPrismaManifest` valida o manifesto contra si mesmo na inicialização:
+model sem entrada no registry, ou sem `delegate`, falha com
+`SOURCE_CONFIGURATION_INVALID`. O delegate nomeado pelo manifesto é validado
+outra vez na construção da source — uma checagem que um tipo nunca poderia
+fazer aqui, porque o nome do delegate vem de dado, não de código.
+
+### 3. A source, por requisição
+
+```typescript title="users/users.business.ts"
+import { prismaSource } from 'nestjs-rest-query/prisma';
+
+async findAll(
+  query: DynamicQueryDto,
+  rules: CompiledQueryRules,
+): Promise<NormalizedQueryResult<object>> {
+  return this.queryBuilderService.execute(
+    prismaSource({
+      client: this.prisma,
+      model: 'user',
+      manifest: APP_MANIFEST,
+    }),
+    query,
+    rules,
+  );
+}
+```
+
+O `prismaSource({ client })` aceita o `PrismaClient` gerado **direto** — sem
+cast e sem fachada própria:
+
+```typescript title="prisma/prisma.service.ts"
+@Injectable()
+export class PrismaService extends PrismaClient {}
+```
+
+Vale dizer porque não era assim até a `3.0.0`: o `client` era tipado
+`Readonly<Record<string, PrismaDelegate>>`, e nenhum `PrismaClient` real
+satisfazia esse tipo — classe não recebe index signature implícita em
+TypeScript, então todo consumidor precisava de uma afirmação.
+
+O `prismaSource` fixa o tipo da linha em `object`; só o `typeormSource` é
+genérico no row, então anote `Promise<NormalizedQueryResult<object>>` em vez de
+usar cast.
+
+## Operadores recusados, por provider
+
+Esta é a **única divergência declarada** da v3. Sob a gramática da v3, `%`, `_` e
+`\` são caracteres literais: `filter[name][like]=100%` procura o texto "100%". O
+TypeORM e o Drizzle emitem `LIKE ... ESCAPE`, então honram isso diretamente. O
+Prisma compila `contains` para `LIKE ('%' || ? || '%')` **sem cláusula
+`ESCAPE`**, e o client tipado não expõe forma de fornecê-la. Sobra apenas o
+caractere de escape default do dialeto, o que divide os providers em dois:
+
+| `provider`            | `like`, `notLike`, `ilike`, `notIlike`, `search`                     | Por quê                                                                                                                |
+| --------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `postgresql`, `mysql` | **Funcionam, e `%`/`_` são literais** — idêntico a TypeORM e Drizzle | `\` é o escape default do `LIKE` no dialeto, então escapar o valor basta                                               |
+| `sqlite`, `sqlserver` | **Recusados: `400 CAPABILITY_UNAVAILABLE`**                          | sem caractere de escape default, a literalidade não pode ser honrada — recusar é melhor que devolver as linhas erradas |
+
+A recusa é por requisição, não na inicialização, então o resto da gramática
+continua utilizável nesses dialetos. Declarar o `provider` errado no manifesto é,
+portanto, a diferença entre um endpoint correto e um endpoint silenciosamente
+errado.
+
+Medido no Prisma `7.8.0` + PostgreSQL pelo
+[`04-app-with-prisma`](https://github.com/naldomadeira/nestjs-rest-query/tree/main/apps/examples/04-app-with-prisma):
+`GET /posts?filter[title][like]=100%25` devolve só "Desconto de 100% na conta de
+luz", e `filter[title][like]=a_b` devolve só "Circuito a_b revisado" — os
+metacaracteres são literais.
+
+Se você está migrando um consumidor Prisma em **SQL Server**, esta é a parte
+quebrada: cinco operadores deixam de existir. Planeje.
+
+## O que o Prisma não verifica
+
+O `PrismaAdapter.describe()` devolve o schema do manifesto na íntegra. Então
+**nada compara o seu schema lógico com o `schema.prisma` nem com o banco**: um
+nome de campo errado aparece como erro do Prisma na primeira requisição que o
+tocar, onde o caminho do TypeORM teria falhado na subida. A garantia de
+"metadado ausente falha fechado" não se estende ao Prisma.
+
+## O `customize` recebe os argumentos da query
+
+O contexto nativo é uma query por vez, marcada com qual delas é:
+
+```typescript
+await this.queryBuilderService.execute(
+  prismaSource({ client: this.prisma, model: 'user', manifest: APP_MANIFEST }),
+  query,
+  rules,
+  {
+    customize: (native) => {
+      // native: { kind: 'data' | 'count', args }
+      native.args.where = { AND: [native.args.where ?? {}, { tenantId }] };
+    },
+    customizeScope: 'both',
+  }
+);
+```
+
+Ser chamado uma vez por query — em vez de receber as duas juntas — é o que faz o
+`'both'`, o default seguro, realmente atingir dados e contagem.
+
+## Prisma 7, se você vem da 6
+
+Seis coisas mudam e nenhuma é opcional:
+
+1. **`url` saiu do `datasource`.** Manter o schema da v2 faz a geração falhar com
+   `P1012: The datasource property 'url' is no longer supported in schema files`.
+   As URLs de conexão para CLI/Migrate vão para o `prisma.config.ts`; o client
+   recebe a conexão de um driver adapter.
+2. **O generator mudou.** `provider = "prisma-client-js"` vira `prisma-client`,
+   com `output` e `moduleFormat` **obrigatórios**, e o client deixa de existir em
+   `@prisma/client`: `import { PrismaClient } from '@prisma/client'` passa a ser
+   `TS2305: Module '"@prisma/client"' has no exported member 'PrismaClient'`.
+3. **`new PrismaClient()` precisa de driver adapter.** Adicione o adapter do seu
+   dialeto na mesma major do client (`@prisma/adapter-pg`) mais o driver (`pg`),
+   e passe `{ adapter: new PrismaPg({ connectionString }) }` ao construtor.
+4. **O client gerado é TypeScript de verdade**, não `.d.ts`. Gerar fora do
+   `rootDir` do build quebra o `nest build` com `TS6059`. Gere dentro de `src`
+   (`output = "../src/generated/prisma"`).
+5. **O runtime do Prisma 7 se carrega por `import()` dinâmico**, então qualquer
+   runner Jest que o toque precisa de `NODE_OPTIONS=--experimental-vm-modules`. A
+   receita ESM do ts-jest (`useESM: true` + `extensionsToTreatAsEsm`) **falha**
+   contra o client gerado com `ReferenceError: exports is not defined`; o que
+   funciona é ts-jest em CommonJS **mais** a flag.
+6. **O `.env` não é mais lido pelo Prisma** (consequência do item 1): carregue
+   `dotenv` e valide a `DATABASE_URL` você mesmo.
 
 ## Próximos passos
 
-- Para um guia completo de parâmetros, operadores e whitelist, veja [Guia de Uso](/docs/usage).
-- A [página do adapter Drizzle](/docs/adapters/drizzle) explica os mesmos conceitos por outro ângulo de ORM.
-- Se quiser implementar seu próprio adapter, veja [Escrevendo seu próprio](/docs/adapters/writing-your-own).
+- [Guia de Uso](/pt-BR/docs/usage) para todos os parâmetros, operadores e
+  códigos de erro.
+- [Visão geral dos adapters](/pt-BR/docs/adapters) para a tabela completa de
+  divergências.
+- O [guia de migração completo](https://github.com/naldomadeira/nestjs-rest-query/blob/main/MIGRATION.md#prisma-specifics)
+  para o caminho `2.x` → `3.x`.

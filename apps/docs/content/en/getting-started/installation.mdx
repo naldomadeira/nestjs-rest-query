@@ -17,6 +17,29 @@ npm install nestjs-rest-query
 yarn add nestjs-rest-query
 ```
 
+<Callout type="warn">
+  The `3.x` API these pages describe is not on npm yet — `2.1.0` is the latest
+  published version. Until `3.0.0` ships, the code here matches the repository's
+  `main`-line source and the four example applications, not the tarball you get
+  from the command above.
+</Callout>
+
+Then install the ORM you use. All ORM peers are optional and the root
+entrypoint loads none of them, so you install exactly one:
+
+```bash tab="TypeORM"
+pnpm add typeorm @nestjs/typeorm
+```
+
+```bash tab="Prisma"
+pnpm add @prisma/client
+pnpm add -D prisma
+```
+
+```bash tab="Drizzle"
+pnpm add drizzle-orm postgres
+```
+
 ## Configure bootstrap
 
 Three adjustments are required in `main.ts` for the library to work correctly.
@@ -27,7 +50,11 @@ Three adjustments are required in `main.ts` for the library to work correctly.
 app.set('query parser', 'extended');
 ```
 
-Express 5 changed the default query parser from `qs` (extended) to `simple`. The library expects parameters like `?filter[name][eq]=foo` to be expanded into nested objects by the framework before reaching the controller — that only happens with the `extended` parser.
+Express 5 changed the default query parser from `qs` (extended) to `simple`.
+The library expects parameters like `?filter[name][eq]=foo` to be expanded into
+nested objects by the framework before reaching the controller — that only
+happens with the `extended` parser. Without it a filter is silently accepted and
+never applied.
 
 ### 2. ValidationPipe with implicit conversion
 
@@ -42,7 +69,9 @@ app.useGlobalPipes(
 );
 ```
 
-The DTO uses `string` for fields like `page` and `perPage`. `enableImplicitConversion: true` instructs `class-transformer` to convert those values to the expected types automatically, without requiring additional decorators in the DTO.
+`DynamicQueryDto` types `page`, `perPage` and `paginate` as `string`, because
+that is what arrives on the wire. The library parses and validates them itself —
+`?page=abc` is a `400 PAGINATION_INVALID`, never a silent fallback to page 1.
 
 ### 3. Swagger interceptor (optional)
 
@@ -56,7 +85,11 @@ SwaggerModule.setup('/', app, document, {
 });
 ```
 
-Swagger UI serializes filters as multiple query params (`filter[name][eq]=foo`). Without the interceptor, the browser sends those parameters in a way that Express may not preserve the bracket notation correctly. `dqbSwaggerRequestInterceptor` rewrites the URL before sending the request, ensuring the filters reach the controller in the expected format.
+Swagger UI serializes filters as multiple query params
+(`filter[name][eq]=foo`). Without the interceptor, the browser sends those
+parameters in a way that Express may not preserve the bracket notation
+correctly. `dqbSwaggerRequestInterceptor` rewrites the URL before sending the
+request, ensuring the filters reach the controller in the expected format.
 
 <Callout type="info">
   This interceptor is only necessary to test filters through the Swagger UI.
@@ -92,7 +125,7 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(
     app,
-    new DocumentBuilder().setTitle('Minha API').setVersion('1.0').build()
+    new DocumentBuilder().setTitle('My API').setVersion('1.0').build()
   );
 
   SwaggerModule.setup('/', app, document, {
@@ -108,7 +141,8 @@ bootstrap();
 
 ## Register the module
 
-Import `DynamicQueryBuilderModule` in the root `AppModule` with `forRoot`. All options are **optional** — without configuration, the library uses the default values:
+Import `DynamicQueryBuilderModule` in the root `AppModule` with `forRoot`. Every
+option is **optional** — `forRoot({})` gives you the defaults:
 
 ```typescript title="app.module.ts"
 import { Module } from '@nestjs/common';
@@ -117,79 +151,110 @@ import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
 @Module({
   imports: [
     DynamicQueryBuilderModule.forRoot({
-      // all options are optional
+      pagination: { defaultPerPage: 10, maxPerPage: 100 },
     }),
   ],
 })
 export class AppModule {}
 ```
 
-The module is `@Global`, so you do not need to import it in feature modules — `QueryBuilderService` becomes available across the entire application automatically.
+The module is `@Global`, so you do not need to import it in feature modules —
+`QueryBuilderService` becomes available across the entire application
+automatically.
+
+<Callout type="warn" title="No adapter here">
+
+`forRoot` configures common policy only. There is no `adapter` option and no
+implicit default adapter: the adapter is decided by the **source** you pass to
+`execute()`. Passing `adapter` or `operators` is refused at startup with
+`SOURCE_CONFIGURATION_INVALID` and the message
+`forRoot no longer accepts "adapter"; see the "2.x → 3.x" section of MIGRATION.md`.
+
+</Callout>
 
 ## Configuration options
 
-`forRoot` accepts a `QueryBuilderConfig` object. All properties are optional.
+`forRoot` accepts a `QueryBuilderConfigV3` object.
 
 ### `pagination`
 
-Controls the default pagination behavior.
+| Option           | Type     | Default | Description                                                     |
+| ---------------- | -------- | ------- | --------------------------------------------------------------- |
+| `defaultPerPage` | `number` | `20`    | Items per page when the request carries no `perPage`.           |
+| `maxPerPage`     | `number` | `100`   | Upper bound. A larger `perPage` is a `400`, not a silent clamp. |
 
-| Option           | Type     | Default | Description                                                                  |
-| ---------------- | -------- | ------- | ---------------------------------------------------------------------------- |
-| `defaultPerPage` | `number` | `10`    | Number of items per page when `perPage` is not provided in the request.      |
-| `maxPerPage`     | `number` | `100`   | Maximum number of items per page, ignoring larger values sent by the client. |
+Both are validated at startup: `defaultPerPage` below `1`, or a `maxPerPage`
+smaller than `defaultPerPage`, throws `SOURCE_CONFIGURATION_INVALID` while the
+module loads.
 
-### `operators`
-
-Restricts the allowed filter operators globally in the application.
-
-| Option    | Type              | Default     | Description                                                                              |
-| --------- | ----------------- | ----------- | ---------------------------------------------------------------------------------------- |
-| `allowed` | `QueryOperator[]` | all allowed | List of accepted operators. `undefined` = all. `[]` (empty list) = no operators allowed. |
-
-```typescript
-DynamicQueryBuilderModule.forRoot({
-  operators: {
-    allowed: ['eq', 'like', 'in', 'between'],
-  },
-});
-```
-
-You can also override this per endpoint with `RulesConfig.operators`; when present, the endpoint value wins over the global `forRoot` setting for that route.
-
-```typescript
-@ApiDynamicQuery({
-  filters: ['name', 'status'],
-  operators: { allowed: ['eq', 'ilike'] },
-})
-list(@Query() query: DynamicQueryDto, @QueryRules() rules: RulesConfig) {
-  return this.service.list(query, rules);
-}
-```
-
-If the endpoint explicitly sets `operators: {}`, it resets that route to all operators allowed.
+<Callout type="info">
+  `defaultPerPage` was `10` in `2.x` and is `20` in `3.x`. Pin it explicitly if
+  your clients depend on the old page size.
+</Callout>
 
 ### `logging`
 
-Enables and configures internal query-building logs.
-
-| Option    | Type                                     | Default       | Description                                                                        |
-| --------- | ---------------------------------------- | ------------- | ---------------------------------------------------------------------------------- |
-| `enabled` | `boolean`                                | `false`       | Enables internal logs.                                                             |
-| `level`   | `'error' \| 'warn' \| 'info' \| 'debug'` | `'info'`      | Minimum emitted log level.                                                         |
-| `logger`  | `LoggerLike`                             | NestJS Logger | Custom logger. Any object with `error/warn/log/debug` works (winston, pino, etc.). |
+| Option         | Type                                     | Default       | Description                                                              |
+| -------------- | ---------------------------------------- | ------------- | ------------------------------------------------------------------------ |
+| `enabled`      | `boolean`                                | `false`       | Enables internal logs.                                                   |
+| `level`        | `'error' \| 'warn' \| 'info' \| 'debug'` | `'info'`      | Minimum emitted level.                                                   |
+| `redactValues` | `boolean`                                | `true`        | Redacts filter and search values before logging.                         |
+| `logger`       | `LoggerLike`                             | NestJS Logger | Any object with `error`/`warn`/`log`/`debug` works (winston, pino, ...). |
 
 ```typescript
 DynamicQueryBuilderModule.forRoot({
-  logging: {
-    enabled: true,
-    level: 'debug',
-  },
+  logging: { enabled: true, level: 'debug' },
 });
 ```
 
+The plan log at `debug` carries metadata only — paths, operators, counts,
+pagination — never the values the client sent.
+
+### `portability`
+
+| Option    | Type      | Default | Description                                                            |
+| --------- | --------- | ------- | ---------------------------------------------------------------------- |
+| `enforce` | `boolean` | `false` | Requires the source to carry certified profile facts, and checks them. |
+
+With `enforce: true`, a source built without `portabilityProfile` is refused
+with `PORTABILITY_PROFILE_MISMATCH`, and so is a profile whose dialect does not
+match the adapter's or that fails `checkPortabilityProfile()`. Collect the facts
+once at startup with `collectProfileFacts()` and hand them to the source
+factory — the request path never queries catalogs.
+
+### `consistency`
+
+| Option        | Type                            | Default      |
+| ------------- | ------------------------------- | ------------ |
+| `consistency` | `'eventual' \| 'transactional'` | `'eventual'` |
+
+<Callout type="warn">
+  **No shipped adapter supports `'transactional'` today.** TypeORM, Prisma and
+  Drizzle all report `transactionalConsistency: false`, so setting it makes
+  every request fail early with `CAPABILITY_UNAVAILABLE` rather than run data
+  and count under different snapshots. Leave it at `'eventual'`.
+</Callout>
+
+### `textProfile`
+
+| Option        | Type                                     | Default             |
+| ------------- | ---------------------------------------- | ------------------- |
+| `textProfile` | `'portable-strict' \| 'database-native'` | `'portable-strict'` |
+
+Under `portable-strict`, `ilike`, `notIlike` and `search` compare a declared
+folded column against a folded term, so no `ILIKE` and no
+`mode: 'insensitive'` is ever emitted.
+
+<Callout type="info">
+  Treat `'database-native'` as reserved. The value travels on the plan, but no
+  adapter reads it: folding is applied by the core either way. Its only
+  observable effect today is that the `portability.enforce` check is skipped.
+</Callout>
+
 ## Next steps
 
-With the module registered, inject `QueryBuilderService` into any provider and start building dynamic queries from HTTP request parameters.
+With the module registered, inject `QueryBuilderService` into any provider,
+declare a schema and endpoint rules, and pass a source to `execute()`.
 
-If you want to start from zero with a real endpoint, continue to [First endpoint](/docs/getting-started/first-endpoint). To understand the OpenAPI integration, see [Swagger](/docs/swagger).
+Continue to [First endpoint](/docs/getting-started/first-endpoint) for a working
+route end to end, or [Adapters](/docs/adapters) to see what each ORM needs.
