@@ -113,17 +113,19 @@ import { typeormSource } from 'nestjs-rest-query/typeorm';
 await this.queryService.execute(typeormSource(repository), query, rules, {
   // Hook comum a todos os adapters: tenant, soft delete, políticas internas.
   transformPlan: (plan) => plan,
-  // Hook específico do adapter, para capacidades fora do contrato REST.
-  customize: (compiled) => {
-    compiled.data.andWhere('root.tenant_id = :tenant', { tenant });
+  // Hook específico do adapter: recebe o SelectQueryBuilder tipado.
+  customize: (qb) => {
+    qb.andWhere('root.tenant_id = :tenant', { tenant });
   },
   customizeScope: 'both',
 });
 ```
 
 `customize` declara se afeta `data`, `count` ou ambos; o default seguro é
-`both`. Um escopo parcial gera warning estruturado, porque o count pode passar
-a descrever uma pergunta diferente da dos dados.
+`both`. O callback é invocado **uma vez por query do escopo**, então um único
+`andWhere` com `both` entra nas duas. Um escopo parcial gera warning
+estruturado, porque o count pode passar a descrever uma pergunta diferente da
+dos dados.
 
 ## 4. Coerção de valores
 

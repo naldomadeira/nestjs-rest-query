@@ -56,27 +56,43 @@ describe('TypeOrmAdapter', () => {
     expect(compiled.count).toBeDefined();
   });
 
-  it('customize com escopo both entrega o contexto inteiro', () => {
+  it('customize com escopo both atinge data e count', () => {
     const plan = buildQueryPlan({}, RULES_PRESETS['user.default']);
     const compiled = adapter.compile(plan, input());
 
-    let received: unknown;
-    adapter.customize(compiled, (value) => (received = value));
-    expect(received).toBe(compiled);
+    const received: unknown[] = [];
+    adapter.customize(compiled, (native) => received.push(native));
+    expect(received).toEqual([compiled.data, compiled.count]);
   });
 
-  it('customize com escopo count aponta as duas pontas para o count', () => {
+  it('um único andWhere no escopo both entra nas duas queries', () => {
     const plan = buildQueryPlan({}, RULES_PRESETS['user.default']);
     const compiled = adapter.compile(plan, input());
 
-    adapter.customize(
-      compiled,
-      (value) => {
-        expect(value.data).toBe(compiled.count);
-        expect(value.count).toBe(compiled.count);
-      },
-      'count'
+    adapter.customize(compiled, (qb) =>
+      qb.andWhere('root.active = :tenant', { tenant: true })
     );
+
+    expect(compiled.data.getQuery()).toMatch(/"?root"?\."?active"? = :tenant/);
+    expect(compiled.count.getQuery()).toMatch(/"?root"?\."?active"? = :tenant/);
+  });
+
+  it('customize com escopo count só toca a query de contagem', () => {
+    const plan = buildQueryPlan({}, RULES_PRESETS['user.default']);
+    const compiled = adapter.compile(plan, input());
+
+    const received: unknown[] = [];
+    adapter.customize(compiled, (native) => received.push(native), 'count');
+    expect(received).toEqual([compiled.count]);
+  });
+
+  it('customize com escopo data só toca a query de dados', () => {
+    const plan = buildQueryPlan({}, RULES_PRESETS['user.default']);
+    const compiled = adapter.compile(plan, input());
+
+    const received: unknown[] = [];
+    adapter.customize(compiled, (native) => received.push(native), 'data');
+    expect(received).toEqual([compiled.data]);
   });
 
   it('typeormSource produz a source discriminada', () => {

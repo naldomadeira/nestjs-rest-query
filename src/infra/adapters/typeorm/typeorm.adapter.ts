@@ -1,4 +1,4 @@
-import type { ObjectLiteral, Repository } from 'typeorm';
+import type { ObjectLiteral, Repository, SelectQueryBuilder } from 'typeorm';
 import type {
   AdapterCapabilities,
   AdapterResult,
@@ -53,7 +53,8 @@ export class TypeOrmAdapter<
 > implements RestQueryAdapterV3<
   TypeOrmSourceInput<T>,
   CompiledTypeOrmQuery<T>,
-  T
+  T,
+  SelectQueryBuilder<T>
 > {
   readonly id = 'typeorm' as const;
 
@@ -94,20 +95,19 @@ export class TypeOrmAdapter<
 
   customize(
     compiled: CompiledTypeOrmQuery<T>,
-    callback: (value: CompiledTypeOrmQuery<T>) => void,
+    callback: (native: SelectQueryBuilder<T>) => void,
     scope: CustomizeScope = 'both'
   ): void {
-    // O callback recebe o contexto inteiro; o escopo diz quais query builders
-    // ele pode tocar. `both` é o default seguro (spec §16).
-    callback(
-      scope === 'both'
-        ? compiled
-        : ({
-            ...compiled,
-            data: scope === 'data' ? compiled.data : compiled.count,
-            count: scope === 'count' ? compiled.count : compiled.data,
-          } as CompiledTypeOrmQuery<T>)
-    );
+    // Uma invocação por query do escopo: é o que faz `both`, o default seguro,
+    // atingir data e count com um único `qb.andWhere(...)` (spec §16).
+    const targets =
+      scope === 'data'
+        ? [compiled.data]
+        : scope === 'count'
+          ? [compiled.count]
+          : [compiled.data, compiled.count];
+
+    for (const query of targets) callback(query);
   }
 
   execute(compiled: CompiledTypeOrmQuery<T>): Promise<AdapterResult<T>> {
@@ -127,13 +127,19 @@ const sharedAdapter = new TypeOrmAdapter<ObjectLiteral>();
  */
 export function typeormSource<T extends ObjectLiteral>(
   repository: Repository<T>
-): QuerySource<TypeOrmSourceInput<T>, CompiledTypeOrmQuery<T>, T> {
+): QuerySource<
+  TypeOrmSourceInput<T>,
+  CompiledTypeOrmQuery<T>,
+  T,
+  SelectQueryBuilder<T>
+> {
   return {
     kind: 'typeorm',
     adapter: sharedAdapter as unknown as RestQueryAdapterV3<
       TypeOrmSourceInput<T>,
       CompiledTypeOrmQuery<T>,
-      T
+      T,
+      SelectQueryBuilder<T>
     >,
     input: { repository },
   };
