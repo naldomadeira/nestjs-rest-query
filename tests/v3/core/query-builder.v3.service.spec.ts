@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { QueryBuilderService } from '@core/query-builder.v3.service';
 import { calls, fakeSource } from '../fixtures/fake-adapter';
 import { RULES_PRESETS } from '../fixtures/rules';
+import { defineQuerySchema } from '@core/schema';
 
 const rules = RULES_PRESETS['user.default'];
 
@@ -126,6 +127,51 @@ describe('QueryBuilderService (v3)', () => {
     await expect(
       service.execute(fakeSource(), {}, rules)
     ).resolves.toBeDefined();
+  });
+
+  it('valida a source descrita pelo adapter antes de compilar', async () => {
+    const service = new QueryBuilderService({});
+    await service.execute(fakeSource(), {}, rules);
+
+    expect(calls.map((call) => call.kind)).toEqual([
+      'describe',
+      'compile',
+      'execute',
+    ]);
+  });
+
+  it('falha fechado quando o model físico da source não corresponde às regras', async () => {
+    const service = new QueryBuilderService({});
+    const wrongSchema = defineQuerySchema({
+      model: 'company',
+      primaryKey: ['id'],
+      fields: [
+        { path: 'id', kind: 'integer', nullable: false, primaryKey: true },
+      ],
+      relations: [],
+    });
+
+    await expect(
+      service.execute(fakeSource({}, wrongSchema), {}, rules)
+    ).rejects.toThrow(
+      expect.objectContaining({
+        response: expect.objectContaining({
+          code: 'SOURCE_CONFIGURATION_INVALID',
+        }),
+      })
+    );
+    expect(calls.map((call) => call.kind)).toEqual(['describe']);
+  });
+
+  it('reaproveita a validação da mesma source em execuções seguintes', async () => {
+    const service = new QueryBuilderService({});
+    const source = fakeSource();
+
+    await service.execute(source, {}, rules);
+    await service.execute(source, {}, rules);
+
+    expect(calls.filter((call) => call.kind === 'describe')).toHaveLength(1);
+    expect(calls.filter((call) => call.kind === 'compile')).toHaveLength(2);
   });
 
   it('converte erro de input em BadRequestException com o envelope', async () => {
