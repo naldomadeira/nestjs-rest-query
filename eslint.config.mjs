@@ -17,5 +17,14 @@ export default [
       '@typescript-eslint/no-explicit-any': 'warn',
     },
   },
-  { ignores: ['node_modules/*', 'dist/*', 'coverage/*', 'apps/examples/*'] },
+  {
+    ignores: [
+      'node_modules/*',
+      'dist/*',
+      'coverage/*',
+      'apps/examples/*',
+      // Client Prisma gerado pelo harness do corpus, não é código do projeto.
+      'tests/v3/adapters/prisma/generated/*',
+    ],
+  },
 ];
