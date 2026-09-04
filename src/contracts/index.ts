@@ -1,12 +1,4 @@
 export type { QueryInput } from './query-input.interface';
 export type { QueryResult } from './query-result.interface';
-export type {
-  QueryBuilderConfig,
-  PaginationConfig,
-  OperatorsConfig,
-  LoggingConfig,
-} from './query-builder-config.interface';
-export type { RulesConfig } from './rules-config.interface';
-export type { RestQueryAdapter } from './rest-query-adapter.interface';
-export type { PrismaSource, PrismaRelation } from './prisma-source.interface';
-export * as ErrorMessages from './error-messages';
+export type { LoggerLike } from './query-builder-config.interface';
+export * from './v3';

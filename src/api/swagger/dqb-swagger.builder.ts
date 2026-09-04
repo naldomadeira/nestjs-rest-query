@@ -1,5 +1,5 @@
-import { RulesConfig } from '@contracts/rules-config.interface';
 import { QueryOperator } from '@domain/operators/operator.types';
+import type { SwaggerRulesView } from './swagger-rules-view';
 import { DQB_SWAGGER_EXTENSION_KEY } from './swagger.interceptor';
 
 type ApiQueryFn = (typeof import('@nestjs/swagger'))['ApiQuery'];
@@ -16,7 +16,7 @@ try {
   // @nestjs/swagger nao instalado — Swagger docs desabilitado
 }
 
-function buildOperatorsTable(operators: QueryOperator[]): string {
+function buildOperatorsTable(operators: readonly QueryOperator[]): string {
   const COLS = 4;
   const header =
     Array(COLS)
@@ -37,8 +37,8 @@ function buildOperatorsTable(operators: QueryOperator[]): string {
 }
 
 export function buildDQBSwaggerDecorators(
-  rules: RulesConfig,
-  operators: QueryOperator[]
+  rules: SwaggerRulesView,
+  operators: readonly QueryOperator[]
 ): MethodDecorator[] {
   if (!ApiQuery || !ApiExtension) return [];
 
