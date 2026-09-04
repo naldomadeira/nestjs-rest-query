@@ -91,7 +91,7 @@ function assertNoRemovedKeys(config: QueryBuilderConfigV3): void {
     if (Object.prototype.hasOwnProperty.call(config, key)) {
       throw configurationError(
         'SOURCE_CONFIGURATION_INVALID',
-        `forRoot no longer accepts "${key}"; see the v2 to v3 migration guide`,
+        `forRoot no longer accepts "${key}"; see the "2.x → 3.x" section of MIGRATION.md`,
         { key }
       );
     }
