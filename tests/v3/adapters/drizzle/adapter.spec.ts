@@ -16,6 +16,7 @@ import { RULES_PRESETS } from '../../fixtures/rules';
 import { CORPUS_SCHEMAS } from '../../fixtures/schemas';
 import {
   companiesTable,
+  postsTable,
   userRelations,
   usersTable,
 } from '../../fixtures/drizzle-tables';
@@ -472,10 +473,71 @@ describe('DrizzleAdapter compile', () => {
     expect(count.where).toEqual(data.where);
   });
 
-  it('falha fechado ao projetar através de relação many', () => {
-    expect(() =>
-      compile({ includes: 'posts', fields: 'id,posts.title' }, 'user.deep')
-    ).toThrow('cannot project through the to-many relation posts');
+  it('tira a relação many do statement e a hidrata em separado', () => {
+    const { data } = compile(
+      { includes: 'posts', fields: 'id,posts.title' },
+      'user.deep'
+    );
+
+    expect(data.joins).toEqual([]);
+    expect(data.select).toEqual([{ alias: 'users', column: 'id', path: '' }]);
+    expect(data.manyProjections).toEqual([
+      {
+        path: 'posts',
+        table: 'posts',
+        sourceColumn: 'id',
+        targetColumn: 'user_id',
+        columns: ['id', 'title', 'user_id'],
+        orderBy: ['id'],
+      },
+    ]);
+  });
+
+  it('seleciona a coluna de correlação mesmo quando o cliente não a pediu', () => {
+    const { data } = compile(
+      { includes: 'posts', fields: 'name,posts.title' },
+      'user.deep'
+    );
+
+    // `posts` correlaciona por `users.id`, que não está em `fields`.
+    expect(data.select).toContainEqual({
+      alias: 'users',
+      column: 'id',
+      path: '',
+    });
+  });
+
+  it('falha fechado ao projetar uma coleção aninhada em outra relação', () => {
+    const nested = drizzleSource({
+      db: db(),
+      dialect: 'postgres',
+      table: usersTable,
+      relations: {
+        ...userRelations,
+        'company.staff': {
+          target: postsTable,
+          cardinality: 'many',
+          nullable: true,
+          sourceColumn: 'id',
+          targetColumn: 'user_id',
+        },
+      },
+    }).input;
+    const plan = buildQueryPlan(
+      { includes: 'company,company.owner', fields: 'id,company.owner.name' },
+      RULES_PRESETS['user.deep']
+    );
+    const withNestedMany = {
+      ...plan,
+      internalProjection: {
+        root: plan.internalProjection.root,
+        relations: new Map([['company.staff', ['id']]]),
+      },
+    };
+
+    expect(() => new DrizzleAdapter().compile(withNestedMany, nested)).toThrow(
+      'cannot project the nested to-many relation company.staff'
+    );
   });
 
   it('falha fechado quando a relação do plano não foi declarada na source', () => {
@@ -524,7 +586,9 @@ describe('scalarCondition', () => {
     ['lt', '<'],
     ['lte', '<='],
   ] as const)('mapeia %s para o comparador %s', (operator, comparator) => {
-    expect(scalarCondition(ref, filterWith({ operator }), '!')).toEqual({
+    expect(
+      scalarCondition(ref, filterWith({ operator }), '!', 'postgres')
+    ).toEqual({
       op: 'compare',
       ref,
       comparator,
@@ -534,7 +598,12 @@ describe('scalarCondition', () => {
 
   it.each(['notIn', 'in'] as const)('mapeia %s para lista', (operator) => {
     expect(
-      scalarCondition(ref, filterWith({ operator, value: [1, 2] }), '!')
+      scalarCondition(
+        ref,
+        filterWith({ operator, value: [1, 2] }),
+        '!',
+        'postgres'
+      )
     ).toEqual({ op: operator, ref, values: [1, 2] });
   });
 
@@ -542,7 +611,12 @@ describe('scalarCondition', () => {
     'nega o padrão em %s',
     (operator) => {
       expect(
-        scalarCondition(ref, filterWith({ operator, value: 'a%' }), '!')
+        scalarCondition(
+          ref,
+          filterWith({ operator, value: 'a%' }),
+          '!',
+          'postgres'
+        )
       ).toEqual({
         op: 'like',
         ref,
@@ -558,7 +632,8 @@ describe('scalarCondition', () => {
       scalarCondition(
         ref,
         filterWith({ operator: 'search' as PlanFilter['operator'] }),
-        '!'
+        '!',
+        'postgres'
       )
     ).toThrow('Drizzle adapter cannot compile operator search');
   });
