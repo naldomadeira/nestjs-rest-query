@@ -1,6 +1,7 @@
 {
   "name": "nestjs-rest-query",
   "version": "2.1.0",
+  "packageManager": "pnpm@9.15.9",
   "description": "Declarative, whitelist-first REST query params for NestJS, with a canonical semantic core shared by every ORM adapter.",
   "keywords": [
     "nestjs",
