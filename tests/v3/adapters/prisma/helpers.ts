@@ -94,11 +94,15 @@ const TABLES: readonly TableSpec[] = [
 let client: PrismaClient | undefined;
 
 export function openSqlite(): PrismaClientLike {
-  if (client) return client as unknown as PrismaClientLike;
+  // Sem cast: `PrismaClientLike` é `object`, e o delegate é validado em
+  // runtime por `prismaSource`. Era aqui que o `as unknown as` escondia o
+  // fato de que nenhum `PrismaClient` real satisfazia o tipo publicado — o
+  // mesmo defeito que o exemplo 04 encontrou do lado do consumidor.
+  if (client) return client;
 
   const adapter = new PrismaBetterSqlite3({ url: ':memory:' });
   client = new PrismaClient({ adapter });
-  return client as unknown as PrismaClientLike;
+  return client;
 }
 
 export async function seedSqlite(): Promise<void> {

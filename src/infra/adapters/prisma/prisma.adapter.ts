@@ -15,6 +15,8 @@ import { compileSelect } from './prisma-projection.compiler';
 import { compileOrderBy } from './prisma-sort.compiler';
 import type {
   CompiledPrismaQuery,
+  PrismaClientLike,
+  PrismaDelegate,
   PrismaNativeQuery,
   PrismaProvider,
   PrismaQueryArgs,
@@ -134,7 +136,7 @@ export class PrismaAdapter implements RestQueryAdapterV3<
   }
 
   async execute(compiled: CompiledPrismaQuery): Promise<AdapterResult<object>> {
-    const rows = await compiled.delegate.findMany(compiled.data);
+    const rows = toRows(await compiled.delegate.findMany(compiled.data));
     const total = compiled.paginate
       ? await compiled.delegate.count(compiled.count)
       : undefined;
@@ -156,6 +158,64 @@ const sharedAdapter = new PrismaAdapter();
  * chamador: model fora do manifesto e delegate ausente do client falham antes
  * de qualquer query.
  */
+/**
+ * Busca o delegate no client e prova que ele é um delegate.
+ *
+ * `Reflect.get` em vez de índice porque `PrismaClientLike` é `object`: o nome
+ * do delegate vem do manifesto, que é dado, e nenhum tipo poderia garantir sua
+ * presença. O que substitui a garantia estática é esta checagem, que roda uma
+ * vez na construção da source — não por query — e falha fechado antes de
+ * qualquer acesso ao banco.
+ */
+function isDelegate(value: unknown): value is PrismaDelegate {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof Reflect.get(value, 'findMany') === 'function' &&
+    typeof Reflect.get(value, 'count') === 'function'
+  );
+}
+
+function resolveDelegate(
+  client: PrismaClientLike,
+  delegateName: string,
+  model: string
+): PrismaDelegate {
+  const candidate: unknown = Reflect.get(client, delegateName);
+
+  if (!isDelegate(candidate)) {
+    throw configurationError(
+      'SOURCE_CONFIGURATION_INVALID',
+      `Prisma delegate ${delegateName} for model ${model} is missing from the client`,
+      { model, delegate: delegateName }
+    );
+  }
+
+  return candidate;
+}
+
+const isRow = (row: unknown): row is object =>
+  typeof row === 'object' && row !== null;
+
+/**
+ * Estreita o retorno do `findMany` (ver `PrismaDelegate`) por checagem.
+ *
+ * Linha que não é objeto não existe no protocolo do Prisma: se aparecer, é
+ * violação de contrato do client, e o adapter diz isso em vez de repassar o
+ * dado adiante para estourar no normalizador, longe da causa.
+ */
+function toRows(result: unknown): readonly object[] {
+  if (!Array.isArray(result) || !result.every(isRow)) {
+    throw configurationError(
+      'ADAPTER_CONTRACT_VIOLATION',
+      'Prisma findMany did not return an array of rows',
+      {}
+    );
+  }
+
+  return result;
+}
+
 export function prismaSource(
   options: PrismaSourceOptions
 ): QuerySource<
@@ -173,14 +233,11 @@ export function prismaSource(
     );
   }
 
-  const delegate = options.client[model.delegate];
-  if (!delegate) {
-    throw configurationError(
-      'SOURCE_CONFIGURATION_INVALID',
-      `Prisma delegate ${model.delegate} for model ${options.model} is missing from the client`,
-      { model: options.model, delegate: model.delegate }
-    );
-  }
+  const delegate = resolveDelegate(
+    options.client,
+    model.delegate,
+    options.model
+  );
 
   return {
     kind: 'prisma',
