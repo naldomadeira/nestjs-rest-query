@@ -28,7 +28,7 @@ describe('TypeOrmAdapter', () => {
   it('deriva o dialeto do driver da conexão', () => {
     expect(adapter.capabilities(input())).toEqual({
       dialect: 'sqlite',
-      transactionalConsistency: true,
+      transactionalConsistency: false,
       escapeCharacter: '!',
     });
   });

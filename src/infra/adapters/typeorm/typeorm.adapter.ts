@@ -82,7 +82,7 @@ export class TypeOrmAdapter<
 
     return {
       dialect,
-      transactionalConsistency: true,
+      transactionalConsistency: false,
       escapeCharacter: ESCAPE_CHARACTER[dialect],
     };
   }
