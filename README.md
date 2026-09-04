@@ -52,6 +52,11 @@ NestJS has controllers. TypeORM has a query builder. The boilerplate between the
 | Drizzle | ✅ Stable | `nestjs-rest-query/drizzle` |
 | Prisma  | ✅ Stable | `nestjs-rest-query/prisma`  |
 
+> Development note: the v3 branch is a prerelease effort. Prisma and Drizzle
+> subpaths are functional there, but stable `3.0.0` remains blocked on the full
+> ORM × database matrix, Drizzle 1.x GA/MSSQL support, generated Prisma
+> manifests, and package-consumer smoke tests.
+
 Want a different ORM? [Open a discussion](https://github.com/naldomadeira/nestjs-rest-query/discussions).
 
 ## Install
