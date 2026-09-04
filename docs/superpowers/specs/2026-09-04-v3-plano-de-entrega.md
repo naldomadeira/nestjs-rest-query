@@ -80,20 +80,29 @@ se sabe se o erro é do habilitador ou da célula.
    diz qual é o lugar certo: "quem lê o catálogo é o adapter". Também elimina a
    duplicação que o PR4b criaria ao precisar do mesmo collector para Prisma e
    Drizzle.
-3. **Escape do Prisma por dialeto.** `\` nativo em Postgres e MySQL,
-   `$queryRaw` só na célula SQL Server. Corrigir o comentário factualmente
-   errado em `prisma-filter.compiler.ts:96` ("`contains` do Prisma é literal")
-   e o `escapeCharacter: '!'` de `prisma.adapter.ts:62`, que o adapter nunca
-   honra.
-4. **`patternEscape: 'clause' | 'native'`** em `AdapterCapabilities`, com
-   contract test. Uma capability que não descreve o comportamento real foi
-   exatamente como a divergência do `like` passou.
+3. **Padrões do Prisma: nativo onde dá, recusa alta onde não dá.** `\` nativo
+   em Postgres e MySQL; em SQLite e SQL Server — que não têm escape default no
+   `LIKE`, medido — os cinco operadores de padrão são recusados com
+   `CAPABILITY_UNAVAILABLE`. Corrigir o comentário factualmente errado em
+   `prisma-filter.compiler.ts:96` ("`contains` do Prisma é literal") e o
+   `escapeCharacter: '!'` de `prisma.adapter.ts:62`, que o adapter nunca honra.
+   Ver ADR-001, emenda 2, para as duas medições que descartaram o `$queryRaw`.
+4. **`patternEscape: 'clause' | 'native' | 'unsupported'`** em
+   `AdapterCapabilities`, com `escapeCharacter` vazio no caso `unsupported` e
+   contract test verificando a equivalência. Uma capability que não descreve o
+   comportamento real foi exatamente como a divergência do `like` passou.
 5. **Validador do manifesto Prisma** contra o `schema.prisma`, falhando no
    build quando divergirem.
 6. **Peer do Drizzle** de `>=1.0.0-rc.4 <2.0.0` para `>=1.0.0-rc.4 <1.0.0`.
 7. **Alinhar a versão de Node.** `.nvmrc` pina `v20.19.4`, `engines.node` pede
    `>=22`, a CI roda `[22, 24]` e o §6.1 elege 24 como alvo. Os 656 testes
    verdes foram medidos numa versão que o pacote declara não suportar.
+8. **Typecheck de `tests/**`** — item não previsto, descoberto na execução.
+`pnpm typecheck`usa`tsconfig.build.json`, que inclui só `src/**`, e o
+`ts-jest`roda transpile-only por causa do`isolatedModules`: **erro de tipo
+   em teste não era pego por gate nenhum**, e um passou de fato. Nasce
+   `pnpm typecheck:tests` mais um passo na CI. É também o único gate que carrega
+   `tests/v3/integration/**`, que o `pnpm test`ignora por`testPathIgnorePatterns`.
 
 **Critério de saída:** corpus verde no dialeto de referência para os três
 adapters, `patternEscape` coberto por contract test, e o cast removido do
@@ -117,12 +126,15 @@ harness sem `@ts-expect-error` no lugar.
 **Critério de saída:** nove células verdes, sem skip, com `assert-no-skips`
 passando em todas.
 
-**Risco declarado:** o escape `\` do Prisma (PR4a item 3) é a única decisão
-deste plano baseada em comportamento não medido. Que Postgres e MySQL tratem
-`\` como escape default do `LIKE` é documentado — e o perfil de MySQL usa
-`STRICT_ALL_TABLES` sem `NO_BACKSLASH_ESCAPES`, então o default vale. Que o
-`contains` do Prisma 7 o preserve sob bind param, só a célula real prova. Se
-refutar, cai para `$queryRaw` nos três dialetos, conforme ADR-001 emenda 2.
+**Risco declarado:** que o `contains` do Prisma 7 preserve o `\` sob bind
+param, nas células Postgres e MySQL, é a última afirmação deste plano que
+nenhuma medição sustenta. Que os dois bancos tratem `\` como escape default do
+`LIKE` é documentado, e o perfil de MySQL usa `STRICT_ALL_TABLES` sem
+`NO_BACKSLASH_ESCAPES` — mas o caminho do bind param pelo client do Prisma só a
+célula real prova. Se refutar, as duas células caem para
+`patternEscape: 'unsupported'` como SQLite e SQL Server, e o Prisma passa a não
+oferecer operador de padrão em dialeto nenhum — o que torna a lacuna grande
+demais para a `3.0.0` e reabre a emenda 2.
 
 ### PR5 — fase 7
 
@@ -132,16 +144,37 @@ refutar, cai para `$queryRaw` nos três dialetos, conforme ADR-001 emenda 2.
    usável de fora sem cast — e são domínios distintos, sem duplicação a cortar.
 2. **`MIGRATION.md` validado num consumidor v2 real.** Sem codemod: o gate pede
    o guia validado, e um codemod não validado é pior que nenhum.
-3. **Cobertura de branches do TypeORM de 75% para 95%.** É o adapter de
-   referência, e 25% dos seus branches nunca executaram — PK composta,
-   paginação em duas fases, joins idempotentes. Unit tests nos compilers; caso
-   novo no corpus só quando o branch muda resultado observável, para não
+3. **Cobertura de branches: TypeORM de 75% para 95%, Drizzle de 94.6% para
+   95%.** O TypeORM é o adapter de referência, e 25% dos seus branches nunca
+   executaram — PK composta, paginação em duas fases, joins idempotentes. O
+   Drizzle está a 0.41pp do gate por dívida pré-existente, e cobrir
+   `drizzle-projection.compiler.ts` sozinho já limpa. Unit tests nos compilers;
+   caso novo no corpus só quando o branch muda resultado observável, para não
    inflar as nove células.
-4. **Datar bench e segurança no `status.md`.** `budget.spec.ts` já mede o
+
+   **`src/contracts` é inverificável por construção.** O
+   `coveragePathIgnorePatterns` exclui `index.ts$` e `.interface.ts$`, e os 9
+   arquivos de `src/contracts` são exclusivamente esses dois padrões — então
+   nenhum teste move a agulha ali, e "95% em contracts" nunca é atingido nem
+   reprovado, só ausente. Decidir entre mudar o alvo do gate ou abrir exceção
+   no ignore pattern; deixar como está é o pior dos três, porque parece medido.
+
+   **Antes de adicionar `coverageThreshold`,** semear o `fast-check`: a
+   cobertura oscila entre execuções com a mesma contagem de testes
+   (`validate-pagination.ts` variou 91.17% ↔ 97.05%), o que hoje não trava nada
+   porque não há threshold — e travaria de forma intermitente no dia em que
+   houver.
+
+4. **Furo do corpus: `notIn` não vazio nunca é compilado.** O corpus só tem
+   `notIn=[]`, que é sempre-verdadeiro e é elidido do `AND`, então o caminho de
+   `NOT IN` com valores não é exercitado em **nenhum** dos três adapters. É
+   lacuna de cobertura semântica, não de linha: um caso novo no corpus cobre os
+   três de uma vez, e por isso vale mais que qualquer unit test aqui.
+5. **Datar bench e segurança no `status.md`.** `budget.spec.ts` já mede o
    orçamento do §18.4 (núcleo, sem I/O) e roda em `pnpm test`; CodeQL e
    Scorecard já rodam na CI. Falta uma data, não trabalho. Benchmark com I/O
    mediria a latência do banco, não da biblioteca.
-5. **Os 15 erros de lint fora do escopo do `pnpm lint`.** O script cobre
+6. **Os 15 erros de lint fora do escopo do `pnpm lint`.** O script cobre
    `src/**/*.ts`; existem 15 achados reais em `apps/docs/**` e `tests/**`. Como
    o PR5 mexe em exemplos e testes, é onde eles cabem.
 
