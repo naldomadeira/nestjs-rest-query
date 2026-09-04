@@ -92,22 +92,47 @@ considerou: **em Postgres e MySQL, `\` já é o caractere de escape default do
 usa `STRICT_ALL_TABLES` sem `NO_BACKSLASH_ESCAPES`, então o default vale. Só o
 SQL Server não tem escape default e exige a cláusula.
 
-**Decisão:** escape por dialeto — `\` nativo em Postgres e MySQL, `$queryRaw`
-apenas na célula SQL Server. O custo de SQL cru fica isolado num dialeto em vez
-de reescrever cinco operadores em três bancos.
+Duas medições feitas depois disso reduziram as opções, e vale registrar as
+duas porque a primeira redação deste ADR estava otimista.
 
-**Verificação pendente:** que o `contains` do Prisma 7 preserve o `\` sob bind
-param é comportamento que só a célula real prova. Se a medição refutar, a
-decisão cai para `$queryRaw` nos três dialetos — não para a divergência
-declarada, porque uma `3.0.0` estável não deve prometer paridade e entregar
-cinco operadores fora da §11.
+**Medição 1 — o SQLite também não tem escape default.** Contra
+`better-sqlite3`, `v LIKE 'a\_b'` sem cláusula casa a string literal `a\_b`, e
+não `a_b`; `v LIKE '100\%'` não casa nada. Como o dialeto de referência do
+Prisma é o SQLite (`DIALECT_BY_PROVIDER`), o escape nativo cobre 2 de 4
+dialetos, não 3.
+
+**Medição 2 — `$queryRaw` não é saída.** A API tipada do Prisma não aceita
+fragmento SQL dentro da árvore de `where`, então o operador de padrão só
+poderia ser pré-resolvido para um conjunto de PKs e injetado como
+`{ pk: { in: [...] } }`. Isso é semanticamente correto, mas o SQL Server tem
+limite de 2100 parâmetros: um `like` que casa mais de 2100 linhas falharia —
+justamente na célula que a solução existia para consertar.
+
+**Decisão:** onde o escape nativo funciona, usá-lo; onde não funciona, **falhar
+alto**. Postgres e MySQL recebem `patternEscape: 'native'` com `\`. SQLite e
+SQL Server recebem `patternEscape: 'unsupported'`, e o adapter recusa os cinco
+operadores com `CAPABILITY_UNAVAILABLE` — código que já existe em
+`error-codes.ts`, então o contrato de erros não muda.
+
+Isso satisfaz a §5.6: um erro nomeado não é aproximação silenciosa. E mantém o
+gate das nove células, porque o corpus declara a expectativa **por célula**,
+pelo mesmo mecanismo que hoje declara divergência em `cases.ts` — o caso roda,
+casa a expectativa declarada, e o `assert-no-skips` continua passando. O que
+muda em relação à divergência antiga é a natureza da falha: antes, um resultado
+errado silencioso; agora, uma recusa explícita.
+
+**Custo aceito:** um consumidor Prisma em SQLite ou SQL Server não tem `like`,
+`notLike`, `ilike`, `notIlike` nem `search`. É uma perda de recurso visível,
+declarada no manifesto, e preferível a devolver o conjunto errado de linhas.
 
 **Consequência no contrato:** `AdapterCapabilities.escapeCharacter` não
-consegue expressar "com ou sem cláusula `ESCAPE`". Hoje
+consegue expressar "com ou sem cláusula `ESCAPE`", nem "impossível". Hoje
 `prisma.adapter.ts` declara `escapeCharacter: '!'` e o adapter nunca emite a
 cláusula — uma capability que não descreve o comportamento real, que é
 exatamente como a divergência passou. O contrato ganha
-`patternEscape: 'clause' | 'native'`, verificável por contract test.
+`patternEscape: 'clause' | 'native' | 'unsupported'`, com `escapeCharacter`
+vazio quando `unsupported`, e um contract test verifica a equivalência para que
+a capability não possa voltar a mentir.
 
 ## Emenda 3 — generator e codemod saem da `3.0.0`
 
