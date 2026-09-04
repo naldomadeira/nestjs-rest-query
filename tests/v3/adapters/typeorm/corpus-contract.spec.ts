@@ -1,5 +1,6 @@
 import { CORPUS_CASES } from '../../corpus/cases';
 import { runCorpusCase, seedCorpus } from '../../fixtures/corpus-runner';
+import { typeormSource } from '@infra/adapters/typeorm';
 import {
   closeSqlite,
   corpusEntities,
@@ -28,7 +29,9 @@ describe.each(CORPUS_CASES.map((testCase) => [testCase.id, testCase] as const))(
     it(testCase.description, async () => {
       const actual = await runCorpusCase(
         testCase,
-        repositoryFor(testCase.rules)
+        typeormSource(repositoryFor(testCase.rules), {
+          fieldKinds: { post: { id: 'uuid' }, tag: { post_id: 'uuid' } },
+        })
       );
 
       if (testCase.expect.kind === 'error') {
