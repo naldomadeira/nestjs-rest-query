@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+# O job do Drizzle sai daqui até a fase 5 da v3: sem adapter Drizzle, ele
+# ficaria verde sem exercitar nada e sugeriria suporte à linha 0.45, que a v3
+# explicitamente não tem (o alvo é 1.x).
 jobs:
   typeorm:
     name: TypeORM ${{ matrix.typeorm }}
@@ -14,6 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         typeorm: ['0.3.26', '0.3.27', 'latest']
+        # 1.x entra quando a linha estabilizar (spec §6.1).
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -21,30 +25,10 @@ jobs:
           version: 9
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm add -w -D typeorm@${{ matrix.typeorm }}
-      - run: pnpm test
-
-  drizzle:
-    name: Drizzle ${{ matrix.drizzle }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        drizzle: ['0.45.0', '0.45.x', 'latest']
-    steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 9
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm add -w -D drizzle-orm@${{ matrix.drizzle }}
       - run: pnpm test
 
   nestjs:
@@ -61,7 +45,7 @@ jobs:
           version: 9
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: |
