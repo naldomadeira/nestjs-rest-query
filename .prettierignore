@@ -10,3 +10,12 @@ apps/docs/next-env.d.ts
 pnpm-lock.yaml
 *.tgz
 tests/v3/adapters/prisma/generated/
+
+# Clients gerados pelo generator `prisma-client`: reformatá-los é inútil, o
+# próximo `prisma generate` desfaz — e sem esta linha o `format:check` da CI
+# reprova por causa de código que ninguém escreveu.
+apps/examples/*/src/generated/
+tests/v3/adapters/prisma/generated/
+
+# Saída do `nest build` dos exemplos.
+apps/examples/*/dist/
