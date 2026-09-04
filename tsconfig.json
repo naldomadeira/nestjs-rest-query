@@ -12,6 +12,12 @@
     "strict": true,
     "strictPropertyInitialization": false,
     "isolatedModules": true,
+    // Alinhado com tsconfig.build.json, que já pulava a checagem de libs.
+    // Sem isto o editor e a suíte divergem do gate: drizzle-orm@1.0.0-rc.4
+    // produz 44 erros nos próprios .d.cts sob TypeScript 6 (variance em
+    // ColumnBuilder, `config` ausente em cockroach-core), nenhum deste
+    // repositório. Reavaliar no GA do Drizzle 1.x.
+    "skipLibCheck": true,
     "moduleResolution": "node16",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,

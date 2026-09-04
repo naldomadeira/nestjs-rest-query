@@ -5,6 +5,7 @@ export type {
   DrizzleCondition,
   DrizzleDatabase,
   DrizzleJoin,
+  DrizzleManyProjection,
   DrizzleNativeQuery,
   DrizzleOrderBy,
   DrizzleRelation,
@@ -30,7 +31,17 @@ export {
   scalarCondition,
   type DrizzleFilterContext,
 } from './drizzle-filter.compiler';
-export { compileSelect } from './drizzle-projection.compiler';
+export {
+  compileProjection,
+  type CompiledProjection,
+} from './drizzle-projection.compiler';
 export { compileOrderBy } from './drizzle-sort.compiler';
 export { toDriverValue } from './drizzle-value';
+export { toCountSql, toDataSql, toManySql } from './drizzle-sql.compiler';
+export {
+  assertDrizzleClient,
+  drizzleDatabase,
+  type DrizzleClientLike,
+  type DrizzleDatabaseOptions,
+} from './drizzle-database';
 export { DrizzleAdapter, drizzleSource } from './drizzle.adapter';
