@@ -125,7 +125,19 @@ Known blockers before stable `3.0.0`:
 
 ## Intentional adapter divergences (parity)
 
-The library aims for behavioral parity across TypeORM, Drizzle, and Prisma. A few spots are documented divergences — same input, different observable outcome by adapter — because the underlying SQL/ORM model makes "the same as TypeORM" either ambiguous or unsafe. The cross-adapter parity matrix in `tests/parity/matrix.spec.ts` encodes each one explicitly so it is impossible to introduce a new silent divergence.
+The library aims for behavioral parity across TypeORM, Drizzle, and Prisma. A few spots are documented divergences — same input, different observable outcome by adapter — because the underlying SQL/ORM model makes "the same as TypeORM" either ambiguous or unsafe.
+
+In v3 each divergence is declared as **data, on the case itself**, in `tests/v3/corpus/cases.ts`, with a mandatory `reason`. The adapter's contract test compares against the divergent expectation with the same rigor it applies to the canonical one, so an adapter that starts agreeing again breaks the build and forces the divergence to be deleted. `tests/v3/corpus/corpus.spec.ts` keeps an inventory of every declared divergence, so a new one cannot slip in unreviewed.
+
+### Prisma: `%` and `_` are wildcards in `like`
+
+Under the v3 grammar `%` and `_` are literal characters: `filter[name][like]=100%` searches for the text "100%". TypeORM and Drizzle emit `LIKE ... ESCAPE`, so they honour it.
+
+Prisma compiles `contains` to `LIKE ('%' || ? || '%')` with **no `ESCAPE` clause**, and does not escape metacharacters. The typed delegate exposes no way to supply one. Under the Prisma adapter, `%` and `_` therefore behave as wildcards in `like`, `notLike`, `ilike`, `notIlike` and `search`.
+
+This is a genuine violation of §11 and of §5's promise that the same query yields the same rows on every adapter. It is documented rather than fixed because there is no fix available inside the typed client. If your endpoint accepts user-supplied text for these operators and you rely on literal matching, do not treat the Prisma adapter as equivalent to the other two.
+
+Note that only `like/underscore-is-literal` fails observably in the corpus: `like/percent-is-literal` passes by coincidence, because exactly one name in the seed contains "100". Do not read that green case as coverage.
 
 ### `?sort=<many-rel>.<column>` — sort through a to-many relation
 
