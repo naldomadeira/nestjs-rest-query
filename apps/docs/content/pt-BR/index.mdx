@@ -3,6 +3,16 @@ title: Introdução
 description: O que é o nestjs-rest-query e por que utilizá-lo.
 ---
 
+<Callout type="warn" title="Esta documentação descreve a v2">
+
+Os exemplos abaixo ainda usam a API v2 — `RulesConfig`, classes de adapter no
+entrypoint raiz e coerção pelo formato do valor. **A v3 substitui as três.**
+Reescrever este site é a fase 7 do plano da v3; até lá, a descrição
+autoritativa da API atual é
+[o guia de migração v2 → v3](https://github.com/naldomadeira/nestjs-rest-query/blob/main/docs/migration/v2-to-v3.md).
+
+</Callout>
+
 **`nestjs-rest-query`** é uma biblioteca para NestJS que constrói instâncias de `SelectQueryBuilder` do TypeORM de forma dinâmica a partir de parâmetros de query HTTP — filtros, ordenações, paginação, seleção de campos e carregamento de relações — tudo controlado por uma whitelist de segurança por endpoint.
 
 ## Fluxo principal
