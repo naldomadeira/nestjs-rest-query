@@ -482,12 +482,28 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     },
   },
   {
-    id: 'sort/uuid-without-portable-order-fails-closed',
-    description: 'sort por UUID sem portableOrderField falha fechado',
+    // A ausência de `portableOrderField` num campo autorizado para ordem é
+    // erro de *configuração*: `defineQueryRules` falha na inicialização, então
+    // não existe requisição capaz de alcançá-lo. O corpus cobre o caminho
+    // observável — a ordem sai pela coluna portável, não pelo UUID nativo.
+    id: 'sort/uuid-orders-by-portable-order-field',
+    description: 'sort por UUID usa a coluna de ordem portável',
     tags: ['uuid-pk', 'sort-tie'],
-    rules: 'post.no-portable-order',
+    rules: 'post.portable-order',
     query: { sort: 'id' },
-    expect: { kind: 'error', status: 400, code: 'CAPABILITY_UNAVAILABLE' },
+    expect: {
+      kind: 'rows',
+      ids: [
+        '11111111-1111-4111-8111-111111111111',
+        '22222222-2222-4222-8222-222222222222',
+        '33333333-3333-4333-8333-333333333333',
+        '44444444-4444-4444-8444-444444444444',
+        '55555555-5555-4555-8555-555555555555',
+        '66666666-6666-4666-8666-666666666666',
+      ],
+      total: 6,
+      lastPage: 1,
+    },
   },
   {
     id: 'uuid-pk/filter-by-uuid',
