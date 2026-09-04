@@ -1,7 +1,7 @@
 {
   "name": "nestjs-rest-query",
   "version": "2.1.0",
-  "description": "Declarative, whitelist-first REST query params for NestJS and TypeORM.",
+  "description": "Declarative, whitelist-first REST query params for NestJS, with a canonical semantic core shared by every ORM adapter.",
   "keywords": [
     "nestjs",
     "typeorm",
@@ -18,7 +18,7 @@
     "whitelist"
   ],
   "scripts": {
-    "build": "./scripts/build.sh",
+    "build": "tsup",
     "clean": "rm -rf dist",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
     "lint": "eslint \"src/**/*.ts\"",
@@ -36,40 +36,65 @@
     "s04:dev": "pnpm --filter 04-app-with-prisma dev",
     "docs:dev": "pnpm --filter docs dev",
     "docs:build": "pnpm --filter docs build",
-    "docs:start": "pnpm --filter docs start"
+    "docs:start": "pnpm --filter docs start",
+    "verify:package": "sh scripts/verify-package.sh"
   },
   "type": "commonjs",
-  "main": "dist/index.js",
+  "main": "dist/index.cjs",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "require": "./dist/index.js"
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./typeorm": {
-      "types": "./dist/infra/adapters/typeorm.adapter.d.ts",
-      "require": "./dist/infra/adapters/typeorm.adapter.js"
-    },
-    "./drizzle": {
-      "types": "./dist/infra/adapters/drizzle.adapter.d.ts",
-      "require": "./dist/infra/adapters/drizzle.adapter.js"
+      "import": {
+        "types": "./dist/typeorm.d.mts",
+        "default": "./dist/typeorm.mjs"
+      },
+      "require": {
+        "types": "./dist/typeorm.d.ts",
+        "default": "./dist/typeorm.cjs"
+      }
     },
     "./prisma": {
-      "types": "./dist/infra/adapters/prisma.adapter.d.ts",
-      "require": "./dist/infra/adapters/prisma.adapter.js"
+      "import": {
+        "types": "./dist/prisma.d.mts",
+        "default": "./dist/prisma.mjs"
+      },
+      "require": {
+        "types": "./dist/prisma.d.ts",
+        "default": "./dist/prisma.cjs"
+      }
+    },
+    "./drizzle": {
+      "import": {
+        "types": "./dist/drizzle.d.mts",
+        "default": "./dist/drizzle.mjs"
+      },
+      "require": {
+        "types": "./dist/drizzle.d.ts",
+        "default": "./dist/drizzle.cjs"
+      }
     },
     "./package.json": "./package.json"
   },
   "typesVersions": {
     "*": {
       "typeorm": [
-        "./dist/infra/adapters/typeorm.adapter.d.ts"
-      ],
-      "drizzle": [
-        "./dist/infra/adapters/drizzle.adapter.d.ts"
+        "./dist/typeorm.d.ts"
       ],
       "prisma": [
-        "./dist/infra/adapters/prisma.adapter.d.ts"
+        "./dist/prisma.d.ts"
+      ],
+      "drizzle": [
+        "./dist/drizzle.d.ts"
       ]
     }
   },
@@ -81,7 +106,7 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "homepage": "https://naldomadeira.github.io/nestjs-rest-query/",
   "bugs": {
@@ -120,6 +145,7 @@
     "ts-jest": "^29.4.9",
     "ts-node": "^10.9.2",
     "tsc-alias": "^1.8.17",
+    "tsup": "^8.5.1",
     "typeorm": "^0.3.26",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.2"
@@ -138,10 +164,10 @@
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/swagger": "^11.0.0",
-    "@prisma/client": "^5.0.0 || ^6.0.0 || ^7.0.0",
-    "drizzle-orm": "^0.45.0",
+    "@prisma/client": "^6.19.0 || ^7.0.0",
+    "drizzle-orm": "^1.0.0",
     "reflect-metadata": "^0.2.0",
-    "typeorm": "^0.3.26"
+    "typeorm": "^0.3.26 || ^1.0.0"
   },
   "peerDependenciesMeta": {
     "@nestjs/swagger": {
@@ -156,5 +182,6 @@
     "typeorm": {
       "optional": true
     }
-  }
+  },
+  "module": "dist/index.mjs"
 }
