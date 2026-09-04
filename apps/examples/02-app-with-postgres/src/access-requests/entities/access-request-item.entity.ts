@@ -6,6 +6,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
+  type Relation,
 } from 'typeorm';
 import { Company } from '../../companies/entities/company.entity';
 import { Module } from '../../modules/entities/module.entity';
@@ -48,17 +49,25 @@ export class AccessRequestItem {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
+  /**
+   * `AccessRequest` e `AccessRequestItem` se importam mutuamente. Sob ESM o
+   * metadado emitido por `emitDecoratorMetadata` avaliaria a classe ainda em
+   * TDZ; `Relation<T>`, que é só um alias de tipo, faz o metadado virar
+   * `Object` e deixa o alvo real por conta da arrow — chamada depois do
+   * carregamento.
+   */
   @ManyToOne(() => AccessRequest, (request) => request.items, {
     onDelete: 'CASCADE',
+    nullable: false,
   })
   @JoinColumn({ name: 'access_request_id' })
-  accessRequest: AccessRequest;
+  accessRequest: Relation<AccessRequest>;
 
-  @ManyToOne(() => Company, { eager: false })
+  @ManyToOne(() => Company, { eager: false, nullable: false })
   @JoinColumn({ name: 'company_id' })
-  company: Company;
+  company: Relation<Company>;
 
-  @ManyToOne(() => Module, { eager: false })
+  @ManyToOne(() => Module, { eager: false, nullable: false })
   @JoinColumn({ name: 'module_id' })
-  module: Module;
+  module: Relation<Module>;
 }

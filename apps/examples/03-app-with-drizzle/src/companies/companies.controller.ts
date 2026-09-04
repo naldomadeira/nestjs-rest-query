@@ -1,52 +1,50 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import {
   ApiDynamicQuery,
   ApiPaginatedResponse,
   DynamicQueryDto,
-  QueryResult,
   QueryRules,
-  RulesConfig,
+  type CompiledQueryRules,
 } from 'nestjs-rest-query';
-import { CompaniesBusiness } from './companies.business';
+import { CompaniesService } from './companies.service';
+import { companyRules } from './companies.query';
 
-/**
- * Company entity shape for Swagger documentation. Relation slot
- * reflects the flat response produced by `DrizzleAdapter`.
- */
-class CompanyDto {
+/** Forma da empresa para o Swagger — ver `UserView`. */
+class CompanyView {
+  @ApiProperty({ format: 'uuid' })
   id: string;
+
+  @ApiProperty()
   name: string;
-  createdAt: Date;
+
+  @ApiProperty({ format: 'date-time' })
+  createdAt: string;
+
+  @ApiProperty({ required: false, isArray: true })
   users?: Array<{ id: string; name: string }>;
 }
 
 @ApiTags('companies')
 @Controller('companies')
 export class CompaniesController {
-  constructor(private readonly companiesBusiness: CompaniesBusiness) {}
+  constructor(private readonly companiesService: CompaniesService) {}
 
   @Get()
   @ApiOperation({
-    summary: 'Fetch companies with dynamic filters',
+    summary: 'Busca empresas com filtros dinâmicos',
     description:
-      'Fetch companies with support for filters, sorting, and pagination',
+      'Inclui a coleção de usuários, hidratada por consulta própria para não inflar a paginação',
   })
-  @ApiDynamicQuery<CompanyDto>({
-    filters: ['id', 'name', 'createdAt', 'users'],
-    sorts: ['name', 'createdAt'],
-    fields: ['id', 'name', 'createdAt'],
-    includes: ['users'],
-    search: ['name'],
-  })
-  @ApiPaginatedResponse<CompanyDto>(CompanyDto, {
+  @ApiDynamicQuery(companyRules)
+  @ApiPaginatedResponse(CompanyView, {
     status: 200,
-    description: 'List of companies',
+    description: 'Lista de empresas',
   })
   async findAll(
     @Query() query: DynamicQueryDto,
-    @QueryRules() rules: RulesConfig
-  ): Promise<QueryResult<CompanyDto>> {
-    return this.companiesBusiness.findAll(query, rules);
+    @QueryRules() rules: CompiledQueryRules
+  ) {
+    return this.companiesService.findAll(query, rules);
   }
 }

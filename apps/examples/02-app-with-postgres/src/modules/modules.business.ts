@@ -4,9 +4,10 @@ import { Repository } from 'typeorm';
 import {
   DynamicQueryDto,
   QueryBuilderService,
-  QueryResult,
-  RulesConfig,
+  type CompiledQueryRules,
+  type NormalizedQueryResult,
 } from 'nestjs-rest-query';
+import { typeormSource } from 'nestjs-rest-query/typeorm';
 import { Module as ModuleEntity } from './entities/module.entity';
 
 @Injectable()
@@ -17,12 +18,13 @@ export class ModulesBusiness {
     private readonly queryBuilderService: QueryBuilderService,
   ) {}
 
+  /** Ver `users.business.ts` para o porquê da source discriminada. */
   async findAll(
     query: DynamicQueryDto,
-    rules: RulesConfig,
-  ): Promise<QueryResult<ModuleEntity>> {
+    rules: CompiledQueryRules,
+  ): Promise<NormalizedQueryResult<ModuleEntity>> {
     return this.queryBuilderService.execute(
-      this.moduleRepository,
+      typeormSource(this.moduleRepository),
       query,
       rules,
     );

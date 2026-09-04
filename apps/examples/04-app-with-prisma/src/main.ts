@@ -1,4 +1,7 @@
 import 'reflect-metadata';
+// O Prisma 7 não lê mais `.env` por conta do datasource (o `url` saiu do
+// schema): quem carrega o ambiente é a aplicação.
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';

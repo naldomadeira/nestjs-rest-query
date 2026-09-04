@@ -19,7 +19,11 @@ async function seedModules(ds: typeof seedDataSource): Promise<void> {
   logger.info(`Total de módulos a processar: ${MODULES_SEED_DATA.length}`);
   logger.divider();
 
-  await repo.upsert(MODULES_SEED_DATA, {
+  // `repo.create(...)` antes do upsert não é cerimônia: as factories devolvem
+  // objetos literais, e o listener `@BeforeInsert` que preenche as colunas
+  // dobradas só é disparado para instâncias da entidade. Sem isto o seed
+  // gravaria `*_folded` vazio e `?search=` não encontraria nada.
+  await repo.upsert(repo.create(MODULES_SEED_DATA), {
     conflictPaths: ['slug'],
     skipUpdateIfNoValuesChanged: true,
   });
