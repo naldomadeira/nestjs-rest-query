@@ -33,22 +33,22 @@ as duas é a forma mais fácil de superestimar o estado:
 | 2    | API e distribuição    | **completa**              | sources discriminadas, `transformPlan`, `customize` com escopo, 4 subpaths, `verify:package` verde |
 | 3    | TypeORM de referência | **dialeto de referência** | corpus 66/66 em SQLite, com TypeORM `0.3.x` e `1.1.x`                                              |
 | 4    | Prisma                | **dialeto de referência** | corpus 66/66 contra client gerado; sem generator, com 1 divergência declarada                      |
-| 5    | Drizzle               | **dialeto de referência** | corpus 66/66 em SQLite via `drizzle-orm` real                                                      |
+| 5    | Drizzle               | **dialeto de referência** | corpus 66/66 em SQLite; **não executa em banco real** — ver bloqueador nº2                         |
 | 6    | Paridade completa     | **não iniciada**          | nenhuma célula real rodou contra Prisma ou Drizzle                                                 |
-| 7    | Hardening e release   | **não iniciada**          | exemplos, codemods, alpha/beta/RC                                                                  |
+| 7    | Hardening e release   | **não iniciada**          | exemplos, migration validado, alpha/rc (codemod saiu do escopo — ADR-001)                          |
 
 Nenhuma fase de adapter está _completa_: completa exigiria as três células
 reais, que é a fase 6.
 
 ## Estado por adapter
 
-|                                 | TypeORM                               | Prisma                                | Drizzle                            |
-| ------------------------------- | ------------------------------------- | ------------------------------------- | ---------------------------------- |
-| Corpus no dialeto de referência | 66/66                                 | 66/66                                 | 66/66                              |
-| Usa o ORM de verdade            | sim                                   | sim, client gerado                    | sim                                |
-| PostgreSQL / MySQL / SQL Server | harness pronto, matriz não confirmada | **não rodou**                         | **não rodou**                      |
-| Divergências declaradas         | nenhuma                               | 1 (`like` literal)                    | nenhuma                            |
-| Lacuna própria                  | —                                     | generator a partir de `schema.prisma` | coleção aninhada sob outra relação |
+|                                 | TypeORM                             | Prisma                                | Drizzle                            |
+| ------------------------------- | ----------------------------------- | ------------------------------------- | ---------------------------------- |
+| Corpus no dialeto de referência | 66/66                               | 66/66                                 | 66/66                              |
+| Usa o ORM de verdade            | sim                                 | sim, client gerado                    | sim                                |
+| PostgreSQL / MySQL / SQL Server | MySQL verde; PG e MSSQL não rodaram | **não rodou**                         | **não executa** (ver abaixo)       |
+| Divergências declaradas         | nenhuma                             | 1 (`like` literal)                    | nenhuma                            |
+| Lacuna própria                  | —                                   | generator a partir de `schema.prisma` | coleção aninhada sob outra relação |
 
 ### TypeORM
 
@@ -72,8 +72,20 @@ Relações declaradas por path pontuado, planner de junções idempotente, `EXIS
 correlacionado para qualquer salto `many`, coleção de primeiro nível hidratada
 por consulta própria. `ILIKE` nunca é emitido.
 
-`drizzle-orm` está fixado em `1.0.0-rc.4`. Enquanto não houver GA com suporte a
-MSSQL, a v3 permanece pré-release por decisão do design (§25.8).
+`drizzle-orm` está fixado em `1.0.0-rc.4`, que **já traz o driver MSSQL**
+(`node-mssql/`). O que falta é o GA, não o suporte a SQL Server — o
+[ADR-001](../superpowers/specs/2026-09-04-v3-adr-001-matriz-e-escopo-da-3.0.0.md)
+desfaz essa confusão e desamarra a estável do GA por meio de uma faixa de peer
+fechada.
+
+**O adapter não executa em nenhum banco real.** `drizzleDatabase()` executa por
+`client.all(query)`, e `all()` é exclusivo do SQLite no objeto `db` do
+`drizzle-orm`: medido em runtime, `db.all` é `undefined` em `node-postgres`,
+`postgres-js`, `mysql2` e `node-mssql`, que expõem só `execute()`. O guard em
+`drizzle-database.ts:165` lança para as três células reais. O
+`as unknown as DrizzleClientLike` em `tests/v3/adapters/drizzle/helpers.ts:45`
+é o que impediu o compilador de acusar isso, e é por ele que o corpus 66/66
+prova **SQLite, e só**.
 
 ## Divergências intencionais
 
@@ -94,15 +106,15 @@ cobertura.
 
 | Gate                                            | Estado                                                                                 |
 | ----------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Nove combinações reais verdes, sem skips        | **não** — só o dialeto de referência roda                                              |
-| Drizzle/MSSQL em versão estável                 | **não** — `1.0.0-rc.4`                                                                 |
+| Nove combinações reais verdes, sem skips        | **não** — só TypeORM × MySQL rodou; o Drizzle não executa em banco real                |
+| Peer do Drizzle fechado nos RCs medidos         | **não** — a faixa `<2.0.0` admitiria o GA não testado (ADR-001)                        |
 | Nenhum cast no uso público documentado          | sim                                                                                    |
 | Nenhum peer opcional carregado pelo core        | sim — provado por consumer fixture                                                     |
 | Exemplos compilam e passam smoke E2E            | **não** — fase 7                                                                       |
 | Códigos de erro e JSON canônico idênticos       | sim no dialeto de referência; não medido na matriz                                     |
 | Cobertura de branches críticos acima de 95%     | **parcial** — ver abaixo                                                               |
-| Nenhum achado de segurança alto ou crítico      | sem varredura nova nesta rodada                                                        |
-| Benchmarks dentro do orçamento                  | não reexecutado nesta rodada                                                           |
+| Nenhum achado de segurança alto ou crítico      | CodeQL e Scorecard rodam na CI; falta datar o resultado                                |
+| Benchmarks dentro do orçamento                  | `budget.spec.ts` mede o §18.4 em `pnpm test`; falta datar                              |
 | Migration guide validado num consumidor v2 real | **não**                                                                                |
 | Matriz pública de versões coincide com a CI     | **não** — a CI não roda Prisma/Drizzle                                                 |
 | Profiles de banco passam nos checks             | **parcial** — o runtime valida fatos fornecidos pelo chamador, sem collector por banco |
@@ -113,7 +125,7 @@ Medida na última execução completa de `pnpm test`:
 
 | Área                     | Statements | Branches |
 | ------------------------ | ---------- | -------- |
-| Total                    | 95.26%     | 87.62%   |
+| Total                    | 95.31%     | 87.71%   |
 | `infra/adapters/prisma`  | 98.59%     | 96.73%   |
 | `infra/adapters/drizzle` | 97.97%     | 94.28%   |
 | `infra/adapters/typeorm` | 92.14%     | 75.00%   |
@@ -124,22 +136,35 @@ que é o de referência, está em 75% — é a maior dívida de cobertura aberta
 ## Bloqueadores nomeados
 
 1. **Nenhum banco real rodou contra Prisma ou Drizzle.** É a fase 6 inteira e o
-   principal motivo de nada aqui poder ser chamado de paridade.
-2. **SQL Server exige runner Linux x64.** Falhas locais em ARM estão
-   registradas e não substituem a célula.
-3. **Generator do Prisma.** Sem ele, o manifesto é escrito à mão e pode divergir
-   do `schema.prisma` sem que nada acuse.
-4. **Drizzle 1.x em RC.** Trava a estável por decisão de design.
-5. **`like` literal no Prisma.** Divergência documentada, não resolvida.
+   principal motivo de nada aqui poder ser chamado de paridade. Do TypeORM, só
+   a célula MySQL rodou verde.
+2. **O adapter Drizzle não executa em banco real.** `client.all()` só existe no
+   SQLite; Postgres, MySQL e SQL Server expõem `execute()`, com três formas de
+   retorno diferentes. Exige um executor por dialeto antes de qualquer célula.
+   É o bloqueador mais sério, e não estava nesta lista.
+3. **Manifesto do Prisma escrito à mão** pode divergir do `schema.prisma` sem
+   que nada acuse. Fecha com validador; o generator foi para a `3.1.0`
+   (ADR-001).
+4. **`like` literal no Prisma.** Divergência declarada. O ADR-001 decide
+   resolvê-la por escape por dialeto, com a medição na célula real pendente.
+5. **Collector de perfil não está em `src/`.** Existe e funciona em
+   `tests/v3/integration/setup.ts:108`, mas enquanto os fatos vierem do
+   chamador, `PORTABILITY_PROFILE_MISMATCH` passa com fatos mentidos.
 6. **Coleção aninhada sob outra relação no Drizzle** falha fechado.
-7. **Collector de perfil certificado por banco** não existe.
-8. **Cobertura de branches do adapter TypeORM** em 75%.
+7. **Cobertura de branches do adapter TypeORM** em 75%.
+8. **Versão de Node incoerente.** `.nvmrc` pina `v20.19.4`, `engines.node` pede
+   `>=22`, a CI roda `[22, 24]` e o §6.1 elege 24. A última medição verde saiu
+   numa versão que o pacote declara não suportar.
+9. **SQL Server exige runner Linux x64.** Falhas locais em ARM estão
+   registradas e não substituem a célula.
+
+`drizzle-orm` em RC **não** é mais bloqueador da estável: ver ADR-001.
 
 ## Como reproduzir
 
 ```bash
 pnpm install
-pnpm test              # 42 suites, 654 testes — inclui os 3 corpus de referência
+pnpm test              # 42 suites, 656 testes — inclui os 3 corpus de referência
 pnpm typecheck
 pnpm lint
 pnpm verify:package    # build + publint + attw + consumidores CJS/ESM
