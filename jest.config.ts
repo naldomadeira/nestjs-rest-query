@@ -21,6 +21,7 @@ const config: Config = {
     '^@domain/handlers$': '<rootDir>/src/domain/handlers/index.ts',
     '^@domain/(.*)$': '<rootDir>/src/domain/$1',
     '^@contracts$': '<rootDir>/src/contracts/index.ts',
+    '^@contracts/v3$': '<rootDir>/src/contracts/v3/index.ts',
     '^@contracts/(.*)$': '<rootDir>/src/contracts/$1',
     '^@infra/(.*)$': '<rootDir>/src/infra/$1',
   },
