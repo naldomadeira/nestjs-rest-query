@@ -112,6 +112,24 @@ export type DrizzleCondition =
   | { readonly op: 'alwaysFalse' }
   | { readonly op: 'alwaysTrue' };
 
+/**
+ * Relação `many` da projeção, hidratada por uma consulta própria.
+ *
+ * Juntá-la ao statement principal inflaria os roots e quebraria `LIMIT`; a
+ * consulta separada é a segunda fase da §14 para este adapter.
+ */
+export interface DrizzleManyProjection {
+  readonly path: string;
+  readonly table: string;
+  /** Coluna do root que correlaciona com a relação. */
+  readonly sourceColumn: string;
+  readonly targetColumn: string;
+  /** Colunas a projetar no alvo, já sem as internas do plano. */
+  readonly columns: readonly string[];
+  /** Chave primária do alvo, usada para ordenar a coleção. */
+  readonly orderBy: readonly string[];
+}
+
 export interface DrizzleStatement {
   readonly dialect: SqlDialect;
   readonly table: string;
@@ -124,6 +142,9 @@ export interface DrizzleStatement {
   readonly offset?: number;
   /** `true` no statement de contagem: o executor emite `count(*)`. */
   readonly countOnly: boolean;
+  /** Chave primária do root, para agrupar as coleções hidratadas. */
+  readonly rootKey: readonly string[];
+  readonly manyProjections: readonly DrizzleManyProjection[];
 }
 
 /** Contexto entregue a `customize`, uma vez por query do escopo. */
