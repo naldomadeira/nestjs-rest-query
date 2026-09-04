@@ -1,3 +1,4 @@
+import { typeormSource } from '@infra/adapters/typeorm';
 import { CORPUS_CASES } from '../corpus/cases';
 import { runCorpusCase, seedCorpus } from '../fixtures/corpus-runner';
 import {
@@ -36,7 +37,9 @@ describeCell(`corpus real — ${dialect ?? 'sem célula selecionada'}`, () => {
     async (_id, testCase) => {
       const actual = await runCorpusCase(
         testCase,
-        context.repositoryFor(testCase.rules)
+        typeormSource(context.repositoryFor(testCase.rules), {
+          fieldKinds: { post: { id: 'uuid' }, tag: { post_id: 'uuid' } },
+        })
       );
 
       if (testCase.expect.kind === 'error') {
