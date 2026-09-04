@@ -72,3 +72,6 @@ tests/v3/package/consumer-fixtures/*/node_modules/
 tests/v3/package/consumer-fixtures/*/package.json
 tests/v3/package/consumer-fixtures/*/package-lock.json
 *.tgz
+
+# Client Prisma gerado pelo harness do corpus (pnpm prisma:generate)
+tests/v3/adapters/prisma/generated/

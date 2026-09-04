@@ -9,3 +9,4 @@ apps/docs/.source
 apps/docs/next-env.d.ts
 pnpm-lock.yaml
 *.tgz
+tests/v3/adapters/prisma/generated/

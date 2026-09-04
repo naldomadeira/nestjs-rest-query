@@ -33,6 +33,11 @@ const config: Config = {
     '^@contracts/v3$': '<rootDir>/src/contracts/v3/index.ts',
     '^@contracts/(.*)$': '<rootDir>/src/contracts/$1',
     '^@infra/(.*)$': '<rootDir>/src/infra/$1',
+    // O generator "prisma-client" emite import specifiers com `.js` (regra
+    // NodeNext) para arquivos `.ts` — o próprio tsc resolve isso, mas o
+    // resolver do Jest não. Sem este mapeamento, requerer o client Prisma
+    // gerado falha com "Cannot find module './internal/class.js'".
+    '^(\\.{1,2}/.*)\\.js$': '$1',
   },
   collectCoverageFrom: ['src/**/*.{js,ts}'],
   coveragePathIgnorePatterns: [
