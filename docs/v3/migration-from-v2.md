@@ -786,17 +786,23 @@ paths.
 Vale a nota histórica, porque um consumidor v2 pode ter esbarrado nisso: até a
 `3.0.0` o alvo virava junção de predicado, que duplicava linhas do root antes do
 `LIMIT` e devolvia página curta **em silêncio** — medido no exemplo 02 contra
-PostgreSQL, com `perPage=5` voltando 4 linhas para 24 roots que casavam. Hoje
-esse exemplo declara `search: ['user.firstName', 'items.company.name']`, um
-salto `one` e um salto `many` no mesmo `OR`. Note que todo alvo de `search`
-exige coluna dobrada, inclusive através de relação: foi por isso que
-`items.company.cnpj` ficou fora — sem `cnpj_folded`, declará-lo derruba a
-subida, não a requisição. A
-causa era o plano: `PlanFilter` carregava a marca `existential` e
-`PlanSearch.targets` não carregava nenhuma, de modo que Prisma e Drizzle
-acertavam por derivar a cardinalidade sozinhos e o TypeORM, que confia no
-plano, errava. O caso `search/through-many-is-existential` do corpus é o que
-trava a convergência dos três.
+PostgreSQL, com `perPage=5` voltando 4 linhas para 24 roots que casavam.
+
+Aquele exemplo, porém, **manteve** `search: ['user.firstName']` depois do
+conserto, porque os paths da v2 dele esbarram em dois outros limites:
+
+- os dois cruzam **duas** relações (`items` e depois `company`), e o adapter
+  TypeORM recusa cadeia existencial de mais de um salto — assim como recusa
+  many-to-many — enquanto Prisma e Drizzle compilam as duas formas. É pendência
+  declarada, ver [`status.md`](./status.md);
+- `items.company.cnpj` não tem coluna dobrada, e **todo** alvo de `search`
+  exige uma, inclusive através de relação: declará-lo derruba a subida, não a
+  requisição. A
+  causa era o plano: `PlanFilter` carregava a marca `existential` e
+  `PlanSearch.targets` não carregava nenhuma, de modo que Prisma e Drizzle
+  acertavam por derivar a cardinalidade sozinhos e o TypeORM, que confia no
+  plano, errava. O caso `search/through-many-is-existential` do corpus é o que
+  trava a convergência dos três.
 
 Limite que resta: `search` atravessando **duas** relações `many` no mesmo path
 (`posts.tags.label`) é recusado com `CAPABILITY_UNAVAILABLE` — o mesmo limite

@@ -223,7 +223,26 @@ nada.
    (`getRawMany` devolve o valor do driver, `getMany` devolve `Date`). Hoje é
    benigno e `composite-pagination.spec.ts` trava a ordem observável; deixa de
    ser no dia em que algo puder remover o `ORDER BY` da hidratação.
-10. **Publicar `3.0.0-alpha.1`.** Dois gates da §23 — build em consumidor
+10. **`CAPABILITY_UNAVAILABLE` sai com dois status HTTP diferentes.** A recusa
+    de padrão do Prisma usa `inputError` (**400**); as recusas existenciais do
+    TypeORM e o desempate de PK `uuid` usam `configurationError` (**500**).
+    Mesmo código, dois status — e o 500 é disparado por _query de cliente_
+    (um path de filtro que cruza duas relações), o que faz condição causada
+    pelo cliente sair como erro de servidor.
+11. **`QUERY_SYNTAX_UNKNOWN_PARAM` é declarado e nunca lançado.** Parâmetro
+    desconhecido é ignorado, e o JSDoc de `DynamicQueryDto` afirma o contrário
+    — a index signature de `QueryInputLike` existe para permitir a recusa que
+    ninguém implementou. Decidir entre implementar ou marcar o código como
+    reservado.
+12. **`textProfile: 'database-native'` não muda compilação nenhuma.** É lido
+    num único ponto (`query-builder.v3.service.ts:139`), e só para _pular_ a
+    checagem de portabilidade; nenhum adapter o consulta, e
+    `validate-filter.ts` usa a coluna dobrada sempre. Hoje é opção reservada
+    vendida como perfil.
+13. **`consistency: 'transactional'` reprova toda requisição.** Os três
+    adapters declaram `transactionalConsistency: false` e o serviço recusa
+    quando a opção é pedida. Está configurável e é inutilizável.
+14. **Publicar `3.0.0-alpha.1`.** Dois gates da §23 — build em consumidor
     isolado e guia de migração validado num projeto v2 real de terceiro — só
     podem ser provados por alguém de fora. Pular o alpha significa descobri-los
     num rc.
