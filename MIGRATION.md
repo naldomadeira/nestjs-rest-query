@@ -489,13 +489,23 @@ Worth a line of history, because a 2.x consumer may have hit it: until the
 `3.0.0` release this was a predicate join, which duplicated root rows before
 `LIMIT` and silently returned a short page — measured in example 02 against
 PostgreSQL, where `perPage=5` came back with 4 rows out of 24 matching roots.
-Example 02 declares `search: ['user.firstName', 'items.company.name']` today,
-mixing a `one` hop and a `many` hop in one `OR`, and its smoke E2E locks the
-behaviour. It leaves `items.company.cnpj` out for an unrelated reason worth
-knowing: `search` compares through the folded column, and that field has none,
-so declaring it does not fail the request — it fails **boot**, with
-`Search field items.company.cnpj declares no folded field`. The corpus case that proves the
-three adapters agree is `search/through-many-is-existential`.
+The corpus case that proves the three adapters agree is
+`search/through-many-is-existential`.
+
+Two limits that bite right after this one, and example 02 hits both — which is
+why its whitelist stayed at `search: ['user.firstName']` even after the fix:
+
+- **More than one relation in the path.** Under the TypeORM adapter, an
+  existential condition through a `many` hop **followed by another relation**
+  (`items.company.name`), or through a many-to-many, is refused with
+  `CAPABILITY_UNAVAILABLE`. Prisma and Drizzle compile both. This is a declared
+  pending item, not intended behaviour — see
+  [`docs/v3/status.md`](./docs/v3/status.md).
+- **Every `search` target needs a folded column, including through a
+  relation.** `items.company.cnpj` has none, and declaring it does not fail the
+  request — it fails **boot**, with
+  `Search field items.company.cnpj declares no folded field`. The corpus case that proves the
+  three adapters agree is `search/through-many-is-existential`.
 
 The one remaining limit: `search` through **two** `many` relations in the same
 path (`posts.tags.label`) is refused with `CAPABILITY_UNAVAILABLE` — the same
