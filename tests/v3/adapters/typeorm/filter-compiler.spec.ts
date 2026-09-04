@@ -44,12 +44,12 @@ describe('compilação de filtros TypeORM', () => {
     const { parameters } = compileToQueryBuilder({
       filter: { name: { like: '100%_\\' } },
     });
-    expect(Object.values(parameters)[0]).toBe('%100\\%\\_\\\\%');
+    expect(Object.values(parameters)[0]).toBe('%100!%!_\\%');
   });
 
   it('emite a cláusula ESCAPE explícita', () => {
     const { sql } = compileToQueryBuilder({ filter: { name: { like: 'a' } } });
-    expect(sql).toMatch(/LIKE :dqb_0 ESCAPE '\\'/);
+    expect(sql).toMatch(/LIKE :dqb_0 ESCAPE '!'/);
   });
 
   it('ilike consulta a coluna folded e não emite ILIKE', () => {

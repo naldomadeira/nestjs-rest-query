@@ -29,7 +29,7 @@ describe('TypeOrmAdapter', () => {
     expect(adapter.capabilities(input())).toEqual({
       dialect: 'sqlite',
       transactionalConsistency: true,
-      escapeCharacter: '\\',
+      escapeCharacter: '!',
     });
   });
 
