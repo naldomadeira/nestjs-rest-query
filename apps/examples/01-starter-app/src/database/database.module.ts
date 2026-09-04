@@ -11,7 +11,8 @@ import * as path from 'path';
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => {
         return {
-          type: 'sqlite',
+          // O TypeORM 1.x removeu o driver `sqlite` em favor de `better-sqlite3`.
+  type: 'better-sqlite3',
           database: 'database.sqlite',
           entities: [path.resolve(__dirname, '../**/*.entity{.ts,.js}')],
           migrations: [`${__dirname}/migrations/*{.ts,.js}`],
