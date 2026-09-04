@@ -1,3 +1,4 @@
+import type { SqlDialect } from '@contracts/v3';
 import { configurationError } from '@core/errors';
 import type { TypedQueryPlan } from '@core/query-plan';
 import type { PlanFilter } from '@core/semantic-validator';
@@ -12,6 +13,7 @@ import type {
 export interface DrizzleFilterContext {
   readonly planner: DrizzleJoinPlanner;
   readonly escapeCharacter: string;
+  readonly dialect: SqlDialect;
 }
 
 /**
@@ -55,7 +57,7 @@ export function compileFilter(
   }
 
   return scoped(filter.relationPath, filter.column, context, (ref) =>
-    scalarCondition(ref, filter, context.escapeCharacter)
+    scalarCondition(ref, filter, context.escapeCharacter, context.dialect)
   );
 }
 
@@ -120,9 +122,10 @@ function compileRelationPresence(
 export function scalarCondition(
   ref: DrizzleColumnRef,
   filter: PlanFilter,
-  escapeCharacter: string
+  escapeCharacter: string,
+  dialect: SqlDialect
 ): DrizzleCondition {
-  const value = toDriverValue(filter.value);
+  const value = toDriverValue(filter.value, dialect);
 
   switch (filter.operator) {
     case 'eq':
