@@ -20,14 +20,27 @@ export interface ApiPaginatedResponseOptions {
 }
 
 /**
- * Documenta no Swagger o envelope `QueryResult<T>` retornado por endpoints paginados.
+ * Documenta no Swagger o envelope `NormalizedQueryResult<T>` retornado por
+ * endpoints paginados.
+ *
+ * O envelope não mudou na v3 (`data` mais os quatro campos de paginação), mas
+ * a chamada em volta dele mudou inteira — e este JSDoc aparece no IntelliSense
+ * de quem está migrando, o que faz de um exemplo desatualizado aqui uma
+ * instrução errada no pior momento possível.
  *
  * @example
  * ```ts
+ * // As regras são compiladas uma vez, fora da classe: o decorator é avaliado
+ * // no carregamento do módulo, antes de existir container ou repositório.
+ * const userRules = defineQueryRules(registry, 'user', { filters: [...] });
+ *
  * @Get()
- * @ApiDynamicQuery({ filters: ['name'], sorts: ['name'] })
+ * @ApiDynamicQuery(userRules)
  * @ApiPaginatedResponse(User, { description: 'Lista de usuários' })
- * async findAll(@Query() query: DynamicQueryDto, @QueryRules() rules: RulesConfig) {
+ * async findAll(
+ *   @Query() query: DynamicQueryDto,
+ *   @QueryRules() rules: CompiledQueryRules
+ * ) {
  *   return this.service.findAll(query, rules);
  * }
  * ```
