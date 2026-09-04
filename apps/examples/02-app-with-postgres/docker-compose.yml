@@ -10,6 +10,15 @@ services:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # Sem healthcheck, `docker compose up --wait` devolve o controle quando o
+    # container está *running* — que no Postgres é antes de ele aceitar
+    # conexão. O smoke E2E então falha na primeira tentativa, de forma
+    # intermitente e só em máquina lenta ou runner de CI.
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d multi_acessos']
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
 volumes:
   postgres_data:

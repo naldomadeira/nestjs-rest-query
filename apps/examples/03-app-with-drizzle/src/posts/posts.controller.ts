@@ -1,53 +1,56 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import {
   ApiDynamicQuery,
   ApiPaginatedResponse,
   DynamicQueryDto,
-  QueryResult,
   QueryRules,
-  RulesConfig,
+  type CompiledQueryRules,
 } from 'nestjs-rest-query';
-import { PostsBusiness } from './posts.business';
+import { PostsService } from './posts.service';
+import { postRules } from './posts.query';
 
-/**
- * Post entity shape for Swagger documentation. Relation slot
- * reflects the flat response produced by `DrizzleAdapter`.
- */
-class PostDto {
+/** Forma do post para o Swagger — ver `UserView`. */
+class PostView {
+  @ApiProperty({ format: 'uuid' })
   id: string;
+
+  @ApiProperty()
   title: string;
-  content?: string;
+
+  @ApiProperty({ required: false, nullable: true })
+  content?: string | null;
+
+  @ApiProperty({ format: 'uuid' })
   userId: string;
-  createdAt: Date;
+
+  @ApiProperty({ format: 'date-time' })
+  createdAt: string;
+
+  @ApiProperty({ required: false })
   user?: { id: string; name: string };
 }
 
 @ApiTags('posts')
 @Controller('posts')
 export class PostsController {
-  constructor(private readonly postsBusiness: PostsBusiness) {}
+  constructor(private readonly postsService: PostsService) {}
 
   @Get()
   @ApiOperation({
-    summary: 'Fetch posts with dynamic filters',
+    summary: 'Busca posts com filtros dinâmicos',
     description:
-      'Fetch posts with support for filters, sorting, pagination, and user includes',
+      'Relação `one` não nulável para o autor, com projeção aninhada e busca dobrada',
   })
-  @ApiDynamicQuery<PostDto>({
-    filters: ['id', 'title', 'userId', 'createdAt', 'user'],
-    sorts: ['title', 'createdAt', 'user'],
-    fields: ['id', 'title', 'content', 'userId', 'createdAt'],
-    includes: ['user'],
-  })
-  @ApiPaginatedResponse<PostDto>(PostDto, {
+  @ApiDynamicQuery(postRules)
+  @ApiPaginatedResponse(PostView, {
     status: 200,
-    description: 'List of posts',
+    description: 'Lista de posts',
   })
   async findAll(
     @Query() query: DynamicQueryDto,
-    @QueryRules() rules: RulesConfig
-  ): Promise<QueryResult<PostDto>> {
-    return this.postsBusiness.findAll(query, rules);
+    @QueryRules() rules: CompiledQueryRules
+  ) {
+    return this.postsService.findAll(query, rules);
   }
 }

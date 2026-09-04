@@ -1,66 +1,68 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import {
   ApiDynamicQuery,
   ApiPaginatedResponse,
   DynamicQueryDto,
-  QueryResult,
   QueryRules,
-  RulesConfig,
+  type CompiledQueryRules,
 } from 'nestjs-rest-query';
-import { UsersBusiness } from './users.business';
+import { UsersService } from './users.service';
+import { userRules } from './users.query';
 
 /**
- * User entity shape for Swagger documentation. Relation slots reflect
- * the flat response produced by `DrizzleAdapter` so the generic-typed
- * `RulesConfig<UserDto>` accepts include keys.
+ * Forma do usuário **para o Swagger**, não para o runtime.
+ *
+ * A projeção real é decidida pelas regras e pela URL, e o adapter Drizzle
+ * devolve `object`. Esta classe existe só para o schema OpenAPI ter um corpo
+ * concreto; ela não participa da autorização nem da execução.
  */
-class UserDto {
+class UserView {
+  @ApiProperty({ format: 'uuid' })
   id: string;
+
+  @ApiProperty()
   name: string;
+
+  @ApiProperty()
   email: string;
-  companyId?: string;
-  createdAt: Date;
-  company?: { id: string; name: string };
+
+  @ApiProperty({ format: 'uuid', nullable: true })
+  companyId: string | null;
+
+  @ApiProperty({ format: 'date-time' })
+  createdAt: string;
+
+  @ApiProperty({ required: false, nullable: true })
+  company?: { id: string; name: string } | null;
+
+  @ApiProperty({ required: false, isArray: true })
   posts?: Array<{ id: string; title: string }>;
 }
 
 @ApiTags('users')
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersBusiness: UsersBusiness) {}
+  constructor(private readonly usersService: UsersService) {}
 
   @Get()
   @ApiOperation({
-    summary: 'Fetch users with dynamic filters',
+    summary: 'Busca usuários com filtros dinâmicos',
     description:
-      'Fetch users with support for filters, sorting, pagination, and relationships',
+      'Filtros, ordenação, paginação, busca dobrada e relações, com whitelist exata por campo',
   })
-  @ApiDynamicQuery<UserDto>({
-    filters: [
-      'id',
-      'name',
-      'email',
-      'companyId',
-      'createdAt',
-      'company',
-      'posts',
-    ],
-    // sort on 'posts' is intentionally NOT allowed: ORDER BY through a 'many'
-    // relation is rejected by the adapter (semantic ambiguity under DISTINCT).
-    sorts: ['name', 'email', 'createdAt', 'company'],
-    fields: ['id', 'name', 'email', 'companyId', 'createdAt'],
-    includes: ['company', 'posts'],
-    search: ['name', 'email', 'company.name'],
-  })
-  @ApiPaginatedResponse<UserDto>(UserDto, {
+  // As regras compiladas são a fonte única: o decorator as registra no handler
+  // e gera a documentação a partir delas, então Swagger e autorização não podem
+  // divergir.
+  @ApiDynamicQuery(userRules)
+  @ApiPaginatedResponse(UserView, {
     status: 200,
-    description: 'List of users',
+    description: 'Lista de usuários',
   })
   async findAll(
     @Query() query: DynamicQueryDto,
-    @QueryRules() rules: RulesConfig
-  ): Promise<QueryResult<UserDto>> {
-    return this.usersBusiness.findAll(query, rules);
+    @QueryRules() rules: CompiledQueryRules
+  ) {
+    return this.usersService.findAll(query, rules);
   }
 }

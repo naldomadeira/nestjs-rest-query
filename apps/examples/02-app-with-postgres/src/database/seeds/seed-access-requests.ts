@@ -21,12 +21,7 @@ import { AccessRequest } from '../../access-requests/entities/access-request.ent
 import { Company } from '../../companies/entities/company.entity';
 import { Module } from '../../modules/entities/module.entity';
 import { User } from '../../users/entities/user.entity';
-import {
-  makeApprovedAccessRequest,
-  makeAccessRequestsForUser,
-  makePendingAccessRequest,
-  makeRejectedAccessRequest,
-} from './factories/access-request.factory';
+import { makeAccessRequestsForUser } from './factories/access-request.factory';
 import { seedDataSource } from './seed.datasource';
 import { logger, parseCount, runSeed } from './utils/seed.helpers';
 

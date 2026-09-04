@@ -1,65 +1,41 @@
 @baseUrl = http://localhost:3003
 
-# COMPANIES — prisma adapter
+# GET /companies — regras em src/companies/companies.query.ts
 #
-# Result row shape (Prisma's native nested graph):
-#   { id, name, createdAt, users: [...] }
+# Shape da linha: { id, name, createdAt, users: [...] }
 
-### List all
+### Envelope canônico
 GET {{baseUrl}}/companies
 
-### Pagination
-GET {{baseUrl}}/companies?page=1&perPage=5
+### Paginação
+GET {{baseUrl}}/companies?page=1&perPage=2
 
-### No pagination
-GET {{baseUrl}}/companies?paginate=false
+### Filtros
+GET {{baseUrl}}/companies?filter[id][in]=1,2
 
-# ─────────────────────────────────────────────────────────────────────
-# FILTERS — root columns
-# ─────────────────────────────────────────────────────────────────────
+### like com caractere literal
+GET {{baseUrl}}/companies?filter[name][like]=Elétrica
 
-GET {{baseUrl}}/companies?filter[name][eq]=Acme Corp
-GET {{baseUrl}}/companies?filter[name][ilike]=tech
-GET {{baseUrl}}/companies?filter[createdAt][gte]=2024-01-01
-GET {{baseUrl}}/companies?filter[name][in]=Acme Corp,Globex,Initech
+### ilike pela coluna dobrada
+GET {{baseUrl}}/companies?filter[name][ilike]=ELÉTRICA
 
-# ─────────────────────────────────────────────────────────────────────
-# FILTERS — relation paths (1:N: users) wrap in `some`
-# ─────────────────────────────────────────────────────────────────────
+### Filtro através da coleção → `users: { some: ... }`
+GET {{baseUrl}}/companies?filter[users.name][ilike]=ana
 
-GET {{baseUrl}}/companies?filter[users.email][ilike]=ana
+### Busca (declarada em name)
+GET {{baseUrl}}/companies?search=logística
 
-# ─────────────────────────────────────────────────────────────────────
-# SORTING
-# ─────────────────────────────────────────────────────────────────────
+### Ordenação
+GET {{baseUrl}}/companies?sort=-name
 
-GET {{baseUrl}}/companies?sort=name
-GET {{baseUrl}}/companies?sort=-createdAt
+### Coleção incluída, com projeção aninhada
+GET {{baseUrl}}/companies?includes=users&fields=id,name,users.name
 
-### ✗ Sort through 'many' relation → 400
-GET {{baseUrl}}/companies?sort=-users.name
+### Coleção incluída com a projeção default da relação
+GET {{baseUrl}}/companies?includes=users
 
-# ─────────────────────────────────────────────────────────────────────
-# SEARCH
-# ─────────────────────────────────────────────────────────────────────
+### ✗ 400 — ordenar por coluna de coleção
+GET {{baseUrl}}/companies?sort=users.name
 
-GET {{baseUrl}}/companies?search=acme
-
-# ─────────────────────────────────────────────────────────────────────
-# FIELDS / INCLUDES
-# ─────────────────────────────────────────────────────────────────────
-
-GET {{baseUrl}}/companies?fields=id,name
-
-### 'many' include — Prisma returns users as an array
-GET {{baseUrl}}/companies?includes=users&page=1&perPage=2
-
-### fields + includes: users reduced to PK only
-GET {{baseUrl}}/companies?fields=name&includes=users
-
-# ─────────────────────────────────────────────────────────────────────
-# COMBINATIONS
-# ─────────────────────────────────────────────────────────────────────
-
-GET {{baseUrl}}/companies?filter[name][ilike]=acme&includes=users&page=1&perPage=5
-GET {{baseUrl}}/companies?filter[users.email][ilike]=acme&includes=users&page=1&perPage=3
+### ✗ 400 FIELD_NOT_ALLOWED — a whitelist da relação é exata
+GET {{baseUrl}}/companies?includes=users&fields=id,users.createdAt
