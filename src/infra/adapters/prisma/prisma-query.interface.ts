@@ -23,12 +23,47 @@ export interface PrismaManifest {
 
 export type PrismaManifestInput = PrismaManifest;
 
+/**
+ * Delegate do Prisma como a v3 o chama.
+ *
+ * Os parâmetros são `unknown` **de propósito**, e é a diferença entre a v3 ser
+ * usável de fora e não ser. O delegate gerado declara
+ * `findMany<T extends UserFindManyArgs>(args?: SelectSubset<T, UserFindManyArgs>)`,
+ * e `PrismaQueryArgs` — cujo `where` é `Record<string, unknown>` — não estende
+ * `UserFindManyArgs`. Declarar aqui o tipo preciso tornaria o client gerado
+ * não atribuível, e **todo** consumidor precisaria de um cast no uso
+ * documentado, contra o gate §23.
+ *
+ * Métodos são bivariantes nos parâmetros em TypeScript, então a forma frouxa
+ * aceita o delegate real sem afrouxar nada do lado de quem chama: `compile()`
+ * continua produzindo `PrismaQueryArgs` tipado, e é isso que vai ao client.
+ *
+ * O retorno é `unknown` pela mesma razão (`PrismaPromise<GetFindResult<…>[]>`)
+ * e é estreitado no adapter por checagem, nunca por afirmação.
+ */
 export interface PrismaDelegate {
-  findMany(args: PrismaQueryArgs): Promise<readonly object[]>;
-  count(args: PrismaCountArgs): Promise<number>;
+  findMany(args: unknown): Promise<unknown>;
+  count(args: unknown): Promise<number>;
 }
 
-export type PrismaClientLike = Readonly<Record<string, PrismaDelegate>>;
+/**
+ * O client do Prisma, tipado pelo que a v3 realmente exige dele: ser um objeto
+ * do qual se busca um delegate por nome.
+ *
+ * Não pode ser `Readonly<Record<string, PrismaDelegate>>`, que é o que era até
+ * a medição do exemplo 04: o client gerado é uma **classe**, e classe não
+ * recebe index signature implícita em TypeScript — só type alias recebe. Com
+ * o tipo de registro, nenhum `PrismaClient` real é atribuível, e o exemplo
+ * precisou de uma ponte de 20 linhas para atravessar a fronteira. É o mesmo
+ * defeito do commit `5fd238c`, do outro lado dela.
+ *
+ * O que garante a forma não é o tipo, é `prismaSource`: o delegate é buscado
+ * pelo nome que o manifesto declara e **validado em runtime**, falhando com
+ * `SOURCE_CONFIGURATION_INVALID` na inicialização se não expuser `findMany` e
+ * `count`. Validação em runtime é o que o tipo nunca poderia dar aqui — o
+ * nome do delegate vem de dado, não de código.
+ */
+export type PrismaClientLike = object;
 
 export interface PrismaSourceInput {
   readonly client: PrismaClientLike;

@@ -130,7 +130,7 @@ async function openPrismaCell(context: IntegrationContext): Promise<Cell> {
   return {
     sourceFor: (preset) =>
       prismaSource({
-        client: client as never,
+        client,
         model: modelOf(preset),
         manifest,
       }) as AnyQuerySource,
