@@ -61,9 +61,12 @@ export function compilePlan<T extends ObjectLiteral>(
  * Subconjunto de joins necessário só aos predicados. O count não pode juntar
  * relações de apresentação: elas multiplicariam os roots (spec §14).
  *
- * Como caminhos por relação `many` viram EXISTS, todo join de predicado é
- * `one` — por isso o count nunca infla e a primeira fase da paginação pode
- * usar LIMIT/OFFSET direto.
+ * Como todo caminho por relação `many` — de filtro **ou** de busca — vira
+ * EXISTS, todo join de predicado é `one`. É isso que faz o count nunca inflar
+ * e permite à primeira fase da paginação usar LIMIT/OFFSET direto. Enquanto o
+ * alvo de busca por `many` era compilado como join de predicado, a premissa
+ * era falsa e o LIMIT caía sobre linhas duplicadas: página curta com `total`
+ * certo, porque só o `getCount()` conta roots distintos.
  */
 export function predicateOnly(joins: JoinPlan): JoinPlan {
   const nodes = new Map(

@@ -54,14 +54,28 @@ export function compileFilters<T extends ObjectLiteral>(
   const search = context.plan.search;
   if (search && search.targets.length > 0) {
     // Search combina seus campos com OR e entra como mais um termo do AND.
+    //
+    // Existencial e não existencial convivem no mesmo OR: a busca é uma só
+    // pergunta ("algum destes lugares contém o termo"), e separá-la em dois
+    // grupos a transformaria num AND de duas buscas.
     qb.andWhere(
       new Brackets((where) => {
         for (const target of search.targets) {
           const key = bag.add(
             containsPattern(search.foldedTerm, context.escapeCharacter)
           );
+          const like = (column: string): string =>
+            `${column} LIKE :${key} ESCAPE '${context.escapeCharacter}'`;
+
           where.orWhere(
-            `${columnRef(target.column, context)} LIKE :${key} ESCAPE '${context.escapeCharacter}'`
+            target.existential
+              ? existsThroughMany(
+                  qb,
+                  target.path,
+                  target.relationPath,
+                  (alias) => like(`${alias}.${leafColumn(target.column)}`)
+                )
+              : like(columnRef(target.column, context))
           );
         }
       })
@@ -178,12 +192,47 @@ function existentialCondition<T extends ObjectLiteral>(
   context: FilterCompilerContext,
   bag: ParameterBag
 ): string {
-  const relationPath = filter.relationPath;
+  const exists = existsThroughMany(
+    qb,
+    filter.path,
+    filter.relationPath,
+    // Alvo é a própria relação: a condição é só a correlação, sem folha.
+    filter.target === 'relation'
+      ? null
+      : (alias) =>
+          existentialLeafCondition(
+            `${alias}.${leafColumn(filter.column)}`,
+            filter,
+            context,
+            bag
+          )
+  );
+
+  // `isNull=true` numa relação many significa coleção vazia.
+  return filter.target === 'relation' && filter.value === true
+    ? `NOT ${exists}`
+    : exists;
+}
+
+/**
+ * `EXISTS` correlacionado por um caminho que cruza `many`.
+ *
+ * É a mesma maquinaria para filtro e para busca — inclusive a correlação por
+ * FK composta —, porque a semântica é a mesma: "algum item corresponde". O
+ * chamador só fornece a condição da folha, já qualificada pelo alias da
+ * subquery, ou `null` quando a pergunta é sobre a própria coleção.
+ */
+function existsThroughMany<T extends ObjectLiteral>(
+  qb: SelectQueryBuilder<T>,
+  path: string,
+  relationPath: readonly string[],
+  leaf: ((subAlias: string) => string) | null
+): string {
   if (relationPath.length !== 1) {
     throw configurationError(
       'CAPABILITY_UNAVAILABLE',
-      `Existential filters through nested many relations are not supported yet: ${filter.path}`,
-      { path: filter.path }
+      `Existential conditions through nested many relations are not supported yet: ${path}`,
+      { path }
     );
   }
 
@@ -202,19 +251,9 @@ function existentialCondition<T extends ObjectLiteral>(
     .join(' AND ');
 
   const conditions = [correlation];
+  if (leaf) conditions.push(leaf(subAlias));
 
-  if (filter.target !== 'relation') {
-    const leaf = filter.column.split('.').pop()!;
-    const column = `${subAlias}.${leaf}`;
-    conditions.push(existentialLeafCondition(column, filter, context, bag));
-  }
-
-  const exists = `EXISTS (SELECT 1 FROM ${owner.tableName} ${subAlias} WHERE ${conditions.join(' AND ')})`;
-
-  // `isNull=true` numa relação many significa coleção vazia.
-  return filter.target === 'relation' && filter.value === true
-    ? `NOT ${exists}`
-    : exists;
+  return `EXISTS (SELECT 1 FROM ${owner.tableName} ${subAlias} WHERE ${conditions.join(' AND ')})`;
 }
 
 function existentialLeafCondition(
@@ -257,6 +296,11 @@ function existentialLeafCondition(
       return `${column} ${SQL_COMPARISON[filter.operator]} :${key}`;
     }
   }
+}
+
+/** Última parte de um path pontuado: a coluna física da folha. */
+function leafColumn(column: string): string {
+  return column.slice(column.lastIndexOf('.') + 1);
 }
 
 /** Referência SQL de uma coluna lógica, resolvendo o alias do join. */

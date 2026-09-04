@@ -318,6 +318,10 @@ function compileSearch(
         relationPath: Object.freeze(
           resolved.relationChain.map((relation) => relation.path)
         ),
+        // Mesmo `crossesMany` de `validate-filter.ts`: buscar por uma folha
+        // atravessando `many` é "algum item casa o termo", nunca um join de
+        // predicado — que duplicaria roots e encurtaria a página.
+        existential: crossesMany(resolved.relationChain),
       });
     })
   );
