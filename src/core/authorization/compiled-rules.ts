@@ -12,6 +12,15 @@ export interface CompiledSearchTarget {
   /** Coluna consultada: sempre o folded field (spec §12). */
   readonly column: string;
   readonly relationPath: readonly string[];
+  /**
+   * `true` quando o caminho cruza uma relação many (spec §11.1).
+   *
+   * É calculado aqui, e não no validador semântico, porque a cardinalidade
+   * mora nos descritores de relação e a cadeia deles só existe enquanto
+   * `resolvePath` roda — na inicialização. Depois disso sobra `relationPath`,
+   * que são nomes. `validateSearch` apenas propaga a marca para o plano.
+   */
+  readonly existential: boolean;
 }
 
 export interface CompiledQueryRules {
