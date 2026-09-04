@@ -66,3 +66,9 @@ notes.txt
 
 # Análise e documentação interna
 /analise
+
+# Artefatos das consumer fixtures
+tests/v3/package/consumer-fixtures/*/node_modules/
+tests/v3/package/consumer-fixtures/*/package.json
+tests/v3/package/consumer-fixtures/*/package-lock.json
+*.tgz
