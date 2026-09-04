@@ -1,4 +1,5 @@
 import type { ColumnMetadata } from 'typeorm/metadata/ColumnMetadata';
+import type { ColumnType } from 'typeorm/driver/types/ColumnTypes';
 import type { EntityMetadata, ObjectLiteral, Repository } from 'typeorm';
 import { configurationError } from '@core/errors';
 import {
@@ -72,7 +73,13 @@ const TYPE_MAP: Readonly<Record<string, ScalarKind>> = {
   blob: 'binary',
   varbinary: 'binary',
   binary: 'binary',
+  // `enum` é o nome físico no PostgreSQL e no MySQL; `simple-enum` é o nome
+  // que o TypeORM dá ao enum portável (varchar + CHECK), e é o único que ele
+  // aceita no SQLite. Sem ele, uma entidade com enum portável fazia o registry
+  // inteiro falhar como "tipo não mapeado" — os dois descrevem o mesmo tipo
+  // lógico, com os mesmos `enumValues`.
   enum: 'enum',
+  'simple-enum': 'enum',
 };
 
 /** Sufixos convencionais das colunas internas do perfil portável. */
@@ -186,7 +193,9 @@ function resolveKind(
   const raw =
     typeof column.type === 'string'
       ? column.type.toLowerCase()
-      : normalizeConstructorType(column.type);
+      : // `String(...)` mantém a falha fechada: um construtor fora do mapa
+        // viraria `"undefined"` e cairia no erro abaixo, nunca em `string`.
+        String(CONSTRUCTOR_TYPES.get(column.type));
 
   const kind = TYPE_MAP[raw];
   if (!kind) {
@@ -199,19 +208,23 @@ function resolveKind(
   return kind;
 }
 
-/** TypeORM aceita construtores (`Number`, `String`, `Date`, `Boolean`). */
-function normalizeConstructorType(type: unknown): string {
-  const name = (type as { name?: string })?.name?.toLowerCase();
-  switch (name) {
-    case 'number':
-      return 'integer';
-    case 'string':
-      return 'varchar';
-    case 'boolean':
-      return 'boolean';
-    case 'date':
-      return 'datetime';
-    default:
-      return String(name ?? type);
-  }
-}
+/**
+ * TypeORM aceita construtores no lugar do nome físico: é o que `@Column()` sem
+ * `type` explícito deixa na metadata, por reflexão do tipo da propriedade.
+ *
+ * O `ColumnType` do TypeORM admite exatamente estes quatro construtores fora
+ * das strings, então o mapa é total. Não há arm de fallback de propósito: o
+ * `default` que existia aqui era inalcançável — nenhum outro valor tipifica — e
+ * sugeria que um construtor desconhecido teria tratamento próprio, quando o
+ * único tratamento correto é o mesmo erro de tipo não mapeado que
+ * `resolveKind` já levanta.
+ */
+const CONSTRUCTOR_TYPES: ReadonlyMap<
+  Exclude<ColumnType, string>,
+  string
+> = new Map<Exclude<ColumnType, string>, string>([
+  [Number, 'integer'],
+  [String, 'varchar'],
+  [Boolean, 'boolean'],
+  [Date, 'datetime'],
+]);
