@@ -40,7 +40,7 @@ describe('corpus canônico', () => {
    * Divergência intencional é exceção, e exceção precisa doer para entrar.
    *
    * Este teste é o inventário: qualquer nova divergência muda a lista abaixo e
-   * aparece na revisão, em vez de passar como mais um objeto no meio dos 85
+   * aparece na revisão, em vez de passar como mais um objeto no meio dos 71
    * casos.
    */
   it('declara apenas as divergências de adapter já revisadas', () => {
@@ -71,6 +71,7 @@ describe('corpus canônico', () => {
       'prisma:ilike/case-fold@sqlite,mssql',
       'prisma:ilike/nfd-input-matches-nfc-storage@sqlite,mssql',
       'prisma:search/or-across-configured-fields@sqlite,mssql',
+      'prisma:search/through-many-is-existential@sqlite,mssql',
     ]);
 
     for (const entry of declared) {
