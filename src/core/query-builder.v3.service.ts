@@ -177,10 +177,10 @@ export class QueryBuilderService {
     const expected = plan.schema;
 
     if (actual.model !== expected.model) {
-      throw inputError(
-        'SOURCE_CONFIGURATION_INVALID',
+      throw sourceMismatch(
+        source.kind,
         `Source model ${actual.model} does not match query rules model ${expected.model}`,
-        { adapter: source.kind, expected: expected.model, actual: actual.model }
+        { expected: expected.model, actual: actual.model }
       );
     }
 

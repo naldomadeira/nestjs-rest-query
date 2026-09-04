@@ -178,6 +178,28 @@ describe('QueryBuilderService (v3)', () => {
     expect(calls.map((call) => call.kind)).toEqual(['describe']);
   });
 
+  it('trata model físico incompatível como erro de configuração da source', async () => {
+    const service = new QueryBuilderService({});
+    const wrongSchema = defineQuerySchema({
+      model: 'company',
+      primaryKey: ['id'],
+      fields: [
+        { path: 'id', kind: 'integer', nullable: false, primaryKey: true },
+      ],
+      relations: [],
+    });
+
+    await expect(
+      service.execute(fakeSource({}, wrongSchema), {}, rules)
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        statusCode: 500,
+        code: 'SOURCE_CONFIGURATION_INVALID',
+      }),
+    });
+    expect(calls.map((call) => call.kind)).toEqual(['describe']);
+  });
+
   it('reaproveita a validação da mesma source em execuções seguintes', async () => {
     const service = new QueryBuilderService({});
     const source = fakeSource();
