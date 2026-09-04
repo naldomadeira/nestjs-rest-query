@@ -1,7 +1,11 @@
 import { CORPUS_CASES } from '../../corpus/cases';
-import { closeSqlite, openSqlite } from './helpers';
-import { seedCorpus } from './seed';
-import { runCorpusCase } from './run-corpus';
+import { runCorpusCase, seedCorpus } from '../../fixtures/corpus-runner';
+import {
+  closeSqlite,
+  corpusEntities,
+  openSqlite,
+  repositoryFor,
+} from './helpers';
 
 /**
  * Contract test do corpus contra SQLite.
@@ -13,7 +17,7 @@ import { runCorpusCase } from './run-corpus';
  */
 beforeAll(async () => {
   const dataSource = await openSqlite();
-  await seedCorpus(dataSource);
+  await seedCorpus(dataSource, corpusEntities());
 }, 60_000);
 
 afterAll(closeSqlite);
@@ -22,7 +26,10 @@ describe.each(CORPUS_CASES.map((testCase) => [testCase.id, testCase] as const))(
   'corpus %s',
   (_id, testCase) => {
     it(testCase.description, async () => {
-      const actual = await runCorpusCase(testCase);
+      const actual = await runCorpusCase(
+        testCase,
+        repositoryFor(testCase.rules)
+      );
 
       if (testCase.expect.kind === 'error') {
         expect(actual).toEqual({

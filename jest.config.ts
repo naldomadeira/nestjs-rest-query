@@ -3,7 +3,16 @@ import type { Config } from 'jest';
 const config: Config = {
   moduleFileExtensions: ['ts', 'js'],
   testRegex: '.*\\.(spec|test)\\.ts$',
-  testPathIgnorePatterns: ['/node_modules/', '/dist/', '/.claude/', '/apps/'],
+  // A integração real vive em jest.integration.config.ts: ela exige os bancos
+  // do perfil certificado no ar, e deixá-la aqui reportaria 66 skips a cada
+  // execução local.
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/dist/',
+    '/.claude/',
+    '/apps/',
+    '/tests/v3/integration/',
+  ],
   verbose: true,
   collectCoverage: true,
   coverageDirectory: 'coverage',

@@ -2,37 +2,41 @@ import { DataSource, type ObjectLiteral, type Repository } from 'typeorm';
 import { buildQueryPlan } from '@core/query-plan';
 import { compilePlan } from '@infra/adapters/typeorm';
 import { RULES_PRESETS } from '../../fixtures/rules';
-import { CompanyEntity, PostEntity, TagEntity, UserEntity } from './entities';
-
-const ENTITY_BY_MODEL: Record<string, new () => ObjectLiteral> = {
-  user: UserEntity,
-  company: CompanyEntity,
-  post: PostEntity,
-  tag: TagEntity,
-};
+import {
+  buildCorpusEntities,
+  type CorpusEntities,
+} from '../../fixtures/entity-schemas';
 
 let dataSource: DataSource | undefined;
+let entities: CorpusEntities | undefined;
 
 export async function openSqlite(): Promise<DataSource> {
   if (dataSource?.isInitialized) return dataSource;
+
+  entities = buildCorpusEntities('sqlite');
   dataSource = new DataSource({
     type: 'sqlite',
     database: ':memory:',
     synchronize: true,
-    entities: [UserEntity, CompanyEntity, PostEntity, TagEntity],
+    entities: entities.all,
   });
   await dataSource.initialize();
   return dataSource;
 }
 
+export function corpusEntities(): CorpusEntities {
+  return entities!;
+}
+
 export async function closeSqlite(): Promise<void> {
   if (dataSource?.isInitialized) await dataSource.destroy();
   dataSource = undefined;
+  entities = undefined;
 }
 
 export function repositoryFor(preset: string): Repository<ObjectLiteral> {
-  const model = preset.split('.')[0];
-  return dataSource!.getRepository(ENTITY_BY_MODEL[model]);
+  const model = preset.split('.')[0] as keyof CorpusEntities;
+  return dataSource!.getRepository(entities![model] as never);
 }
 
 export interface CompiledSnapshot {

@@ -1,27 +1,23 @@
-import { DataSource } from 'typeorm';
+import type { DataSource } from 'typeorm';
 import { buildSchemaRegistry } from '@infra/adapters/typeorm';
-import { CompanyEntity, PostEntity, TagEntity, UserEntity } from './entities';
+import { closeSqlite, corpusEntities, openSqlite } from './helpers';
 
 let dataSource: DataSource;
 
 beforeAll(async () => {
-  dataSource = new DataSource({
-    type: 'sqlite',
-    database: ':memory:',
-    synchronize: true,
-    entities: [UserEntity, CompanyEntity, PostEntity, TagEntity],
-  });
-  await dataSource.initialize();
+  dataSource = await openSqlite();
 });
 
-afterAll(async () => {
-  await dataSource.destroy();
-});
+afterAll(closeSqlite);
+
+const UserEntity = () => corpusEntities().user;
+const PostEntity = () => corpusEntities().post;
+const TagEntity = () => corpusEntities().tag;
 
 describe('buildSchemaRegistry', () => {
   it('mapeia colunas físicas para ScalarKind', () => {
     const schema = buildSchemaRegistry(
-      dataSource.getRepository(UserEntity)
+      dataSource.getRepository(UserEntity())
     ).get('user')!;
 
     expect(schema.fields.get('id')?.kind).toBe('integer');
@@ -35,18 +31,18 @@ describe('buildSchemaRegistry', () => {
 
   it('descobre PK simples e composta', () => {
     expect(
-      buildSchemaRegistry(dataSource.getRepository(UserEntity)).get('user')
+      buildSchemaRegistry(dataSource.getRepository(UserEntity())).get('user')
         ?.primaryKey
     ).toEqual(['id']);
     expect(
-      buildSchemaRegistry(dataSource.getRepository(TagEntity)).get('tag')
+      buildSchemaRegistry(dataSource.getRepository(TagEntity())).get('tag')
         ?.primaryKey
     ).toEqual(['post_id', 'label']);
   });
 
   it('mapeia cardinalidade das relações', () => {
     const schema = buildSchemaRegistry(
-      dataSource.getRepository(UserEntity)
+      dataSource.getRepository(UserEntity())
     ).get('user')!;
 
     expect(schema.relations.get('company')?.cardinality).toBe('one');
@@ -56,7 +52,9 @@ describe('buildSchemaRegistry', () => {
   });
 
   it('inclui todos os schemas alcançáveis por relação', () => {
-    const registry = buildSchemaRegistry(dataSource.getRepository(UserEntity));
+    const registry = buildSchemaRegistry(
+      dataSource.getRepository(UserEntity())
+    );
     expect([...registry.keys()].sort()).toEqual([
       'company',
       'post',
@@ -67,7 +65,7 @@ describe('buildSchemaRegistry', () => {
 
   it('marca colunas folded e portableOrder como internas', () => {
     const schema = buildSchemaRegistry(
-      dataSource.getRepository(UserEntity)
+      dataSource.getRepository(UserEntity())
     ).get('user')!;
 
     expect(schema.fields.get('name_folded')?.internal).toBe(true);
@@ -77,7 +75,12 @@ describe('buildSchemaRegistry', () => {
   });
 
   it('liga o portableOrderField ao campo uuid correspondente', () => {
-    const registry = buildSchemaRegistry(dataSource.getRepository(PostEntity));
+    // MySQL e SQLite não têm tipo UUID nativo, então o tipo lógico vem de uma
+    // declaração explícita — a extensão de schema do spec §9.
+    const registry = buildSchemaRegistry(
+      dataSource.getRepository(PostEntity()),
+      { fieldKinds: { post: { id: 'uuid' } } }
+    );
     const post = registry.get('post')!;
 
     expect(post.fields.get('id')?.kind).toBe('uuid');
@@ -85,8 +88,15 @@ describe('buildSchemaRegistry', () => {
     expect(post.fields.get('id_order')?.internal).toBe(true);
   });
 
+  it('sem declaração explícita, char(36) permanece string', () => {
+    const post = buildSchemaRegistry(
+      dataSource.getRepository(PostEntity())
+    ).get('post')!;
+    expect(post.fields.get('id')?.kind).toBe('string');
+  });
+
   it('liga o portableOrderField numa PK composta', () => {
-    const tag = buildSchemaRegistry(dataSource.getRepository(TagEntity)).get(
+    const tag = buildSchemaRegistry(dataSource.getRepository(TagEntity())).get(
       'tag'
     )!;
     expect(tag.fields.get('post_id')?.portableOrderField).toBe('post_id_order');
@@ -94,14 +104,16 @@ describe('buildSchemaRegistry', () => {
 
   it('marca colunas nuláveis corretamente', () => {
     const schema = buildSchemaRegistry(
-      dataSource.getRepository(UserEntity)
+      dataSource.getRepository(UserEntity())
     ).get('user')!;
     expect(schema.fields.get('nickname')?.nullable).toBe(true);
     expect(schema.fields.get('name')?.nullable).toBe(false);
   });
 
   it('produz o mesmo shape que o schema canônico do corpus', () => {
-    const registry = buildSchemaRegistry(dataSource.getRepository(UserEntity));
+    const registry = buildSchemaRegistry(
+      dataSource.getRepository(UserEntity())
+    );
     const user = registry.get('user')!;
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -117,7 +129,7 @@ describe('buildSchemaRegistry', () => {
   });
 
   it('recusa coluna de tipo desconhecido em vez de tratar como string', () => {
-    const repository = dataSource.getRepository(UserEntity);
+    const repository = dataSource.getRepository(UserEntity());
     const column = repository.metadata.columns.find(
       (c) => c.propertyName === 'zip'
     )!;
