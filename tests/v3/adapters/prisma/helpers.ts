@@ -7,7 +7,7 @@ import {
 } from '@infra/adapters/prisma';
 import { CORPUS_SEED } from '../../corpus/seed';
 import { CORPUS_SCHEMAS } from '../../fixtures/schemas';
-import { PrismaClient } from './generated/client';
+import { PrismaClient } from './generated/sqlite/client';
 
 /**
  * SQLite como dialeto de referência do adapter Prisma.

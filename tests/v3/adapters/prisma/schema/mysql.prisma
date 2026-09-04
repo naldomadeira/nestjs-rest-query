@@ -1,0 +1,95 @@
+// Schema Prisma do modelo canonico do corpus, provider mysql (spec §18.2).
+//
+// Um arquivo por provider porque o `provider` do `datasource` tem de ser
+// literal no Prisma: `env()` nao e aceito ali. Os quatro sao versionados em vez
+// de gerados por substituicao de texto para ficarem visiveis - um consumidor
+// copia daqui - e o drift entre eles nao passa calado:
+// `manifest-matches-schema.spec.ts` valida os quatro contra o mesmo manifesto e
+// exige que declarem os mesmos models, campos, relacoes e chaves.
+//
+// A unica diferenca deliberada esta nos atributos nativos, e ela e a propria
+// superficie de portabilidade que a matriz mede: `@db.Decimal(38, 6)` e `@db.Date`
+// casam `numeric(38, 6)`/`DECIMAL(38, 6)` e `date` da DDL, e sem eles o
+// Prisma decodificaria os mesmos bytes com outra precisao e outro tipo.
+//
+// Toda relacao do lado definidor declara `onDelete: NoAction` e
+// `onUpdate: NoAction` porque e o que a DDL do perfil certificado realmente
+// diz: nenhuma FK de `test/profiles/` declara acao referencial, e a ausencia
+// em SQL significa NO ACTION. Nao e concessao ao SQL Server - embora seja ele
+// quem recusa o ciclo `User.company` <-> `Company.owner` sem isso, por causa
+// da regra de multiplos caminhos de cascata. Os outros tres aceitariam o
+// implicito e passariam a descrever um cascade que o banco nao tem.
+//
+// As tabelas vem da DDL do perfil certificado (`test/profiles/`), nunca de
+// `db push` nem de migration: e a collation e a precisao declaradas la que
+// sustentam a paridade.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated/mysql"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model User {
+  id         Int      @id
+  name       String
+  name_folded String
+  email      String
+  email_folded String
+  document   String
+  zip        String
+  code       String
+  score      BigInt
+  balance    Decimal  @db.Decimal(38, 6)
+  active     Boolean
+  born_on    DateTime @db.Date
+  created_at DateTime
+  nickname   String?
+  company_id Int?
+
+  company        Company?  @relation("UserCompany", fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  posts          Post[]    @relation("UserPosts")
+  ownedCompanies Company[] @relation("CompanyOwner")
+
+  @@map("users")
+}
+
+model Company {
+  id         Int     @id
+  name       String
+  name_folded String
+  owner_id   Int?
+
+  owner     User?  @relation("CompanyOwner", fields: [owner_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees User[] @relation("UserCompany")
+
+  @@map("companies")
+}
+
+model Post {
+  id           String @id
+  id_order     String
+  title        String
+  title_folded String
+  user_id      Int
+
+  author User  @relation("UserPosts", fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tags   Tag[]
+
+  @@map("posts")
+}
+
+model Tag {
+  post_id       String
+  post_id_order String
+  label         String
+
+  post Post @relation(fields: [post_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([post_id, label])
+  @@map("tags")
+}
