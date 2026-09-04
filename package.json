@@ -141,6 +141,7 @@
     "globals": "^17.6.0",
     "jest": "^30.3.0",
     "jest-junit": "^17.0.0",
+    "mssql": "^12.7.0",
     "postgres": "^3.4.9",
     "prettier": "^3.8.3",
     "reflect-metadata": "^0.2.0",
