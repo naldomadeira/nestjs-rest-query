@@ -1,4 +1,15 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
+import { foldText } from 'nestjs-rest-query';
+
+/**
+ * A coluna dobrada é responsabilidade de quem escreve, não do ORM.
+ *
+ * `foldText` é o mesmo `normalize('NFC').toLowerCase()` que o núcleo aplica ao
+ * termo da busca — usar a função exportada é o que garante que gravação e
+ * consulta concordem. Numa aplicação real isto vira um listener de entidade ou
+ * uma coluna gerada pelo banco; aqui fica explícito para o exemplo mostrar de
+ * onde o valor vem.
+ */
 
 export class SeedProductsAndCategory1756384597273 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -123,10 +134,10 @@ export class SeedProductsAndCategory1756384597273 implements MigrationInterface 
 
     for (const name of categories) {
       await queryRunner.query(
-        `INSERT INTO "category"("name") 
-         SELECT ? 
+        `INSERT INTO "category"("name","nameFolded") 
+         SELECT ?, ? 
          WHERE NOT EXISTS (SELECT 1 FROM "category" WHERE "name" = ?);`,
-        [name, name],
+        [name, foldText(name), name],
       );
     }
 
@@ -163,13 +174,20 @@ export class SeedProductsAndCategory1756384597273 implements MigrationInterface 
         const price = randomPrice();
         insertedProductNames.push(name);
 
-        rowsValuesSql.push('(?, ?, ?, ?, ?)');
-        rowsParams.push(name, price, catId, fmtDate(created), fmtDate(updated));
+        rowsValuesSql.push('(?, ?, ?, ?, ?, ?)');
+        rowsParams.push(
+          name,
+          foldText(name),
+          price,
+          catId,
+          fmtDate(created),
+          fmtDate(updated),
+        );
         count++;
 
         if (rowsValuesSql.length === batchSize) {
           await queryRunner.query(
-            `INSERT INTO "product"("name","price","categoryId","createdAt","updatedAt")
+            `INSERT INTO "product"("name","nameFolded","price","categoryId","createdAt","updatedAt")
              VALUES ${rowsValuesSql.join(',')};`,
             rowsParams,
           );
@@ -181,7 +199,7 @@ export class SeedProductsAndCategory1756384597273 implements MigrationInterface 
 
     if (rowsValuesSql.length > 0) {
       await queryRunner.query(
-        `INSERT INTO "product"("name","price","categoryId","createdAt","updatedAt")
+        `INSERT INTO "product"("name","nameFolded","price","categoryId","createdAt","updatedAt")
          VALUES ${rowsValuesSql.join(',')};`,
         rowsParams,
       );

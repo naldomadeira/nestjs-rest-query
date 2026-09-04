@@ -9,6 +9,10 @@ export class Category {
   @Column()
   name: string;
 
+  /** Valor dobrado de `name` — ver `Product.nameFolded`. */
+  @Column({ select: false })
+  nameFolded: string;
+
   @OneToMany(() => Product, (product) => product.category)
   products: Product[];
 }

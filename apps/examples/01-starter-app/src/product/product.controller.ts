@@ -1,13 +1,14 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { ProductService } from './product.service';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Product } from './entities/product.entity';
 import {
   ApiDynamicQuery,
   DynamicQueryDto,
   QueryRules,
-  RulesConfig,
+  type CompiledQueryRules,
 } from 'nestjs-rest-query';
+import { ProductService } from './product.service';
+import { productRules } from './product.query';
+import { Product } from './entities/product.entity';
 
 @Controller('products')
 @ApiTags('products')
@@ -18,20 +19,16 @@ export class ProductController {
   @ApiOperation({
     summary: 'Busca produtos com filtros dinâmicos',
     description:
-      'Busca produtos com suporte a filtros, ordenação, paginação e relacionamentos',
+      'Filtros, ordenação, paginação e relações, com whitelist exata por campo',
   })
-  @ApiDynamicQuery({
-    filters: ['id', 'price', 'name', 'category', 'categoryId'],
-    fields: ['id', 'price', 'name', 'category', 'createdAt'],
-    sorts: ['id', 'price', 'name', 'createdAt'],
-    includes: ['category'],
-  })
-  @ApiOkResponse({
-    type: Product,
-  })
+  // As regras compiladas são a fonte única: o decorator as registra no handler
+  // e gera a documentação a partir delas, então Swagger e autorização não
+  // podem divergir.
+  @ApiDynamicQuery(productRules)
+  @ApiOkResponse({ type: Product })
   async findAll(
     @Query() query: DynamicQueryDto,
-    @QueryRules() rules: RulesConfig,
+    @QueryRules() rules: CompiledQueryRules,
   ) {
     return this.productService.findAll(query, rules);
   }
