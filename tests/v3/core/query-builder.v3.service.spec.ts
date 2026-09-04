@@ -3,8 +3,23 @@ import { QueryBuilderService } from '@core/query-builder.v3.service';
 import { calls, fakeSource } from '../fixtures/fake-adapter';
 import { RULES_PRESETS } from '../fixtures/rules';
 import { defineQuerySchema } from '@core/schema';
+import type { ProfileFacts } from '@core/portability';
 
 const rules = RULES_PRESETS['user.default'];
+
+const validProfile: ProfileFacts = {
+  dialect: 'postgres',
+  serverVersion: '18.0',
+  encoding: 'UTF8',
+  sessionTimeZone: 'UTC',
+  strictMode: true,
+  textColumns: [
+    { table: 'users', column: 'name', collation: 'C' },
+    { table: 'users', column: 'name_folded', collation: 'C' },
+  ],
+  indexes: ['users_name_folded_idx'],
+  requiredIndexes: ['users_name_folded_idx'],
+};
 
 describe('QueryBuilderService (v3)', () => {
   beforeEach(() => {
@@ -172,6 +187,59 @@ describe('QueryBuilderService (v3)', () => {
 
     expect(calls.filter((call) => call.kind === 'describe')).toHaveLength(1);
     expect(calls.filter((call) => call.kind === 'compile')).toHaveLength(2);
+  });
+
+  it('valida o perfil portável quando a configuração exige paridade certificada', async () => {
+    const service = new QueryBuilderService({
+      portability: { enforce: true },
+    });
+
+    await service.execute(fakeSource({}, undefined, validProfile), {}, rules);
+
+    expect(calls.map((call) => call.kind)).toEqual([
+      'describe',
+      'compile',
+      'execute',
+    ]);
+  });
+
+  it('falha cedo quando paridade certificada é exigida sem profile na source', async () => {
+    const service = new QueryBuilderService({
+      portability: { enforce: true },
+    });
+
+    await expect(service.execute(fakeSource(), {}, rules)).rejects.toThrow(
+      expect.objectContaining({
+        response: expect.objectContaining({
+          code: 'PORTABILITY_PROFILE_MISMATCH',
+        }),
+      })
+    );
+    expect(calls.map((call) => call.kind)).toEqual(['describe']);
+  });
+
+  it('falha cedo quando o profile portável tem violações', async () => {
+    const service = new QueryBuilderService({
+      portability: { enforce: true },
+    });
+
+    await expect(
+      service.execute(
+        fakeSource({}, undefined, {
+          ...validProfile,
+          sessionTimeZone: 'America/Fortaleza',
+        }),
+        {},
+        rules
+      )
+    ).rejects.toThrow(
+      expect.objectContaining({
+        response: expect.objectContaining({
+          code: 'PORTABILITY_PROFILE_MISMATCH',
+        }),
+      })
+    );
+    expect(calls.map((call) => call.kind)).toEqual(['describe']);
   });
 
   it('converte erro de input em BadRequestException com o envelope', async () => {

@@ -91,6 +91,7 @@ export type {
   CustomizeScope,
   LoggingConfigV3,
   PaginationConfigV3,
+  PortabilityConfigV3,
   QueryBuilderConfigV3,
   QuerySource,
   RestQueryAdapterV3,

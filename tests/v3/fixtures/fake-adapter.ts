@@ -3,6 +3,7 @@ import type {
   QuerySource,
   RestQueryAdapterV3,
 } from '@contracts/v3';
+import type { ProfileFacts } from '@core/portability';
 import type { TypedQueryPlan } from '@core/query-plan';
 import type { QuerySchema } from '@core/schema';
 import { userSchema } from './schemas';
@@ -54,7 +55,8 @@ const fakeAdapter: RestQueryAdapterV3<FakeSourceInput, FakeCompiled, FakeRow> =
 
 export function fakeSource(
   capabilities: Partial<AdapterCapabilities> = {},
-  schema: QuerySchema = userSchema
+  schema: QuerySchema = userSchema,
+  portabilityProfile?: ProfileFacts
 ): QuerySource<FakeSourceInput, FakeCompiled, FakeRow> {
   return {
     kind: 'typeorm',
@@ -68,5 +70,6 @@ export function fakeSource(
       },
       schema,
     },
+    portabilityProfile,
   };
 }

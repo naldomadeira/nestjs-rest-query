@@ -20,4 +20,5 @@ export {
   TypeOrmAdapter,
   typeormSource,
   type TypeOrmSourceInput,
+  type TypeOrmSourceOptions,
 } from './typeorm.adapter';
