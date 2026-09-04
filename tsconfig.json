@@ -27,6 +27,7 @@
       "@domain/*": ["src/domain/*"],
       "@contracts/*": ["src/contracts/*"],
       "@contracts": ["src/contracts/index.ts"],
+      "@contracts/v3": ["src/contracts/v3/index.ts"],
       "@domain/handlers": ["src/domain/handlers/index.ts"],
       "@infra/*": ["src/infra/*"],
       "@test/*": ["test/*"]
