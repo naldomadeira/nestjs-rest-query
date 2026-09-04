@@ -3,9 +3,11 @@
 # Cada serviço sobe a versão-alvo da matriz com encoding Unicode, collation
 # binária, sessão em UTC e modo estrito. Sem volume persistente: cada execução
 # parte do mesmo estado reproduzível.
+# As imagens são parametrizáveis para permitir validar localmente com uma
+# versão já em cache; o default é o alvo principal da matriz (spec §6.1).
 services:
   postgres:
-    image: postgres:18
+    image: ${DQB_PG_IMAGE:-postgres:18}
     environment:
       POSTGRES_USER: dqb
       POSTGRES_PASSWORD: dqb
@@ -28,7 +30,7 @@ services:
       - ./postgres/profile.sql:/docker-entrypoint-initdb.d/profile.sql:ro
 
   mysql:
-    image: mysql:8.4
+    image: ${DQB_MYSQL_IMAGE:-mysql:8.4}
     environment:
       MYSQL_ROOT_PASSWORD: dqb
       MYSQL_DATABASE: dqb
@@ -50,7 +52,7 @@ services:
       - ./mysql/profile.sql:/docker-entrypoint-initdb.d/profile.sql:ro
 
   mssql:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+    image: ${DQB_MSSQL_IMAGE:-mcr.microsoft.com/mssql/server:2022-latest}
     # Runner Linux x64 (spec §19). Em ARM a célula roda sob emulação e é
     # opcional localmente, mas obrigatória em CI.
     platform: linux/amd64
