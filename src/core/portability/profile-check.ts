@@ -23,13 +23,34 @@ export interface ProfileFacts {
   encoding: string;
   sessionTimeZone: string;
   strictMode: boolean;
+  /**
+   * `true` quando o **driver** entrega um instante ao banco em UTC.
+   *
+   * É fato do cliente, não do servidor, e por isso existe separado do
+   * `sessionTimeZone`: um driver que converte para o fuso local do processo
+   * grava o instante errado num servidor corretamente configurado em UTC. Pior,
+   * ele *lê* com o mesmo deslocamento — então a aplicação inteira fica
+   * auto-consistente e errada, e nada acusa.
+   *
+   * Foi exatamente o que a matriz de paridade encontrou: o TypeORM força
+   * `useUTC: false` no driver do SQL Server quando `options.useUTC` não vem
+   * marcado, e a célula dele passava com o dado errado enquanto Prisma e
+   * Drizzle, que ficam em UTC, liam o instante errado.
+   */
+  clientDateTimeIsUtc: boolean;
   textColumns: readonly ProfileTextColumn[];
   indexes: readonly string[];
   requiredIndexes: readonly string[];
 }
 
 export interface ProfileViolation {
-  rule: 'encoding' | 'timezone' | 'collation' | 'strict-mode' | 'index';
+  rule:
+    | 'encoding'
+    | 'timezone'
+    | 'client-timezone'
+    | 'collation'
+    | 'strict-mode'
+    | 'index';
   detail: string;
 }
 
@@ -68,6 +89,17 @@ export function checkPortabilityProfile(
     violations.push({
       rule: 'timezone',
       detail: `expected UTC, found ${facts.sessionTimeZone}`,
+    });
+  }
+
+  // Servidor em UTC com driver em fuso local é o pior caso: a aplicação grava
+  // e lê com o mesmo deslocamento, fica auto-consistente, e só um segundo
+  // leitor em UTC revela o instante errado.
+  if (!facts.clientDateTimeIsUtc) {
+    violations.push({
+      rule: 'client-timezone',
+      detail:
+        'the driver does not hand datetimes to the database in UTC; a known UTC instant came back shifted',
     });
   }
 

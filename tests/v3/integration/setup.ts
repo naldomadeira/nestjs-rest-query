@@ -98,7 +98,13 @@ export async function assertProfile(
 ): Promise<void> {
   await assertProfileFacts({
     dialect: context.dialect,
-    query: <R>(sql: string) => context.dataSource.query(sql) as Promise<R[]>,
+    // Parâmetros repassados ao driver: a sonda de fuso do cliente mede
+    // justamente a conversão que ele faz no caminho do parâmetro.
+    query: <R>(sql: string, params?: readonly unknown[]) =>
+      context.dataSource.query(
+        sql,
+        params ? [...params] : undefined
+      ) as Promise<R[]>,
     textColumns: CERTIFIED_TEXT_COLUMNS,
     requiredIndexes: REQUIRED_INDEXES,
   });
