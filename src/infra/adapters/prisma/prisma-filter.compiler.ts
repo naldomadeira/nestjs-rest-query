@@ -40,7 +40,15 @@ export function compileFilter(
   filter: PlanFilter
 ): PrismaWhere | undefined {
   // `in=[]` é sempre falso; `notIn=[]` é sempre verdadeiro e some do AND.
-  if (filter.alwaysFalse) return { OR: [] };
+  //
+  // A condição falsa é o próprio `in: []`, não um `OR: []`: o Prisma reduz
+  // `{ OR: [] }` isolado a `1=0`, mas **ignora** o mesmo `OR` vazio quando ele
+  // está dentro de um `AND` — e todo filtro daqui sai dentro de um `AND`.
+  if (filter.alwaysFalse) {
+    return nestThroughRelations(plan, plan.model, filter.relationPath, {
+      [leafColumn(filter.column)]: { in: [] },
+    });
+  }
   if (filter.alwaysTrue) return undefined;
 
   if (filter.target === 'relation') {
