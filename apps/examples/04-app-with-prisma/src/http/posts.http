@@ -1,68 +1,47 @@
 @baseUrl = http://localhost:3003
 
-# POSTS — prisma adapter
+# GET /posts — regras em src/posts/posts.query.ts
 #
-# Result row shape (Prisma's native nested graph):
-#   { id, title, content, userId, createdAt, user: {...} | null }
+# Shape da linha: { id (uuid), title, userId, createdAt, user: {...} }
+#
+# A PK é UUID: `sort=id` só é aceito porque o schema declara
+# portableOrderField: 'idOrder'.
 
-### List all
+### Envelope canônico
 GET {{baseUrl}}/posts
 
-### Pagination
-GET {{baseUrl}}/posts?page=1&perPage=5
+### Paginação estável sobre PK UUID (desempate por id_order)
+GET {{baseUrl}}/posts?perPage=3&page=1&fields=id
 
-### No pagination
-GET {{baseUrl}}/posts?paginate=false
+### Segunda página — nenhuma linha repetida
+GET {{baseUrl}}/posts?perPage=3&page=2&fields=id
 
-# ─────────────────────────────────────────────────────────────────────
-# FILTERS — root columns
-# ─────────────────────────────────────────────────────────────────────
+### Ordenação pela PK UUID, pela coluna de ordem portável
+GET {{baseUrl}}/posts?sort=-id
 
-GET {{baseUrl}}/posts?filter[title][ilike]=Hello
-GET {{baseUrl}}/posts?filter[title][ilike]=intro&sort=-createdAt
-GET {{baseUrl}}/posts?filter[createdAt][gte]=2024-01-01
-GET {{baseUrl}}/posts?filter[createdAt][between]=2024-01-01,2025-12-31
+### `%` é LITERAL: não casa "1000 clientes atendidos"
+GET {{baseUrl}}/posts?filter[title][like]=100%25
 
-# ─────────────────────────────────────────────────────────────────────
-# FILTERS — relation paths (1:1: user)
-# ─────────────────────────────────────────────────────────────────────
+### `_` é LITERAL: não casa "Circuito axb descontinuado"
+GET {{baseUrl}}/posts?filter[title][like]=a_b
 
-GET {{baseUrl}}/posts?filter[user.email][ilike]=ana
-GET {{baseUrl}}/posts?filter[user.name][eq]=Ana
+### notLike
+GET {{baseUrl}}/posts?filter[title][notLike]=Circuito
 
-# ─────────────────────────────────────────────────────────────────────
-# SORTING
-# ─────────────────────────────────────────────────────────────────────
+### content é anulável e sem coluna dobrada: só isNull
+GET {{baseUrl}}/posts?filter[content][isNull]=true
 
-GET {{baseUrl}}/posts?sort=title
-GET {{baseUrl}}/posts?sort=-createdAt
+### Filtro por relação `one`
+GET {{baseUrl}}/posts?filter[user.name][ilike]=ana
 
-### Sort by 'one' relation column (allowed)
-GET {{baseUrl}}/posts?sort=-user.name
+### Busca (declarada em title)
+GET {{baseUrl}}/posts?search=ELÉTRICA
 
-### Multi-field
-GET {{baseUrl}}/posts?sort=title,-createdAt
+### Autor incluído, com projeção aninhada
+GET {{baseUrl}}/posts?includes=user&fields=id,title,user.name
 
-# ─────────────────────────────────────────────────────────────────────
-# FIELDS / INCLUDES
-# ─────────────────────────────────────────────────────────────────────
+### Ordenação por coluna de relação `one`
+GET {{baseUrl}}/posts?sort=user.name,-createdAt
 
-GET {{baseUrl}}/posts?fields=id,title
-GET {{baseUrl}}/posts?fields=id,title,content&page=1&perPage=5
-
-### 'one' include — Prisma returns the user as a nested object
-GET {{baseUrl}}/posts?includes=user
-GET {{baseUrl}}/posts?includes=user&page=1&perPage=10
-
-### fields + includes: relation reduced to PK only
-GET {{baseUrl}}/posts?fields=title&includes=user
-
-### Opt in to a relation scalar:
-GET {{baseUrl}}/posts?fields=title,user.name&includes=user
-
-# ─────────────────────────────────────────────────────────────────────
-# COMBINATIONS
-# ─────────────────────────────────────────────────────────────────────
-
-GET {{baseUrl}}/posts?filter[title][ilike]=hello&sort=-createdAt&includes=user&page=1&perPage=5
-GET {{baseUrl}}/posts?filter[user.email][ilike]=acme&sort=-user.name&includes=user&page=1&perPage=10
+### ✗ 400 OPERATOR_NOT_ALLOWED — content declara só isNull
+GET {{baseUrl}}/posts?filter[content][ilike]=luz

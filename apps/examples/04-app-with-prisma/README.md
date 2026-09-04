@@ -1,131 +1,189 @@
-# Prisma ORM Sample App
+<div align="center">
+  <img src="../../docs/public/logomark.svg" width="40" /><br><br>
+</div>
 
-NestJS example demonstrating `nestjs-rest-query` with Prisma.
+<div align="center">
 
-## What's This?
+# 04 - App with Prisma
 
-A NestJS + Prisma app that mirrors the structure of `02-app-with-postgres` (TypeORM) and `03-app-with-drizzle` (Drizzle). The controllers, routes, and query string formats are **identical** to the other examples — only the persistence layer differs.
+Exemplo do **nestjs-rest-query v3** com Prisma 7 e PostgreSQL
 
-`DynamicQueryBuilderModule` is configured with `PrismaAdapter`, and each business class builds a `PrismaSource` with `relations` so the adapter can translate dotted paths, search, sort, includes, fields, and pagination into native `findMany` / `count` calls.
+</div>
 
-## Layout note: `prisma/` at the project root
+---
 
-Unlike the Drizzle sample (which colocates the seed under `src/database/`), this app keeps the schema and seed under a top-level `prisma/` directory. That's where the Prisma CLI looks by default — fighting it would mean adding `--schema=...` flags to every script. The `prisma/` layout matches the convention every Prisma user already has muscle memory for.
+## O que este exemplo prova
 
-## Quick Start
+Que a API pública v3 do adapter Prisma é usável **de fora**, num app NestJS
+real, contra um PostgreSQL de verdade — sem cast, sem `any` e sem
+`@ts-expect-error`. É o gate §23, e o smoke em `test/prisma.e2e-spec.ts` é a
+medida dele.
 
-### Prerequisites
+Três endpoints, três models: `GET /users`, `GET /companies`, `GET /posts`.
 
-- Node.js >= 20
-- pnpm
-- Docker (for Postgres)
-
-### Setup
-
-```bash
-pnpm install                # 1. dependencies
-cp .env.example .env        # 2. environment (DATABASE_URL)
-pnpm db:up                  # 3. start Postgres in Docker
-pnpm db:setup               # 4. db push + generate client + seed
-pnpm dev                    # 5. start the API
-```
-
-App: `http://localhost:3003` · Swagger: `http://localhost:3003/`.
-
-To re-seed (wipes and reinserts):
+## Como rodar
 
 ```bash
-pnpm seed:reset
+cp .env.example .env         # 1. DATABASE_URL
+pnpm db:up                   # 2. Postgres 16 no Docker, porta 5434
+pnpm db:setup                # 3. gera o client, recria o schema e popula
+pnpm dev                     # 4. sobe a API
 ```
 
-## Database
-
-Postgres 16 on `localhost:5434` (use `pnpm db:down` to stop).
-
-### Schema
-
-Three tables (see `prisma/schema.prisma`):
-
-- `companies`: id, name, created_at
-- `users`: id, name, email, company_id (FK, nullable), created_at
-- `posts`: id, title, content, user_id (FK), created_at
-
-Relations:
-
-- Company 1:N Users
-- User 1:N Posts
-
-## API Endpoints
-
-The same query string as the TypeORM and Drizzle samples works here. A few highlights:
+API em `http://localhost:3003`, Swagger na raiz.
 
 ```bash
-# All users, paginated
-curl "http://localhost:3003/users?page=1&perPage=10"
-
-# Filter by company name (Prisma wraps in nested where)
-curl "http://localhost:3003/users?filter[company.name][eq]=Acme%20Corp"
-
-# Filter through a 'many' relation (Prisma wraps in `some`)
-curl "http://localhost:3003/users?filter[posts.title][ilike]=hello"
-
-# Include posts (Prisma returns `posts: [...]` natively)
-curl "http://localhost:3003/users?includes=posts&page=1&perPage=2"
-
-# fields + includes: company is reduced to its PK only
-curl "http://localhost:3003/users?fields=name&includes=company"
-
-# Opt in to a relation scalar:
-curl "http://localhost:3003/users?fields=name,company.name&includes=company"
-
-# Sort through a 'one' relation (allowed)
-curl "http://localhost:3003/users?sort=-company.name"
-
-# Sort through a 'many' relation → 400
-curl "http://localhost:3003/users?sort=-posts.createdAt"
+pnpm test:e2e                # smoke E2E (prepara e limpa o próprio banco)
+pnpm typecheck               # tsc --noEmit em strict
 ```
 
-See `src/http/*.http` for the full set of fixtures.
+O `test:e2e` carrega `NODE_OPTIONS=--experimental-vm-modules`: o runtime do
+Prisma 7 se carrega por `import()` dinâmico, e sem a flag a maioria dos casos
+falha por callback de import dinâmico.
 
-## Architecture
+## O que muda em relação à v2
 
-- **`AppModule`** registers `DynamicQueryBuilderModule.forRoot({ adapter: new PrismaAdapter(), ... })`. Every request goes through the same service, regardless of ORM.
-- **`PrismaService`** extends `PrismaClient` and is provided globally via `PrismaModule`.
-- **Business services** build a `PrismaSource` per request: `{ prisma, model, primaryKeyField, relations }`, then call `queryBuilderService.execute(source as never, query, rules)`.
-  - `as never` is a deliberate cast: `QueryBuilderService` is generically typed against `ObjectLiteral` (TypeORM) at the type level. Runtime is adapter-agnostic, but TypeScript needs the escape hatch until the typing rework lands. We use `as never` (not `as any`) so the cast is grep-able.
+### 1. O adapter não vem mais da raiz
 
-## Differences from the TypeORM/Drizzle adapters
+```diff
+- import { DynamicQueryBuilderModule, PrismaAdapter } from 'nestjs-rest-query';
++ import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
++ import { prismaSource } from 'nestjs-rest-query/prisma';
+```
 
-These come from Prisma's data model and are documented in the library's adapter page:
+`forRoot` configura só políticas comuns. `adapter` e `operators` passaram a ser
+**rejeitados** na inicialização — quem determina o adapter é a source, e a
+restrição de operadores é por campo, nas regras do endpoint.
 
-- `like` / `ilike` are **literal substring matches** in Prisma. `%` and `_` are not wildcards.
-- `ilike` requires a Prisma provider that supports `mode: 'insensitive'`. Postgres (this sample) and MongoDB do; **SQLite does not** — restrict `OperatorsConfig.allowed` to omit `ilike` if you target SQLite.
-- `isNull` translation differs by leaf kind: scalars use `{ not: null }`, relations use `{ isNot: null }`. The adapter handles this automatically based on `PrismaSource.relations` metadata.
-- The adapter always stacks repeated filters under a top-level `where.AND: [...]`. This is equivalent to merged objects in most cases but visually different in Prisma's query log.
+### 2. Schema lógico e regras declarados
+
+`RulesConfig` saiu. Agora:
+
+- `src/query/schemas.ts` — o schema lógico dos três models
+  (`defineQuerySchema`), incluindo as colunas dobradas e o campo de ordem
+  portável.
+- `src/query/manifest.ts` — o **manifesto do Prisma**, escrito à mão
+  (`createPrismaManifest`).
+- `src/<módulo>/<módulo>.query.ts` — as regras do endpoint
+  (`defineQueryRules`), com whitelist exata: autorizar a relação `company` não
+  autoriza `company.name`.
+
+Tudo é validado na construção: path inexistente, default fora de `allowed`,
+operador incompatível com o tipo e sort ambíguo falham ao subir a aplicação,
+não na primeira requisição.
+
+### 3. O manifesto do Prisma é escrito à mão
+
+Não existe equivalente ao `buildSchemaRegistry(repository)` do TypeORM: o
+generator que derivaria o manifesto do `schema.prisma` é lacuna declarada para
+a 3.1.0. Consequência prática: **nada valida o schema lógico contra o
+`schema.prisma` nem contra o banco**. Um campo declarado com o nome errado só
+aparece na primeira requisição que o tocar.
+
+### 4. Prisma 6 → 7 (subida obrigatória, não opcional)
+
+- `url` **saiu** do `datasource` do `schema.prisma`. Manter `url = env(...)`
+  falha a geração com `P1012`. Quem conecta é o driver adapter
+  (`@prisma/adapter-pg`), passado ao construtor do client.
+- O generator virou `prisma-client` (não `prisma-client-js`), com `output` e
+  `moduleFormat` explícitos. O client é gerado em `src/generated/prisma` e é de
+  lá que se importa — `import { PrismaClient } from '@prisma/client'` não
+  compila mais.
+- Quem carrega o `.env` é a aplicação, não o Prisma.
+
+### 5. `PrismaClientLike` exige uma ponte escrita à mão
+
+`prismaSource({ client })` pede `Readonly<Record<string, PrismaDelegate>>`, e o
+`PrismaClient` gerado não é atribuível a esse tipo. `src/prisma/prisma-client-like.ts`
+atravessa a fronteira sem cast, com verificação em runtime, e explica por quê.
+Isso é custo da biblioteca, não do exemplo.
+
+## Banco
+
+PostgreSQL 16 em `localhost:5434` (`pnpm db:down` para parar).
+
+A DDL vive em `prisma/database.ts`, em SQL cru, e não em `prisma db push`: o
+que sustenta a portabilidade é `COLLATE "C"` nas colunas textuais e a precisão
+declarada, e `db push` deriva a DDL do `schema.prisma`, que não sabe declarar
+collation. A referência é `test/profiles/postgres/profile.sql`.
+
+Três tabelas:
+
+| tabela      | colunas do domínio                             | colunas exigidas pela v3      |
+| ----------- | ---------------------------------------------- | ----------------------------- |
+| `companies` | id, name, created_at                           | `name_folded`                 |
+| `users`     | id, name, email, company_id, created_at        | `name_folded`, `email_folded` |
+| `posts`     | id (uuid), title, content, user_id, created_at | `title_folded`, `id_order`    |
+
+- `*_folded` são as **colunas dobradas**. Sob o perfil `portable-strict`,
+  `ilike` e `search` comparam valor dobrado contra coluna dobrada em vez de
+  pedir `mode: 'insensitive'` ao Prisma — que dependeria da collation do
+  servidor. **Preencher essas colunas na escrita é responsabilidade da
+  aplicação**, com o helper `foldText` exportado pelo pacote.
+- `posts.id_order` é o `portableOrderField` da PK UUID. O desempate de
+  paginação é sempre sobre a PK, e UUID não tem ordem total idêntica nas três
+  famílias de banco; sem essa coluna o endpoint falha na subida com
+  `CAPABILITY_UNAVAILABLE`.
+
+## Operadores de padrão neste exemplo
+
+O Prisma nunca emite cláusula `ESCAPE`, então só sobra o escape default do
+dialeto (ADR-001, emenda 2):
+
+| provider                | `like`, `notLike`, `ilike`, `notIlike`, `search`           |
+| ----------------------- | ---------------------------------------------------------- |
+| `postgresql` (este app) | funcionam; `%` e `_` são **literais**, como a §11 exige    |
+| `mysql`                 | idem                                                       |
+| `sqlite`, `sqlserver`   | recusados com `CAPABILITY_UNAVAILABLE`, sem escape default |
+
+O smoke fixa a literalidade em dois casos: `filter[title][like]=100%` não casa
+`"1000 clientes atendidos"`, e `filter[title][like]=a_b` não casa
+`"Circuito axb descontinuado"`.
+
+## Exemplos de requisição
+
+```bash
+# envelope canônico
+curl "http://localhost:3003/users?page=1&perPage=5"
+
+# projeção exata (a coluna dobrada nunca sai no JSON)
+curl "http://localhost:3003/users?fields=id,name"
+
+# relação `one` com projeção aninhada
+curl "http://localhost:3003/users?includes=company&fields=id,company.name"
+
+# relação `many`: array, e `total` continua contando roots
+curl "http://localhost:3003/companies?includes=users&fields=id,name,users.name"
+
+# filtro através de relação `many` (vira `some` no Prisma)
+curl "http://localhost:3003/users?filter[posts.title][ilike]=elétrica"
+
+# busca portátil: a caixa do termo não muda o conjunto
+curl "http://localhost:3003/users?search=ELÉTRICA"
+
+# 400 FIELD_NOT_ALLOWED: `createdAt` é ordenável, mas não projetável
+curl "http://localhost:3003/users?fields=id,createdAt"
+```
+
+Mais fixtures em `src/http/*.http`.
 
 ## Scripts
 
 ```bash
-pnpm dev              # Start dev server
-pnpm build            # Compile TypeScript
-pnpm db:up            # Start Postgres container
-pnpm db:down          # Stop Postgres container
-pnpm db:push          # Apply schema (prisma db push --force-reset --skip-generate)
-pnpm db:generate      # Generate the Prisma client
-pnpm db:setup         # Convenience: db:push && db:generate && seed
-pnpm seed             # Insert deterministic sample data
-pnpm seed:reset       # Wipe and re-seed
+pnpm dev          # sobe a API em watch
+pnpm build        # compila (inclui o client gerado)
+pnpm typecheck    # tsc --noEmit, strict
+pnpm db:up        # sobe o Postgres
+pnpm db:down      # para o Postgres
+pnpm db:generate  # gera o client do Prisma em src/generated/prisma
+pnpm seed         # recria o schema e popula
+pnpm db:setup     # db:generate && seed
+pnpm test:e2e     # smoke E2E
 ```
 
-## Conventions
+## Ver também
 
-- Controllers use `@ApiDynamicQuery(rules)` for OpenAPI integration
-- Business services accept `DynamicQueryDto` and `RulesConfig`, return `QueryResult<T>`
-- Prisma client is injected via `PrismaService` (extends `PrismaClient`)
-- Path alias `@app/*` resolves to `src/*`
-
-## See Also
-
-- Parent library: [nestjs-rest-query](../../)
-- TypeORM example: `02-app-with-postgres`
-- Drizzle example: `03-app-with-drizzle`
+- Biblioteca: [nestjs-rest-query](../../)
+- Guia de migração v2 → v3: [`docs/v3/migration-from-v2.md`](../../docs/v3/migration-from-v2.md)
+- Exemplo TypeORM: `01-starter-app`, `02-app-with-postgres`
+- Exemplo Drizzle: `03-app-with-drizzle`

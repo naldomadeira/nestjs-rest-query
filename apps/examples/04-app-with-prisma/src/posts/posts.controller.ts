@@ -1,22 +1,34 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import {
   ApiDynamicQuery,
   ApiPaginatedResponse,
   DynamicQueryDto,
-  QueryResult,
   QueryRules,
-  RulesConfig,
+  type CompiledQueryRules,
+  type NormalizedQueryResult,
 } from 'nestjs-rest-query';
 import { PostsBusiness } from './posts.business';
+import { postsRules } from './posts.query';
 
 class PostDto {
+  @ApiProperty({ format: 'uuid' })
   id: string;
+
+  @ApiProperty()
   title: string;
-  content?: string;
-  userId: string;
-  createdAt: Date;
-  user?: { id: string; name: string };
+
+  @ApiProperty({ nullable: true, type: String })
+  content: string | null;
+
+  @ApiProperty()
+  userId: number;
+
+  @ApiProperty()
+  createdAt: string;
+
+  @ApiProperty({ required: false })
+  user?: { id: number; name: string };
 }
 
 @ApiTags('posts')
@@ -26,26 +38,15 @@ export class PostsController {
 
   @Get()
   @ApiOperation({
-    summary: 'Fetch posts with dynamic filters',
-    description:
-      'Fetch posts with support for filters, sorting, pagination, and user includes',
+    summary: 'Busca posts com filtros dinâmicos',
+    description: 'Filtros, ordenação, paginação e o autor incluído',
   })
-  @ApiDynamicQuery<PostDto>({
-    filters: ['id', 'title', 'userId', 'createdAt', 'user'],
-    sorts: ['title', 'createdAt', 'user'],
-    fields: ['id', 'title', 'content', 'userId', 'createdAt'],
-    includes: ['user'],
-  })
-  @ApiPaginatedResponse<PostDto>(PostDto, {
-    status: 200,
-    description: 'List of posts',
-  })
+  @ApiDynamicQuery(postsRules)
+  @ApiPaginatedResponse(PostDto, { status: 200, description: 'Lista de posts' })
   async findAll(
     @Query() query: DynamicQueryDto,
-    @QueryRules() rules: RulesConfig
-  ): Promise<QueryResult<PostDto>> {
-    return this.postsBusiness.findAll(query, rules) as Promise<
-      QueryResult<PostDto>
-    >;
+    @QueryRules() rules: CompiledQueryRules
+  ): Promise<NormalizedQueryResult<object>> {
+    return this.postsBusiness.findAll(query, rules);
   }
 }

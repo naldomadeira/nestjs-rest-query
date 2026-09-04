@@ -8,6 +8,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
+  type Relation,
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { AccessRequestItem } from './access-request-item.entity';
@@ -37,13 +38,21 @@ export class AccessRequest {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
-  @ManyToOne(() => User, { eager: false })
+  /**
+   * `nullable: false` não é decoração: o adapter deriva o schema da metadata,
+   * e o schema declarado tem de bater com ele campo a campo. `user_id` é
+   * `NOT NULL` no banco, então a relação também precisa dizer isso.
+   *
+   * `Relation<T>` evita o TDZ do ciclo entre entidades sob ESM — ver
+   * `AccessRequestItem.accessRequest`.
+   */
+  @ManyToOne(() => User, { eager: false, nullable: false })
   @JoinColumn({ name: 'user_id' })
-  user: User;
+  user: Relation<User>;
 
   @OneToMany(() => AccessRequestItem, (item) => item.accessRequest, {
     cascade: true,
     eager: false,
   })
-  items: AccessRequestItem[];
+  items: Relation<AccessRequestItem>[];
 }

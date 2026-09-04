@@ -1,7 +1,10 @@
 {
   "compilerOptions": {
     "module": "commonjs",
-    "declaration": true,
+    // Uma aplicação não publica tipos, e emitir declarations aqui só produz
+    // TS2883: os tipos que `pgTable()` e `drizzle()` inferem no `drizzle-orm`
+    // 1.x não são nomeáveis de fora do pacote.
+    "declaration": false,
     "removeComments": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
@@ -10,16 +13,17 @@
     "target": "ES2021",
     "sourceMap": true,
     "outDir": "./dist",
-    "baseUrl": "./",
     "incremental": true,
+    // `drizzle-orm@1.0.0-rc.4` emite erros nos próprios `.d.cts` sob TypeScript
+    // 6; a biblioteca faz a mesma concessão no `tsconfig.json` dela. Revisar no
+    // GA do Drizzle 1.x.
     "skipLibCheck": true,
-    "strictNullChecks": false,
-    "noImplicitAny": false,
-    "strictBindCallApply": false,
-    "forceConsistentCasingInFileNames": false,
-    "noFallthroughCasesInSwitch": false,
-    "paths": {
-      "@app/*": ["src/*"]
-    }
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "types": ["node", "jest"],
+    "strict": true,
+    // As classes de view do Swagger declaram campos sem inicializador; é o
+    // mesmo ajuste do exemplo 01.
+    "strictPropertyInitialization": false
   }
 }

@@ -25,10 +25,10 @@ const categorySchema: QuerySchema = defineQuerySchema({
       kind: 'string',
       nullable: false,
       primaryKey: false,
-      foldedField: 'nameFolded',
+      foldedField: 'name_folded',
     },
     {
-      path: 'nameFolded',
+      path: 'name_folded',
       kind: 'string',
       nullable: false,
       primaryKey: false,
@@ -51,10 +51,10 @@ const productSchema: QuerySchema = defineQuerySchema({
       kind: 'string',
       nullable: false,
       primaryKey: false,
-      foldedField: 'nameFolded',
+      foldedField: 'name_folded',
     },
     {
-      path: 'nameFolded',
+      path: 'name_folded',
       kind: 'string',
       nullable: false,
       primaryKey: false,
@@ -68,7 +68,12 @@ const productSchema: QuerySchema = defineQuerySchema({
     { path: 'updatedAt', kind: 'datetime', nullable: false, primaryKey: false },
   ],
   relations: [
-    { path: 'category', target: 'category', cardinality: 'one', nullable: false },
+    {
+      path: 'category',
+      target: 'category',
+      cardinality: 'one',
+      nullable: false,
+    },
   ],
 });
 

@@ -1,14 +1,16 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiDynamicQuery,
+  ApiPaginatedResponse,
   DynamicQueryDto,
-  QueryResult,
   QueryRules,
-  RulesConfig,
+  type CompiledQueryRules,
+  type NormalizedQueryResult,
 } from 'nestjs-rest-query';
 import { AccessRequestsBusiness } from './access-requests.business';
 import { AccessRequest } from './entities/access-request.entity';
+import { accessRequestRules } from './access-requests.query';
 
 @ApiTags('access-requests')
 @Controller('access-requests')
@@ -20,47 +22,17 @@ export class AccessRequestsController {
   @Get()
   @ApiOperation({
     summary: 'Busca solicitações de acesso com filtros dinâmicos',
+    description:
+      'Relação one (user), coleção many (items) e relações one dentro da coleção (items.company, items.module), com projeção aninhada',
   })
-  @ApiDynamicQuery<AccessRequest>({
-    filters: [
-      'userId',
-      'overallStatus',
-      'createdAt',
-      'deletedAt',
-      'user',
-      'items',
-      'items.company',
-      'items.module',
-      'user.firstName',
-    ],
-    sorts: ['userId', 'overallStatus', 'createdAt', 'user.firstName'],
-    fields: [
-      'id',
-      'userId',
-      'overallStatus',
-      'createdAt',
-      'updatedAt',
-      'deletedAt',
-      'items',
-      'user',
-    ],
-    includes: ['user', 'items', 'items.company', 'items.module'],
-    search: [
-      'user.firstName',
-      'user.document',
-      'items.company.name',
-      'items.company.cnpj',
-    ],
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Lista de solicitações retornada com sucesso',
-    type: [AccessRequest],
+  @ApiDynamicQuery(accessRequestRules)
+  @ApiPaginatedResponse(AccessRequest, {
+    description: 'Lista de solicitações de acesso',
   })
   async findAll(
     @Query() query: DynamicQueryDto,
-    @QueryRules() rules: RulesConfig,
-  ): Promise<QueryResult<AccessRequest>> {
+    @QueryRules() rules: CompiledQueryRules,
+  ): Promise<NormalizedQueryResult<AccessRequest>> {
     return this.accessRequestsBusiness.findAll(query, rules);
   }
 }

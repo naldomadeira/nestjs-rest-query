@@ -31,9 +31,10 @@ yarn-error.log*
 .env.local
 .env.*.local
 
-# Prisma generated client (committed in CI? keep ignored locally to keep repo lean)
-# Generated under node_modules/.prisma by `prisma generate`. Migrations dir
-# is also intentionally ignored — sample uses `db push`, not migrate.
+# Client gerado pelo Prisma 7: o generator `prisma-client` escreve em
+# `output` (aqui `generated/`), não mais em `node_modules/.prisma`.
+# `pnpm db:generate` (e o `test:e2e`) recriam.
+/src/generated
 prisma/migrations/
 
 # Diagnostic reports
