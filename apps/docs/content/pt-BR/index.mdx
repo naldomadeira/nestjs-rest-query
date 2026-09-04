@@ -3,88 +3,200 @@ title: Introdução
 description: O que é o nestjs-rest-query e por que utilizá-lo.
 ---
 
-<Callout type="warn" title="Esta documentação descreve a v2">
+<Callout type="warn" title="Estas páginas descrevem a v3, que ainda não foi publicada">
 
-Os exemplos abaixo ainda usam a API v2 — `RulesConfig`, classes de adapter no
-entrypoint raiz e coerção pelo formato do valor. **A v3 substitui as três.**
-Reescrever este site é a fase 7 do plano da v3; até lá, a descrição
-autoritativa da API atual é
-[o guia de migração v2 → v3](https://github.com/naldomadeira/nestjs-rest-query/blob/main/docs/v3/migration-from-v2.md).
+A API `3.x` descrita neste site está implementada no repositório, exercitada por
+quatro aplicações de exemplo e por uma matriz de paridade de nove células, mas a
+última versão no npm continua sendo a `2.1.0`. Os gates que faltam para a
+release estão em
+[`docs/v3/status.md`](https://github.com/naldomadeira/nestjs-rest-query/blob/main/docs/v3/status.md).
+Se você está na `2.x` hoje, leia
+[o guia de migração](https://github.com/naldomadeira/nestjs-rest-query/blob/main/MIGRATION.md#2x--3x)
+antes de subir de versão — a v3 não tem modo de compatibilidade.
 
 </Callout>
 
-**`nestjs-rest-query`** é uma biblioteca para NestJS que constrói instâncias de `SelectQueryBuilder` do TypeORM de forma dinâmica a partir de parâmetros de query HTTP — filtros, ordenações, paginação, seleção de campos e carregamento de relações — tudo controlado por uma whitelist de segurança por endpoint.
+O **`nestjs-rest-query`** transforma parâmetros de query HTTP — filtros,
+ordenações, paginação, seleção de campos, carregamento de relações e busca
+textual — num plano de query tipado, autoriza esse plano contra uma whitelist
+por endpoint e deixa um adapter de ORM compilá-lo. TypeORM, Prisma e Drizzle são
+atendidos pelo mesmo núcleo, e devem responder à mesma requisição da mesma
+forma.
 
 ## Fluxo principal
 
 ```mermaid
 flowchart TD
   subgraph IN["Requisição HTTP"]
-    Q["GET /users\n?filter[status][eq]=active\n&sort=name,-createdAt\n&fields=id,name,status\n&page=1&perPage=20"]
+    Q["GET /products<br/>?filter[name][ilike]=cabo<br/>&sort=-createdAt,name<br/>&fields=id,name,price<br/>&page=1&perPage=20"]
   end
 
-  subgraph CTRL["Controller (por endpoint)"]
-    D["@ApiDynamicQuery / @DynamicQuery\ndefine: filters · sorts · fields · includes"]
+  subgraph DECL["Declarado uma vez, por model e por endpoint"]
+    S["defineQuerySchema<br/>o que o modelo é: tipos,<br/>nulabilidade, relações, colunas dobradas"]
+    R["defineQueryRules<br/>o que este endpoint autoriza:<br/>paths exatos, operadores por campo, projeções"]
+    S --> R
   end
 
-  subgraph LIB["nestjs-rest-query"]
-    W["Whitelist de segurança\nvalida campos e operadores permitidos"]
-    H["applyFilters · applySorts · applyFields\napplyIncludes · applyPagination"]
-    W --> H
+  subgraph CORE["Núcleo do nestjs-rest-query"]
+    P["parse → autorização → coerção → plano<br/>TypedQueryPlan, congelado"]
   end
 
-  subgraph OUT["Resposta"]
-    R["{ data[], page, perPage, total, lastPage }"]
+  subgraph AD["Adapter, escolhido pela source"]
+    T["typeormSource(repo)"]
+    PR["prismaSource({ client, model, manifest })"]
+    DR["drizzleSource({ db, dialect, table, relations })"]
   end
 
-  IN --> CTRL
-  CTRL --> LIB
-  LIB --> OUT
+  subgraph OUT["Resposta canônica"]
+    O["{ data[], page, perPage, total, lastPage }"]
+  end
+
+  IN --> CORE
+  R --> CORE
+  CORE --> AD
+  AD --> OUT
 ```
 
-Cada endpoint declara sua própria whitelist via `@ApiDynamicQuery` (com OpenAPI) ou `@DynamicQuery` (sem). Em runtime, `QueryBuilderService` valida os parâmetros recebidos contra essa whitelist, aplica cada handler e devolve o resultado já paginado.
+As regras compiladas do endpoint são a fonte única de duas coisas ao mesmo
+tempo: a autorização em runtime e os parâmetros OpenAPI que
+`@ApiDynamicQuery(rules)` gera. Elas não podem divergir, porque não são duas
+declarações.
 
-## Funcionalidades
+## O que a v3 mudou
 
-- **Filtros dinâmicos** — filtre por qualquer campo permitido usando operadores como `eq`, `like`, `in`, `between`, `isNull` e mais
-- **Ordenação** — ordenação multi-coluna com `ASC` / `DESC`, controlada por endpoint
-- **Paginação** — baseada em página ou limit/offset, com `page`, `perPage`, `total` e `lastPage` no topo da resposta
-- **Seleção de campos** — retorne apenas as colunas que o cliente precisa
-- **Carregamento de relações** — carregue relações TypeORM declaradas na sua whitelist
-- **Whitelist de segurança** — os decorators `@ApiDynamicQuery` / `@DynamicQuery` definem exatamente quais campos e operadores cada endpoint permite
-- **Integração com Swagger** — `@ApiDynamicQuery` gera automaticamente decorators `@ApiQuery` para todos os parâmetros de query suportados
-- **Totalmente tipado** — escrito em TypeScript, com definições de tipos completas
+Se você conhece a API `2.x`, quatro coisas são diferentes em natureza, não em
+grau:
 
-## Como funciona
+- **O schema é declarado, não adivinhado.** O `kind` declarado do campo decide
+  como o texto recebido é coagido, então `"00430123"` continua a string
+  `"00430123"` em vez de virar o número `430123`.
+- **O adapter vem da source, não do `forRoot`.** O pacote raiz não carrega ORM
+  nenhum; `forRoot({ adapter })` é recusado na inicialização.
+- **A whitelist casa paths exatos.** Autorizar a relação `company` não autoriza
+  mais `company.name`.
+- **Configuração impossível falha quando a aplicação sobe**, não na primeira
+  requisição que por acaso passe por ela.
 
-1. Decore o método do seu controller com `@ApiDynamicQuery(rules)` (ou `@DynamicQuery(rules)`)
-2. Adicione `@QueryRules()` como decorator de parâmetro para receber as regras em tempo de execução
-3. Chame `queryBuilderService.execute(repo, query, rules)` — a biblioteca aplica filtros, ordenações, paginação e relações, retornando os resultados com os dados de paginação no topo da resposta
+## Recursos
 
-```typescript
+- **Filtros dinâmicos** — 14 operadores (`eq`, `ne`, `like`, `ilike`,
+  `notLike`, `notIlike`, `gt`, `gte`, `lt`, `lte`, `in`, `notIn`, `between`,
+  `isNull`), autorizados por campo
+- **Ordenação** — múltiplas colunas, `-` para descendente, recusada onde a
+  ordem não seria portável entre bancos
+- **Paginação** — `page`/`perPage` com `total` e `lastPage`, ou
+  `paginate=false`
+- **Seleção de campos** — `fields=`, limitado por uma projeção declarada por
+  nível
+- **Carregamento de relações** — `includes=`, cada relação com a projeção de
+  campos dela
+- **Busca textual portável** — `search=` sobre colunas pré-normalizadas
+  (dobradas), então a mesma requisição devolve as mesmas linhas
+  independentemente da collation do servidor
+- **Envelope de erro estável** — toda recusa carrega um `code` legível por
+  máquina
+- **Três adapters de ORM** atrás de um núcleo só, mais um corpus de paridade que
+  compara os três
+
+## Endpoint mínimo
+
+Duas declarações e uma chamada. Este é o
+[`apps/examples/01-starter-app`](https://github.com/naldomadeira/nestjs-rest-query/tree/main/apps/examples/01-starter-app),
+aparado:
+
+```typescript title="product.query.ts"
+import { defineQueryRules, defineQuerySchema } from 'nestjs-rest-query';
+import type { QuerySchema, SchemaRegistry } from 'nestjs-rest-query';
+
+const productSchema: QuerySchema = defineQuerySchema({
+  model: 'product',
+  primaryKey: ['id'],
+  fields: [
+    { path: 'id', kind: 'integer', nullable: false, primaryKey: true },
+    {
+      path: 'name',
+      kind: 'string',
+      nullable: false,
+      primaryKey: false,
+      foldedField: 'name_folded',
+    },
+    {
+      path: 'name_folded',
+      kind: 'string',
+      nullable: false,
+      primaryKey: false,
+      internal: true,
+    },
+    { path: 'price', kind: 'decimal', nullable: false, primaryKey: false },
+    { path: 'createdAt', kind: 'datetime', nullable: false, primaryKey: false },
+  ],
+  relations: [],
+});
+
+export const PRODUCT_SCHEMAS: SchemaRegistry = new Map([
+  ['product', productSchema],
+]);
+
+export const productRules = defineQueryRules(PRODUCT_SCHEMAS, 'product', {
+  filters: [
+    { path: 'id', operators: ['eq', 'in'] },
+    { path: 'name', operators: ['eq', 'like', 'ilike'] },
+    { path: 'price', operators: ['eq', 'gt', 'gte', 'lt', 'lte', 'between'] },
+  ],
+  sorts: ['id', 'name', 'price', 'createdAt'],
+  fields: {
+    root: {
+      allowed: ['id', 'name', 'price', 'createdAt'],
+      default: ['id', 'name', 'price', 'createdAt'],
+    },
+  },
+  search: ['name'],
+});
+```
+
+```typescript title="product.controller.ts"
 @Get()
-@ApiDynamicQuery({
-  filters: ['name', 'status', 'createdAt'],
-  sorts: ['name', 'createdAt'],
-  includes: ['company'],
-})
-findAll(
+@ApiDynamicQuery(productRules)
+async findAll(
   @Query() query: DynamicQueryDto,
-  @QueryRules() rules: RulesConfig,
+  @QueryRules() rules: CompiledQueryRules,
 ) {
-  return this.queryBuilderService.execute(this.repo, query, rules);
+  return this.productService.findAll(query, rules);
 }
 ```
 
-## Começar
+```typescript title="product.service.ts"
+import { typeormSource } from 'nestjs-rest-query/typeorm';
+
+async findAll(
+  query: DynamicQueryDto,
+  rules: CompiledQueryRules,
+): Promise<NormalizedQueryResult<Product>> {
+  return this.queryBuilderService.execute(
+    typeormSource(this.productRepository),
+    query,
+    rules,
+  );
+}
+```
+
+`productRules` é construído no carregamento do módulo, fora da classe, porque
+`@ApiDynamicQuery` é um decorator de método e roda antes de o Nest ter container
+ou repositório.
+
+## Comece por aqui
 
 <Cards>
   <Card
     title="Pré-requisito NestJS"
-    href="/docs/getting-started/prerequisites"
+    href="/pt-BR/docs/getting-started/prerequisites"
   />
-  <Card title="Instalação" href="/docs/getting-started/installation" />
-  <Card title="Primeiro endpoint" href="/docs/getting-started/first-endpoint" />
-  <Card title="Swagger" href="/docs/swagger" />
-  <Card title="Customizando a Query" href="/docs/advanced/customizing" />
+  <Card title="Instalação" href="/pt-BR/docs/getting-started/installation" />
+  <Card
+    title="Primeiro endpoint"
+    href="/pt-BR/docs/getting-started/first-endpoint"
+  />
+  <Card title="Adapters" href="/pt-BR/docs/adapters" />
+  <Card title="Swagger" href="/pt-BR/docs/swagger" />
+  <Card title="Customizando a Query" href="/pt-BR/docs/advanced/customizing" />
 </Cards>

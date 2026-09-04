@@ -1,70 +1,127 @@
 ---
 title: Pré-requisito NestJS
-description: Requisitos para usar o nestjs-rest-query em uma aplicação NestJS com TypeORM, Drizzle ou Prisma.
+description: Requisitos para usar o nestjs-rest-query numa aplicação NestJS com TypeORM, Drizzle ou Prisma.
 ---
 
-Antes de instalar a biblioteca, confirme se o seu projeto NestJS já atende aos requisitos abaixo.
-
-Esta lib foi pensada para aplicações NestJS que usam TypeORM, Drizzle ou Prisma e decorators habilitados. Se esse for o seu cenário, a configuração costuma ser simples.
+Antes de instalar a biblioteca, confirme que seu projeto NestJS já atende aos
+requisitos abaixo.
 
 ## Aplicação NestJS
 
-| Requisito  | Versão mínima | Observação                                                                                       |
-| ---------- | ------------- | ------------------------------------------------------------------------------------------------ |
-| **NestJS** | `^11.0.0`     | A biblioteca foi desenhada para projetos NestJS com `@nestjs/common` e `@nestjs/core` presentes. |
+| Requisito  | Versão    | Observação                                                                              |
+| ---------- | --------- | --------------------------------------------------------------------------------------- |
+| **NestJS** | `^11.0.0` | `@nestjs/common` e `@nestjs/core` precisam estar presentes. A `12.x` não está na faixa. |
 
 ## Runtime
 
-| Requisito   | Versão mínima |
-| ----------- | ------------- |
-| **Node.js** | `>= 20`       |
+| Requisito   | Versão  |
+| ----------- | ------- |
+| **Node.js** | `>= 22` |
 
-## Dependências peer
+O Node `24.x` é o alvo principal: é nele que a matriz de bancos roda. O job
+geral da CI também roda `22.x`.
 
-Esses pacotes devem estar presentes no seu projeto — **não** são incluídos na biblioteca.
+## Peer dependencies
 
-| Pacote             | Versão mínima        | Obrigatório     |
-| ------------------ | -------------------- | --------------- |
-| `@nestjs/common`   | `^11.0.0`            | Sim             |
-| `@nestjs/core`     | `^11.0.0`            | Sim             |
-| `reflect-metadata` | `^0.2.0`             | Sim             |
-| `typeorm`          | `^0.3.26`            | Um dos adapters |
-| `drizzle-orm`      | `^0.45.0`            | Um dos adapters |
-| `@prisma/client`   | `^5 \|\| ^6 \|\| ^7` | Um dos adapters |
-| `@nestjs/swagger`  | `^11.0.0`            | Opcional        |
+Estes pacotes precisam existir no seu projeto — eles **não** vêm embutidos na
+biblioteca. Os quatro peers de ORM/Swagger são declarados **opcionais**, e o
+entrypoint raiz não carrega nenhum deles: `import ... from 'nestjs-rest-query'`
+nunca puxa um ORM.
 
-Se o seu projeto ainda não está usando NestJS, comece por criar a aplicação com `nest new`. A biblioteca depende do ecossistema do framework para decorators, metadata e injeção de dependência.
+| Pacote             | Faixa                 | Obrigatório     |
+| ------------------ | --------------------- | --------------- |
+| `@nestjs/common`   | `^11.0.0`             | Sim             |
+| `@nestjs/core`     | `^11.0.0`             | Sim             |
+| `reflect-metadata` | `^0.2.0`              | Sim             |
+| `typeorm`          | `^0.3.26 \|\| ^1.0.0` | Um dos adapters |
+| `drizzle-orm`      | `>=1.0.0-rc.4 <1.0.0` | Um dos adapters |
+| `@prisma/client`   | `^6.19.0 \|\| ^7.0.0` | Um dos adapters |
+| `@nestjs/swagger`  | `^11.0.0`             | Opcional        |
 
-`@nestjs/swagger` só é necessário se você quiser gerar documentação OpenAPI com `@ApiDynamicQuery` e testar filtros pela UI do Swagger. Veja a seção [Swagger](/docs/swagger) para detalhes.
+<Callout type="warn" title="Drizzle 0.45.x não é suportado">
+  A faixa de `drizzle-orm` é fechada nos release candidates contra os quais a
+  matriz de paridade foi medida. Um projeto em `0.45.x` permanece na linha `2.x`
+  desta biblioteca; subir o Drizzle é obrigatório, não opcional, e quebra quatro
+  coisas — veja a página do [adapter Drizzle](/pt-BR/docs/adapters/drizzle).
+</Callout>
+
+O `@nestjs/swagger` só é necessário para gerar documentação OpenAPI com
+`@ApiDynamicQuery` e para testar filtros pela Swagger UI. Sem ele, o decorator
+continua registrando as regras do endpoint; apenas não emite parâmetro OpenAPI
+nenhum. Veja [Swagger](/pt-BR/docs/swagger).
+
+## Bancos de dados
+
+A paridade é prometida sobre um **perfil certificado de banco**, publicado em
+[`test/profiles/`](https://github.com/naldomadeira/nestjs-rest-query/tree/main/test/profiles):
+PostgreSQL 18, MySQL 8.4 LTS e SQL Server 2022, com collation por ponto de
+código nas colunas de texto portáveis. `collectProfileFacts()` e
+`checkPortabilityProfile()` são exportados para você verificar o próprio banco
+contra ele, e `forRoot({ portability: { enforce: true } })` transforma uma
+divergência em recusa em vez de surpresa.
+
+O SQLite é o **dialeto de referência**, não uma célula da matriz: ele prova que o
+compilador de cada adapter implementa a semântica do plano. É nele que roda o
+[`01-starter-app`](https://github.com/naldomadeira/nestjs-rest-query/tree/main/apps/examples/01-starter-app).
+
+### Duas famílias de coluna que seu schema precisa ganhar
+
+Nenhuma das duas é configuração; as duas são DDL que a sua aplicação preenche.
+
+- **Colunas dobradas.** `search`, `ilike` e `notIlike` nunca emitem `ILIKE` nem
+  o `mode: 'insensitive'` do Prisma. Eles comparam uma coluna pré-normalizada
+  com um termo normalizado pela mesma função, e é isso que faz a mesma
+  requisição devolver as mesmas linhas independentemente da collation do
+  servidor. Um campo usado por `search` sem `foldedField` faz o
+  `defineQueryRules` **recusar-se a construir** — a aplicação não sobe.
+- **Colunas de ordem portável.** `uuid` e `enum` não ordenam igual nas três
+  famílias de banco, então a v3 ordena por um `portableOrderField` que você
+  declara. Uma chave primária `uuid` precisa de uma em **toda** requisição,
+  porque o desempate da paginação é sempre aplicado sobre a chave primária.
+
+As duas estão detalhadas em
+[Regras de whitelist do endpoint](/pt-BR/docs/usage/endpoint-whitelist-rules).
 
 ## Adapters suportados
 
+O adapter não é configurado globalmente. Ele é decidido pela **source** que você
+passa ao `execute()`, e cada fábrica de source vive no seu próprio subpath.
+
 ### TypeORM
 
-O suporte a TypeORM é estável e usa um `SelectQueryBuilder` gerado a partir do seu `Repository`. Toda a lógica de filtros, sorts, fields, includes e paginação é aplicada sobre esse builder.
+`typeormSource(repository)`, de `nestjs-rest-query/typeorm`.
 
-Isso significa que:
-
-- Você precisa ter o TypeORM configurado com pelo menos um banco de dados (PostgreSQL, MySQL, SQLite, etc.).
-- Suas entidades devem usar os decorators do TypeORM (`@Entity`, `@Column`, `@ManyToOne`, etc.).
-- O adapter de TypeORM opera sobre repositórios TypeORM — não há suporte a query raw ou outras camadas de abstração.
+- TypeORM configurado com pelo menos um banco, e entidades declaradas com os
+  decorators do TypeORM.
+- As colunas companheiras seguem uma **convenção** aqui, sobre o path da
+  propriedade da entidade: `<campo>_folded` e `<campo>_order`. O resolver marca
+  automaticamente como interna qualquer propriedade terminada em `_folded` ou
+  `_order`.
+- O nome do model é derivado, não escolhido:
+  `metadata.name.replace(/Entity$/, '').toLowerCase()`.
+- `buildSchemaRegistry(repository)` consegue derivar o registry lógico inteiro
+  da metadata das entidades — mas só onde existe um `Repository` vivo.
 
 ### Drizzle
 
-O suporte a Drizzle é estável e é ativado via `DrizzleAdapter`. O adapter usa a sua instância de Drizzle, além de um mapa explícito de relations quando relations são necessárias.
+`drizzleSource({ db, dialect, table, relations })` mais
+`drizzleDatabase({ client, dialect })`, os dois de `nestjs-rest-query/drizzle`.
 
-Isso significa que:
-
-- Você precisa ter o Drizzle configurado com um driver suportado (PostgreSQL, MySQL, SQLite, etc.).
-- Seu schema precisa ser declarado com Drizzle (`pgTable`, `mysqlTable`, etc.).
-- Ao usar `includes`, você precisa declarar o mapa de relations para o adapter resolvê-las com segurança.
+- Drizzle `1.0.0-rc.4` ou posterior dentro da faixa, num driver suportado.
+- O adapter não lê o seu `pgTable`. Você declara um **descritor lógico** com
+  `createDrizzleTable({ name, model, columns })` e as relações por path
+  pontuado.
+- O dialeto é argumento obrigatório, porque qual método de execução chamar
+  (`all()` ou `execute()`) sai do dialeto declarado, nunca da inspeção do
+  objeto.
 
 ### Prisma
 
-O suporte a Prisma é estável e é ativado via `PrismaAdapter`. O adapter funciona com o Prisma Client e qualquer banco de dados suportado pelo Prisma.
+`prismaSource({ client, model, manifest })`, de `nestjs-rest-query/prisma`.
 
-Isso significa que:
-
-- Você precisa ter o Prisma configurado com um banco de dados suportado (PostgreSQL, MySQL, SQLite, etc.).
-- Seu schema precisa estar declarado no `schema.prisma` e o Prisma Client gerado.
-- Passe um `PrismaSource` descrevendo o client e o nome do modelo para `queryBuilderService.execute()`.
+- Um Prisma Client gerado, passado **direto** — sem cast, sem fachada própria.
+- Um manifesto escrito à mão com `createPrismaManifest`, ligando cada model ao
+  delegate do client e declarando o `provider`.
+- Em `sqlite` e `sqlserver`, cinco operadores (`like`, `notLike`, `ilike`,
+  `notIlike`, `search`) são recusados; veja a página do
+  [adapter Prisma](/pt-BR/docs/adapters/prisma).

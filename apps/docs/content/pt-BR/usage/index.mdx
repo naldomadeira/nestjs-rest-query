@@ -1,74 +1,79 @@
 ---
 title: Guia de Uso
-description: Como usar o nestjs-rest-query em controllers NestJS — decorators, DTOs, service e estrutura da resposta.
+description: Como usar o nestjs-rest-query em controllers NestJS — decorators, DTOs, serviço, envelope de resposta e envelope de erro.
 ---
 
-Se você ainda não tem um endpoint funcionando, comece por [Primeiro endpoint](/docs/getting-started/first-endpoint). Esta página é a referência dos decorators, parâmetros, operadores e whitelist de segurança.
+Se você ainda não tem um endpoint funcionando, comece por
+[Primeiro endpoint](/pt-BR/docs/getting-started/first-endpoint). Esta página é a
+referência dos decorators, do formato do fio e dos dois envelopes. As regras têm
+página própria:
+[Regras de whitelist do endpoint](/pt-BR/docs/usage/endpoint-whitelist-rules).
 
 ## Decorators
 
 ### `@ApiDynamicQuery(rules)`
 
-Decorator de método para endpoints que precisam de documentação Swagger. Faz duas coisas simultaneamente:
+Decorator de método para endpoints que precisam de documentação OpenAPI. Ele faz
+duas coisas ao mesmo tempo:
 
-- Armazena o `RulesConfig` como metadata no método (lido por `@QueryRules()` em runtime)
-- Gera `@ApiQuery` automaticamente para todos os parâmetros suportados (filtros, sort, fields, includes, page, perPage)
+- guarda as **regras compiladas** no método, onde `@QueryRules()` as lê em
+  runtime;
+- gera `@ApiQuery` para os parâmetros que este endpoint realmente suporta —
+  `page`, `perPage`, `paginate` sempre, e `sort`, `fields`, `includes`, `search`
+  e `filter` só quando as regras declaram algo para eles.
 
 ```typescript
 @Get()
-@ApiDynamicQuery({
-  filters: ['name', 'email', 'createdAt'],
-  sorts: ['name', 'createdAt'],
-  fields: ['id', 'name', 'email', 'createdAt'],
-  includes: ['company'],
-})
+@ApiDynamicQuery(userRules)
 async findAll(/* ... */) {}
 ```
+
+Ele recebe o objeto que `defineQueryRules(...)` devolveu. **Não é genérico** — um
+`@ApiDynamicQuery<User>(...)` que sobrou dá
+`TS2558: Expected 0 type arguments, but got 1`.
+
+<Callout type="warn">
+  O decorator é avaliado quando a classe do controller carrega, antes de o Nest
+  ter container ou repositório. Compile as regras no escopo do módulo, em
+  arquivo próprio, não dentro da classe.
+</Callout>
 
 ### `@DynamicQuery(rules)`
 
-Idêntico ao `@ApiDynamicQuery`, mas **sem geração de Swagger**. Use em endpoints internos ou quando não tiver `@nestjs/swagger` instalado.
-
-```typescript
-@Get()
-@DynamicQuery({
-  filters: ['name', 'status'],
-  sorts: ['name'],
-})
-async findAll(/* ... */) {}
-```
+Mesmo registro, **sem geração OpenAPI**. Use em endpoints internos ou quando o
+`@nestjs/swagger` não está instalado.
 
 ### `@QueryRules()`
 
-Decorator de **parâmetro** que lê o `RulesConfig` armazenado pelo `@ApiDynamicQuery` ou `@DynamicQuery` e o injeta como argumento do método em runtime.
+Decorator de **parâmetro** que lê as regras registradas por `@ApiDynamicQuery`
+ou `@DynamicQuery` no mesmo método e as injeta como argumento.
 
 ```typescript
 async findAll(
   @Query() query: DynamicQueryDto,
-  @QueryRules() rules: RulesConfig,  // reads the whitelist from the method decorator
+  @QueryRules() rules: CompiledQueryRules,
 ) {}
 ```
 
-<Callout type="warn">
-  `@QueryRules()` depende do metadata gerado por `@ApiDynamicQuery` ou
-  `@DynamicQuery` no mesmo método. Sem um desses decorators, `rules` será `{}`.
-</Callout>
+O `@QueryRules()` depende de um dos decorators de método estar presente. Sem ele
+não há regras a entregar.
 
 ## Controller completo
 
 ```typescript title="users.controller.ts"
 import { Controller, Get, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiDynamicQuery,
   ApiPaginatedResponse,
   DynamicQueryDto,
-  QueryResult,
   QueryRules,
-  RulesConfig,
+  type CompiledQueryRules,
+  type NormalizedQueryResult,
 } from 'nestjs-rest-query';
 import { User } from './entities/user.entity';
 import { UsersBusiness } from './users.business';
+import { userRules } from './users.query';
 
 @ApiTags('users')
 @Controller('users')
@@ -77,36 +82,25 @@ export class UsersController {
 
   @Get()
   @ApiOperation({ summary: 'Lista usuários com filtros dinâmicos' })
-  @ApiDynamicQuery({
-    filters: ['username', 'email', 'firstName', 'lastName', 'createdAt'],
-    sorts: ['username', 'email', 'createdAt'],
-    fields: ['id', 'username', 'email', 'firstName', 'lastName', 'createdAt'],
-  })
-  @ApiPaginatedResponse(User)
+  @ApiDynamicQuery(userRules)
+  @ApiPaginatedResponse(User, { description: 'Lista de usuários' })
   async findAll(
     @Query() query: DynamicQueryDto,
-    @QueryRules() rules: RulesConfig
-  ): Promise<QueryResult<User>> {
+    @QueryRules() rules: CompiledQueryRules
+  ): Promise<NormalizedQueryResult<User>> {
     return this.usersBusiness.findAll(query, rules);
   }
 }
 ```
 
-## Service
+## Serviço
 
-Injete `QueryBuilderService` e o `Repository` normalmente via injeção de dependência do NestJS. Como o módulo é `@Global`, o service está disponível em qualquer provider sem precisar importar `DynamicQueryBuilderModule` novamente.
+Injete o `QueryBuilderService` e o seu repositório/client normalmente. O módulo
+é `@Global`, então o serviço fica disponível em qualquer provider sem importar o
+`DynamicQueryBuilderModule` de novo.
 
 ```typescript title="users.business.ts"
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import {
-  DynamicQueryDto,
-  QueryBuilderService,
-  QueryResult,
-  RulesConfig,
-} from 'nestjs-rest-query';
-import { User } from './entities/user.entity';
+import { typeormSource } from 'nestjs-rest-query/typeorm';
 
 @Injectable()
 export class UsersBusiness {
@@ -118,92 +112,170 @@ export class UsersBusiness {
 
   async findAll(
     query: DynamicQueryDto,
-    rules: RulesConfig
-  ): Promise<QueryResult<User>> {
-    return this.queryBuilderService.execute(this.userRepository, query, rules);
+    rules: CompiledQueryRules
+  ): Promise<NormalizedQueryResult<User>> {
+    return this.queryBuilderService.execute(
+      typeormSource(this.userRepository),
+      query,
+      rules
+    );
   }
 }
 ```
 
+O `execute(source, query, rules, options?)` recebe uma **source**, não um
+repositório. Veja [Adapters](/pt-BR/docs/adapters) para as três fábricas de
+source e [Customizando a Query](/pt-BR/docs/advanced/customizing) para as
+`options`.
+
 ## Parâmetros de query suportados
 
-| Parâmetro  | Formato                         | Exemplo                                       |
-| ---------- | ------------------------------- | --------------------------------------------- |
-| `filter`   | `filter[campo][operador]=valor` | `filter[email][eq]=joao@email.com`            |
-| `sort`     | CSV de campos (`-` para desc)   | `sort=-createdAt,name`                        |
-| `fields`   | lista CSV                       | `fields=id,name,email`                        |
-| `includes` | lista CSV                       | `includes=company,roles`                      |
-| `page`     | número                          | `page=2`                                      |
-| `perPage`  | número                          | `perPage=25`                                  |
-| `paginate` | `true` / `false`                | `paginate=false` (retorna todos os registros) |
+| Parâmetro  | Formato                        | Exemplo                              |
+| ---------- | ------------------------------ | ------------------------------------ |
+| `filter`   | `filter[path][operador]=valor` | `filter[email][eq]=ana@example.com`  |
+| `sort`     | lista de paths, `-` para desc  | `sort=-createdAt,name`               |
+| `fields`   | lista de paths                 | `fields=id,name,company.name`        |
+| `includes` | lista de paths de relação      | `includes=company,posts`             |
+| `search`   | texto livre                    | `search=ana`                         |
+| `page`     | inteiro positivo               | `page=2`                             |
+| `perPage`  | inteiro positivo               | `perPage=25`                         |
+| `paginate` | `true` / `false` / `1` / `0`   | `paginate=false` (devolve só `data`) |
 
-### Operadores de filtro disponíveis
+Detalhes fáceis de errar:
 
-| Operador  | Descrição                           | Exemplo                                            |
-| --------- | ----------------------------------- | -------------------------------------------------- |
-| `eq`      | Igual                               | `filter[status][eq]=active`                        |
-| `ne`      | Diferente                           | `filter[status][ne]=inactive`                      |
-| `gt`      | Maior que                           | `filter[age][gt]=18`                               |
-| `gte`     | Maior ou igual                      | `filter[age][gte]=18`                              |
-| `lt`      | Menor que                           | `filter[price][lt]=100`                            |
-| `lte`     | Menor ou igual                      | `filter[price][lte]=100`                           |
-| `like`    | Contém (case-sensitive)             | `filter[name][like]=João`                          |
-| `ilike`   | Contém (case-insensitive, portável) | `filter[name][ilike]=joao`                         |
-| `in`      | Dentro de uma lista (CSV)           | `filter[status][in]=active,pending`                |
-| `notIn`   | Fora de uma lista (CSV)             | `filter[status][notIn]=deleted`                    |
-| `between` | Entre dois valores (`val1,val2`)    | `filter[createdAt][between]=2024-01-01,2024-12-31` |
-| `isNull`  | Nulo (`true`) ou não nulo (`false`) | `filter[deletedAt][isNull]=true`                   |
+- O parâmetro é `sort`, singular. A propriedade das **regras** é `sorts`.
+- `filter[name]=Ada` é a forma curta de `filter[name][eq]=Ada`.
+- Listas aceitam parâmetro repetido/array (preferível, o `qs` expande) ou CSV. O
+  CSV suporta aspas e escape por barra invertida, então
+  `filter[name][in]="A, B"` é um item e não dois.
+- `page`/`perPage` querem inteiro decimal positivo simples. `?page=` (presente e
+  vazio) é `400`, não uma queda para a página 1.
+- Um `perPage` acima do `maxPerPage` é `400`, não um corte silencioso.
+- Um path precisa estar autorizado **exatamente**. `fields=company.name` também
+  exige `company` em `includes`, tanto na requisição quanto nas regras — a
+  seleção nunca traz uma relação implicitamente.
 
-## Resposta paginada
+### Operadores de filtro
 
-`execute()` retorna `Promise<QueryResult<T>>`. Quando paginação está ativa (padrão), a resposta inclui os dados de paginação no topo:
+Todos os 14, na ordem em que a biblioteca os lista:
+
+| Operador   | Significado                                  | Aplica-se a                                           |
+| ---------- | -------------------------------------------- | ----------------------------------------------------- |
+| `eq`       | igual                                        | qualquer kind não opaco                               |
+| `ne`       | diferente                                    | qualquer kind não opaco                               |
+| `like`     | contém, padrão literal                       | `string`, `uuid`, `enum`                              |
+| `ilike`    | contém, com dobra de caixa                   | `string`, `uuid`, `enum` **com `foldedField`**        |
+| `notLike`  | não contém, padrão literal                   | `string`, `uuid`, `enum`                              |
+| `notIlike` | não contém, com dobra de caixa               | `string`, `uuid`, `enum` **com `foldedField`**        |
+| `gt`       | maior que                                    | kinds com ordem portável, ou com `portableOrderField` |
+| `gte`      | maior ou igual                               | idem                                                  |
+| `lt`       | menor que                                    | idem                                                  |
+| `lte`      | menor ou igual                               | idem                                                  |
+| `in`       | está na lista                                | qualquer kind não opaco                               |
+| `notIn`    | não está na lista                            | qualquer kind não opaco                               |
+| `between`  | entre dois valores, inclusive                | kinds com ordem portável, ou com `portableOrderField` |
+| `isNull`   | `IS NULL` (`true`) / `IS NOT NULL` (`false`) | campos **nuláveis**, e relações                       |
+
+`json` e `binary` são opacos: nenhum operador é inferido para eles.
+
+Quatro comportamentos que vale saber:
+
+- **`%`, `_` e `\` são literais.** `filter[name][like]=100%` procura o texto
+  "100%". Sob Prisma em `sqlite`/`sqlserver` essa promessa não pode ser
+  cumprida, então esses cinco operadores de padrão são recusados lá — veja
+  [adapter Prisma](/pt-BR/docs/adapters/prisma).
+- **`in=[]` devolve zero linhas** (condição sempre falsa) e **`notIn=[]` devolve
+  tudo**. Na `2.x` um `in` vazio era ignorado.
+- **`between` precisa de exatamente dois valores**, senão
+  `400 FILTER_VALUE_INVALID`.
+- **`isNull` sobre relação** pergunta sobre a própria relação:
+  `filter[company][isNull]=true` acha as linhas sem empresa, e numa relação
+  `many` significa "coleção vazia" — compilado como `NOT EXISTS`, nunca como
+  join.
+
+### Coerção de valor, pelo kind declarado
+
+A coerção segue o `kind` do campo, nunca a aparência do texto. Esta é a maior
+mudança observável em relação à `2.x`, onde `"00430123"` virava `430123`.
+
+| Kind       | Entrada aceita                                                 |
+| ---------- | -------------------------------------------------------------- |
+| `string`   | qualquer string, **sem trim** — espaço faz parte do valor      |
+| `uuid`     | um UUID canônico                                               |
+| `enum`     | um membro declarado                                            |
+| `integer`  | inteiro decimal, sem zero à esquerda, dentro da faixa segura   |
+| `bigint`   | inteiro decimal, carregado como `bigint`                       |
+| `decimal`  | decimal finito canônico, mantido exato — nunca float           |
+| `boolean`  | `true`, `false`, `1`, `0`                                      |
+| `date`     | `YYYY-MM-DD`, e tem de ser data de calendário real             |
+| `datetime` | ISO 8601 **com offset ou `Z`** — timestamp sem fuso é recusado |
+
+Qualquer outra coisa é `400 FILTER_VALUE_INVALID`, e `details` nunca ecoa o
+valor que o cliente enviou.
+
+## O envelope de resposta
 
 ```json
 {
   "data": [
-    { "id": 1, "name": "Ana Lima", "email": "ana@email.com" },
-    { "id": 2, "name": "Bruno Costa", "email": "bruno@email.com" }
+    { "id": 1, "name": "Ana Lima", "email": "ana@example.com" },
+    { "id": 2, "name": "Bruno Costa", "email": "bruno@example.com" }
   ],
   "page": 1,
-  "perPage": 10,
+  "perPage": 20,
   "total": 42,
-  "lastPage": 5
+  "lastPage": 3
 }
 ```
 
-Quando `paginate=false`, a resposta contém apenas `{ "data": [...] }`.
+Com `paginate=false` a resposta é `{ "data": [...] }` e nada mais. O `lastPage`
+nunca é `0` — o contrato promete no mínimo `1`.
 
-## RulesConfig — whitelist de segurança
+Quem produz esse JSON é o núcleo, não o adapter. Duas consequências:
 
-Cada endpoint define sua própria whitelist através do `RulesConfig`. Campos não listados na whitelist resultam em `400 Bad Request` — a biblioteca nunca executa filtros, sorts ou includes não autorizados.
+- **A codificação de saída é uniforme.** `bigint` e `decimal` são serializados
+  como string, `datetime` como instante ISO, `date` como `YYYY-MM-DD`, `binary`
+  como base64 — independentemente de o driver ter devolvido string, number ou
+  `Date`.
+- **Colunas internas nunca aparecem**, e uma chave primária que não faz parte da
+  projeção visível é removida mesmo que o adapter tenha precisado selecioná-la
+  para hidratação, deduplicação e paginação.
 
-| Propriedade | Tipo       | Descrição                                                                                         |
-| ----------- | ---------- | ------------------------------------------------------------------------------------------------- |
-| `filters`   | `string[]` | Campos que podem ser usados em `filter[campo][op]`.                                               |
-| `sorts`     | `string[]` | Campos que podem ser usados em `sort=campo` ou `sort=-campo`.                                     |
-| `fields`    | `string[]` | Campos que podem ser selecionados via `fields=`. Também restringe os campos de sort (ver abaixo). |
-| `includes`  | `string[]` | Relações TypeORM que podem ser carregadas via `includes=`.                                        |
-| `alias`     | `string`   | Alias da entidade no QueryBuilder. Padrão: `'root'`.                                              |
+## O envelope de erro
 
-<Callout type="warn">
-  **Atenção:** quando `fields` está definido, ele também restringe os campos de
-  `sorts`. Um campo presente em `sorts` mas ausente de `fields` será rejeitado.
-  Para evitar isso, mantenha `fields` e `sorts` em sincronia — ou omita `fields`
-  se não precisar restringir a seleção de colunas.
-</Callout>
-
-`RulesConfig.operators` pode restringir os operadores de filtro aceitos em um endpoint específico:
-
-```typescript
-@ApiDynamicQuery({
-  filters: ['name', 'status'],
-  operators: { allowed: ['eq', 'ilike'] },
-})
+```json
+{
+  "statusCode": 400,
+  "code": "FIELD_NOT_ALLOWED",
+  "message": "filter path is not allowed: secret",
+  "details": { "path": "secret", "scope": "filter", "allowed": ["id", "name"] }
+}
 ```
 
-Essa configuração do endpoint tem prioridade sobre o `DynamicQueryBuilderModule.forRoot({ operators })` global.
+Ramifique no `code`, nunca na `message`.
 
-### Como a whitelist protege o endpoint
+| Código                         | Status     | Quando                                                                                                                                                                                                         |
+| ------------------------------ | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `QUERY_SYNTAX_INVALID`         | 400        | path ou operador fora do alfabeto seguro, lista malformada                                                                                                                                                     |
+| `QUERY_SYNTAX_UNKNOWN_PARAM`   | 400        | declarado no contrato, **não emitido hoje**                                                                                                                                                                    |
+| `FIELD_NOT_ALLOWED`            | 400        | o path não está na whitelist daquele escopo                                                                                                                                                                    |
+| `FIELD_NOT_FOUND`              | 400        | o path está na whitelist mas não existe no schema                                                                                                                                                              |
+| `RELATION_NOT_FOUND`           | 400        | um salto de relação do path não existe                                                                                                                                                                         |
+| `OPERATOR_NOT_ALLOWED`         | 400        | o campo não autoriza aquele operador                                                                                                                                                                           |
+| `OPERATOR_TYPE_MISMATCH`       | 400        | o operador não faz sentido para aquele kind — `like` num integer, `sort` através de relação `many`                                                                                                             |
+| `FILTER_VALUE_INVALID`         | 400        | o valor não decodifica para o kind declarado                                                                                                                                                                   |
+| `PAGINATION_INVALID`           | 400        | `page`, `perPage` ou `paginate` não é literal válido, ou excede o `maxPerPage`                                                                                                                                 |
+| `SORT_CONFLICT`                | 400        | o mesmo path foi pedido ascendente e descendente                                                                                                                                                               |
+| `CAPABILITY_UNAVAILABLE`       | 400 ou 500 | o operador ou a forma não pode ser atendida: sem coluna dobrada, sem ordem portável, padrões do Prisma em `sqlite`/`sqlserver` (400); chave primária sem ordem portável ou cadeia existencial no TypeORM (500) |
+| `PORTABILITY_PROFILE_MISMATCH` | 500        | `portability.enforce` ligado e os fatos do perfil da source não batem                                                                                                                                          |
+| `SOURCE_CONFIGURATION_INVALID` | 500        | o schema declarado não bate com a source, ou o `forRoot` recebeu chave removida                                                                                                                                |
+| `ADAPTER_CONTRACT_VIOLATION`   | 500        | o adapter não consegue compilar uma forma que o plano pediu                                                                                                                                                    |
+
+A divisão é deliberada: entrada do cliente é `400`, e erro na sua declaração é
+`500`, porque é bug da aplicação e não da requisição. A maior parte dos erros de
+configuração aparece enquanto a aplicação sobe, não numa requisição.
+
+## Como a whitelist protege o endpoint
 
 ```mermaid
 sequenceDiagram
@@ -213,31 +285,23 @@ sequenceDiagram
   participant DQB as QueryBuilderService
 
   Client->>Ctrl: GET /users?filter[password][eq]=secret&filter[name][eq]=Ana
-
-  Note over Ctrl: RulesConfig.filters = ['name', 'email', 'status']
-
-  Ctrl->>DQB: execute(repo, query, rules)
-
-  Note over DQB: 'password' não está na whitelist<br/>→ BadRequestException
-
-  DQB-->>Ctrl: 400 Bad Request
-  Ctrl-->>Client: 400 Bad Request
+  Note over Ctrl: userRules autoriza filtros em<br/>name, email, createdAt — exatamente
+  Ctrl->>DQB: execute(source, query, rules)
+  Note over DQB: 'password' não está na whitelist de filtros →<br/>400 FIELD_NOT_ALLOWED, antes de qualquer SQL
+  DQB-->>Ctrl: 400
+  Ctrl-->>Client: 400 { code: "FIELD_NOT_ALLOWED" }
 ```
 
-Quando um campo não autorizado é usado em `filter`, `sort` ou `includes`, a resposta é:
-
-```json
-{
-  "message": "Filter field(s) not allowed: password. Allowed fields: username, email, firstName, lastName, createdAt",
-  "error": "Bad Request",
-  "statusCode": 400
-}
-```
+Nada chega ao banco antes de todo path e todo operador terem sido autorizados.
 
 ## Próximos passos
 
 <Cards>
-  <Card title="Primeiro endpoint" href="/docs/getting-started/first-endpoint" />
-  <Card title="Swagger" href="/docs/swagger" />
-  <Card title="Customizando a Query" href="/docs/advanced/customizing" />
+  <Card
+    title="Regras de whitelist do endpoint"
+    href="/pt-BR/docs/usage/endpoint-whitelist-rules"
+  />
+  <Card title="Adapters" href="/pt-BR/docs/adapters" />
+  <Card title="Swagger" href="/pt-BR/docs/swagger" />
+  <Card title="Customizando a Query" href="/pt-BR/docs/advanced/customizing" />
 </Cards>
