@@ -43,6 +43,71 @@ jobs:
           files: coverage/cobertura-coverage.xml
         continue-on-error: true
 
+  # Gate §23 "os exemplos compilam e passam smoke E2E".
+  #
+  # É o único gate que atravessa a fronteira do pacote publicado: os exemplos
+  # consomem `nestjs-rest-query` por `workspace:*`, ou seja pelos `exports` e
+  # pelo `dist` — não pelo `src`. Foi compilando o exemplo 01 com `strict` que
+  # apareceu a `DynamicQueryDto` não atribuível ao próprio `execute()` (commit
+  # 5fd238c), e foi o exemplo 04 que revelou o `PrismaClientLike` que nenhum
+  # `PrismaClient` real satisfazia. A suíte da biblioteca não pega nenhum dos
+  # dois, porque ela nunca sai de dentro.
+  examples:
+    name: examples smoke E2E
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Os exemplos resolvem o pacote pelos `exports`, então sem `dist` eles
+      # não compilam nem rodam.
+      - run: pnpm build
+
+      - name: typecheck every example against the published surface
+        run: pnpm --filter "./apps/examples/*" typecheck
+
+      # Cada exemplo sobe o próprio Postgres, no compose que o desenvolvedor
+      # usa localmente e nas mesmas portas (5432/5433/5434) — não em serviço
+      # do runner. É o que faz o smoke da CI e o local serem a mesma coisa: um
+      # `docker-compose.yml` que só funciona aqui divergiria calado.
+      # O `--wait` depende do healthcheck declarado nos três composes.
+      - name: start the example databases
+        run: |
+          docker compose -f apps/examples/02-app-with-postgres/docker-compose.yml up -d --wait
+          docker compose -f apps/examples/03-app-with-drizzle/docker-compose.yml up -d --wait
+          docker compose -f apps/examples/04-app-with-prisma/docker-compose.yml up -d --wait
+
+      # Um passo por exemplo, em vez de um `pnpm -r`: quando quebra, o nome do
+      # passo já diz qual consumidor quebrou.
+      - name: 01 starter app (TypeORM / SQLite)
+        run: pnpm --filter 01-starter-app test:e2e
+
+      - name: 02 app with postgres (TypeORM / PostgreSQL)
+        run: pnpm --filter 02-app-with-postgres test:e2e
+
+      - name: 03 app with drizzle (Drizzle / PostgreSQL)
+        run: pnpm --filter 03-app-with-drizzle test:e2e
+
+      - name: 04 app with prisma (Prisma / PostgreSQL)
+        run: pnpm --filter 04-app-with-prisma test:e2e
+
+      - name: stop the example databases
+        if: always()
+        run: |
+          docker compose -f apps/examples/02-app-with-postgres/docker-compose.yml down -v
+          docker compose -f apps/examples/03-app-with-drizzle/docker-compose.yml down -v
+          docker compose -f apps/examples/04-app-with-prisma/docker-compose.yml down -v
+
   pack-check:
     runs-on: ubuntu-latest
     steps:
