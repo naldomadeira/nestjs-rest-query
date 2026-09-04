@@ -1,6 +1,10 @@
 import type { ObjectLiteral } from 'typeorm';
 import { buildQueryPlan } from '@core/query-plan';
-import { compilePlan, executeCompiled } from '@infra/adapters/typeorm';
+import {
+  compilePlan,
+  executeCompiled,
+  TypeOrmAdapter,
+} from '@infra/adapters/typeorm';
 import { normalizeResult } from '@core/result-normalizer';
 import { RULES_PRESETS } from '../../fixtures/rules';
 import { seedCorpus } from '../../fixtures/corpus-runner';
@@ -117,6 +121,34 @@ describe('paginação TypeORM', () => {
       'user.deep'
     );
     expect(result.queryCount).toBeLessThanOrEqual(3);
+  });
+
+  it('customize também restringe a fase de keys da paginação many', async () => {
+    const plan = buildQueryPlan(
+      { includes: 'posts', perPage: '1', page: '1' },
+      RULES_PRESETS['user.deep']
+    );
+    const repository = repositoryFor('user.deep');
+    const adapter = new TypeOrmAdapter();
+    const compiled = adapter.compile(plan, { repository });
+
+    adapter.customize(
+      compiled,
+      (qb) => qb.andWhere('"root"."id" = :customizedId', { customizedId: 3 }),
+      'data'
+    );
+
+    const result = await executeCompiled(compiled);
+    const normalized = normalizeResult<ObjectLiteral>(
+      result.rows,
+      result.total,
+      plan
+    );
+
+    expect(normalized.total).toBe(11);
+    expect(
+      (normalized.data as Record<string, unknown>[]).map((row) => row.id)
+    ).toEqual([3]);
   });
 
   it('página além do fim devolve lista vazia com total correto', async () => {

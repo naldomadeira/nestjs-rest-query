@@ -118,6 +118,9 @@ export class TypeOrmAdapter<
           : [compiled.data, compiled.count];
 
     for (const query of targets) callback(query);
+    if (scope === 'data' || scope === 'both') {
+      compiled.keyCustomizers.push(callback);
+    }
   }
 
   execute(compiled: CompiledTypeOrmQuery<T>): Promise<AdapterResult<T>> {
