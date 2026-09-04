@@ -1,29 +1,76 @@
-// Core — Module e Service
+// ---------------------------------------------------------------------------
+// Entrypoint raiz do nestjs-rest-query v3.
+//
+// O root não carrega nenhum peer de ORM e não exporta classes runtime de
+// adapter (spec §20). Importe o adapter pelo seu subpath:
+//
+//   import { typeormSource } from 'nestjs-rest-query/typeorm';
+// ---------------------------------------------------------------------------
+
+// Core — módulo e serviço
 export { DynamicQueryBuilderModule } from './core/dynamic-query-builder.module';
-export { QueryBuilderService } from './core/query-builder.service';
+export {
+  QueryBuilderService,
+  type ExecuteOptions,
+} from './core/query-builder.v3.service';
 export { DQB_CONFIG_TOKEN } from './core/constants';
 
-// Adapters
+// Núcleo semântico — schema, regras e perfil textual
 export {
-  TypeOrmAdapter,
-  DrizzleAdapter,
-  type DrizzleQB,
-  PrismaAdapter,
-  type PrismaQB,
-} from './infra/adapters';
-export type { RestQueryAdapter } from './contracts/rest-query-adapter.interface';
-export type {
-  DrizzleSource,
-  DrizzleRelation,
-  DrizzleRelationOne,
-  DrizzleRelationMany,
-} from './contracts/drizzle-source.interface';
-export type {
-  PrismaSource,
-  PrismaRelation,
-} from './contracts/prisma-source.interface';
+  defineQuerySchema,
+  hasTotalPortableOrder,
+  type FieldDescriptor,
+  type QuerySchema,
+  type QuerySchemaInput,
+  type RelationDescriptor,
+  type ScalarKind,
+  type SchemaRegistry,
+} from './core/schema';
+export {
+  defineQueryRules,
+  type CompiledQueryRules,
+  type FieldProjectionInput,
+  type FilterRuleInput,
+  type QueryRulesInput,
+} from './core/authorization';
+export { foldText } from './core/text-profile';
 
-// API — Decorators
+// Núcleo semântico — plano e resultado
+export {
+  buildQueryPlan,
+  type BuildPlanOptions,
+  type ConsistencyMode,
+  type PlanProjection,
+  type TextProfile,
+  type TypedQueryPlan,
+} from './core/query-plan';
+export type {
+  PlanFilter,
+  PlanPagination,
+  PlanSearch,
+  PlanSort,
+} from './core/semantic-validator';
+export type { NormalizedQueryResult } from './core/result-normalizer';
+export { CivilDate, DecimalValue } from './core/coercion';
+
+// Erros
+export {
+  RestQueryError,
+  RestQueryErrorCode,
+  toHttpException,
+  type ErrorDetails,
+  type RestQueryErrorEnvelope,
+} from './core/errors';
+
+// Perfil certificado de banco
+export {
+  checkPortabilityProfile,
+  type ProfileDialect,
+  type ProfileFacts,
+  type ProfileViolation,
+} from './core/portability';
+
+// API — decorators e DTOs
 export { ApiDynamicQuery } from './api/decorators/api-dynamic-query.decorator';
 export { DynamicQuery } from './api/decorators/dynamic-query.decorator';
 export { QueryRules } from './api/decorators/query-rules.decorator';
@@ -31,29 +78,28 @@ export {
   ApiPaginatedResponse,
   type ApiPaginatedResponseOptions,
 } from './api/decorators/api-paginated-response.decorator';
-
-// API — DTOs
-export { PaginationQueryDto, DynamicQueryDto } from './api/dtos';
-
-// Contracts — Interfaces publicas
-export type {
-  QueryBuilderConfig,
-  PaginationConfig,
-  OperatorsConfig,
-  LoggingConfig,
-  LoggerLike,
-} from './contracts/query-builder-config.interface';
-export type { QueryInput } from './contracts/query-input.interface';
-export type { QueryResult } from './contracts/query-result.interface';
-export type { RulesConfig } from './contracts/rules-config.interface';
-export type { EntityPaths } from './contracts/entity-paths.type';
-
-// Domain — Tipos de operadores
-export { Operator, ALL_OPERATORS } from './domain/operators/operator.types';
-export type { QueryOperator } from './domain/operators/operator.types';
-
-// API — Swagger
+export { DynamicQueryDto } from './api/dtos';
+// `PaginationQueryDto` é um alias de tipo, não uma classe.
+export type { PaginationQueryDto } from './api/dtos';
 export { dqbSwaggerRequestInterceptor } from './api/swagger/swagger.interceptor';
 
-// Contracts — Error message templates (G7 parity)
-export * as ErrorMessages from './contracts/error-messages';
+// Contratos — apenas tipos; nenhum runtime de ORM cruza esta fronteira
+export type {
+  AdapterCapabilities,
+  AdapterResult,
+  AnyQuerySource,
+  CustomizeScope,
+  LoggingConfigV3,
+  PaginationConfigV3,
+  QueryBuilderConfigV3,
+  QuerySource,
+  RestQueryAdapterV3,
+  SqlDialect,
+} from './contracts/v3';
+export type { QueryInput } from './contracts/query-input.interface';
+export type { QueryResult } from './contracts/query-result.interface';
+export type { LoggerLike } from './contracts/query-builder-config.interface';
+
+// Operadores
+export { Operator, ALL_OPERATORS } from './domain/operators/operator.types';
+export type { QueryOperator } from './domain/operators/operator.types';

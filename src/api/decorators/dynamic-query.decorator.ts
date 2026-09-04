@@ -1,21 +1,27 @@
 import { SetMetadata } from '@nestjs/common';
-import { RulesConfig } from '@contracts/rules-config.interface';
+import type { CompiledQueryRules } from '@core/authorization';
 import { QUERY_RULES_METADATA_KEY } from '@core/constants';
 
 /**
- * Registra as regras de query dinamica para o endpoint.
+ * Registra as regras compiladas do endpoint.
  *
- * Use este decorator em endpoints que nao precisam de documentacao Swagger.
- * Para endpoints documentados com Swagger, use {@link ApiDynamicQuery}.
+ * Use em endpoints sem documentação Swagger; para os documentados, use
+ * {@link ApiDynamicQuery}.
  *
  * @example
  * ```ts
+ * const rules = defineQueryRules(schema, 'product', {
+ *   filters: [{ path: 'id', operators: ['eq', 'in'] }],
+ *   sorts: ['id'],
+ *   fields: { root: { allowed: ['id', 'name'], default: ['id', 'name'] } },
+ * });
+ *
  * @Get('export')
- * @DynamicQuery({ filters: ['id', 'status'], sorts: ['id'] })
- * async export(@Query() query: DynamicQueryDto, @QueryRules() rules: RulesConfig) {
+ * @DynamicQuery(rules)
+ * async export(@Query() query: DynamicQueryDto, @QueryRules() rules: CompiledQueryRules) {
  *   return this.service.findAll(query, rules);
  * }
  * ```
  */
-export const DynamicQuery = <T = any>(rules: RulesConfig<T>): MethodDecorator =>
+export const DynamicQuery = (rules: CompiledQueryRules): MethodDecorator =>
   SetMetadata(QUERY_RULES_METADATA_KEY, rules);
