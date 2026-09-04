@@ -20,6 +20,7 @@ const capabilities: AdapterCapabilities = {
   dialect: 'postgres',
   transactionalConsistency: true,
   escapeCharacter: '\\',
+  patternEscape: 'clause',
 };
 
 const adapter: RestQueryAdapterV3<FakeSource, FakeCompiled, FakeRow> = {
@@ -83,6 +84,7 @@ describe('QuerySource', () => {
       dialect: 'postgres',
       transactionalConsistency: true,
       escapeCharacter: '\\',
+      patternEscape: 'clause',
     });
   });
 });

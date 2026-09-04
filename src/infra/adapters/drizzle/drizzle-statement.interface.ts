@@ -162,6 +162,15 @@ export interface DrizzleNativeQuery {
  * declarada da fase 5 — e não uma degradação silenciosa.
  */
 export interface DrizzleDatabase {
+  /**
+   * Dialeto que este executor materializa, quando ele sabe declará-lo.
+   *
+   * `drizzleDatabase()` sempre declara. Um executor escrito à mão pode omitir,
+   * e nesse caso a coincidência com o dialeto da source fica por conta de quem
+   * escreveu — porque o modo de falha é silencioso: SQL compilado para um
+   * dialeto e executado por outro devolve resultado errado, não erro.
+   */
+  readonly dialect?: SqlDialect;
   executeData(statement: DrizzleStatement): Promise<readonly object[]>;
   executeCount(statement: DrizzleStatement): Promise<number>;
 }

@@ -102,6 +102,37 @@ describe('drizzleSource', () => {
     ).toThrow('has no declared parent company');
   });
 
+  /**
+   * O modo de falha da divergência é silencioso, e é por isso que ela vira erro
+   * aqui: `LIMIT` versus `OFFSET/FETCH` e a coerção de boolean saem do dialeto,
+   * então SQL compilado para um e executado por outro devolve resultado errado
+   * — não erro. Um executor que não declara dialeto continua aceito: aí a
+   * coincidência é de quem o escreveu.
+   */
+  it('recusa executor que materializa outro dialeto que o declarado', () => {
+    expect(() =>
+      drizzleSource({
+        db: { ...db(), dialect: 'sqlite' },
+        dialect: 'postgres',
+        table: usersTable,
+        relations: userRelations,
+      })
+    ).toThrow(
+      'Drizzle source declares dialect postgres but its executor materializes sqlite'
+    );
+  });
+
+  it('aceita executor que declara o mesmo dialeto da source', () => {
+    expect(
+      drizzleSource({
+        db: { ...db(), dialect: 'postgres' },
+        dialect: 'postgres',
+        table: usersTable,
+        relations: userRelations,
+      }).input.dialect
+    ).toBe('postgres');
+  });
+
   it('aceita source sem relações declaradas', async () => {
     const source = drizzleSource({
       db: db(),
@@ -122,6 +153,7 @@ describe('DrizzleAdapter capabilities', () => {
       dialect: 'postgres',
       transactionalConsistency: false,
       escapeCharacter: '!',
+      patternEscape: 'clause',
     });
     expect(adapter.id).toBe('drizzle');
   });

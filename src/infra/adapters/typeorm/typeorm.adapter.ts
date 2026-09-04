@@ -89,6 +89,8 @@ export class TypeOrmAdapter<
       dialect,
       transactionalConsistency: false,
       escapeCharacter: ESCAPE_CHARACTER[dialect],
+      // Emite `ESCAPE '<char>'` em todo LIKE, então não depende de default.
+      patternEscape: 'clause',
     };
   }
 

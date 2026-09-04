@@ -1,6 +1,6 @@
 import { DataSource, type ObjectLiteral, type Repository } from 'typeorm';
-import { checkPortabilityProfile } from '@core/portability';
-import type { ProfileDialect, ProfileFacts } from '@core/portability';
+import { assertProfileFacts } from '@core/portability';
+import type { ProfileDialect } from '@core/portability';
 import {
   buildCorpusEntities,
   type CorpusEntities,
@@ -70,19 +70,21 @@ export async function openDialect(
  * Rodar o corpus sobre uma collation ou timezone diferente produziria
  * divergências que não são da biblioteca. Melhor falhar aqui, dizendo o quê
  * está fora do perfil.
+ *
+ * A coleta e a checagem vivem em `@core/portability`: o mesmo código que um
+ * consumidor da biblioteca chama na inicialização. Uma cópia própria aqui
+ * seria livre de ser mais permissiva que a que vai para produção — que é
+ * exatamente o que o corpus existe para impedir.
  */
 export async function assertProfile(
   context: IntegrationContext
 ): Promise<void> {
-  const facts = await collectFacts(context);
-  const violations = checkPortabilityProfile(facts);
-
-  if (violations.length > 0) {
-    throw new Error(
-      `PORTABILITY_PROFILE_MISMATCH (${context.dialect}):\n` +
-        violations.map((v) => `  - [${v.rule}] ${v.detail}`).join('\n')
-    );
-  }
+  await assertProfileFacts({
+    dialect: context.dialect,
+    query: <R>(sql: string) => context.dataSource.query(sql) as Promise<R[]>,
+    textColumns: CERTIFIED_TEXT_COLUMNS,
+    requiredIndexes: REQUIRED_INDEXES,
+  });
 }
 
 const REQUIRED_INDEXES = [
@@ -104,141 +106,3 @@ const CERTIFIED_TEXT_COLUMNS = [
   ['users', 'code'],
   ['companies', 'name'],
 ] as const;
-
-async function collectFacts(
-  context: IntegrationContext
-): Promise<ProfileFacts> {
-  const { dataSource, dialect } = context;
-  const query = <R>(sql: string): Promise<R[]> => dataSource.query(sql);
-
-  if (dialect === 'postgres') {
-    const [{ encoding, timezone, version }] = await query<{
-      encoding: string;
-      timezone: string;
-      version: string;
-    }>(
-      `SELECT pg_encoding_to_char(encoding) AS encoding,
-              current_setting('TimeZone') AS timezone,
-              current_setting('server_version') AS version
-       FROM pg_database WHERE datname = current_database()`
-    );
-
-    const collations = await query<{
-      table_name: string;
-      column_name: string;
-      collation_name: string | null;
-    }>(
-      `SELECT table_name, column_name, collation_name
-       FROM information_schema.columns
-       WHERE table_schema = current_schema()`
-    );
-
-    const indexes = await query<{ indexname: string }>(
-      `SELECT indexname FROM pg_indexes WHERE schemaname = current_schema()`
-    );
-
-    return {
-      dialect,
-      serverVersion: version,
-      encoding,
-      sessionTimeZone: timezone,
-      strictMode: true, // Postgres não converte implicitamente nos tipos usados
-      textColumns: CERTIFIED_TEXT_COLUMNS.map(([table, column]) => ({
-        table,
-        column,
-        collation:
-          collations.find(
-            (c) => c.table_name === table && c.column_name === column
-          )?.collation_name ?? 'C',
-      })),
-      indexes: indexes.map((i) => i.indexname),
-      requiredIndexes: REQUIRED_INDEXES,
-    };
-  }
-
-  if (dialect === 'mysql') {
-    const [{ charset, timezone, version, sqlMode }] = await query<{
-      charset: string;
-      timezone: string;
-      version: string;
-      sqlMode: string;
-    }>(
-      `SELECT @@character_set_database AS charset,
-              @@session.time_zone AS timezone,
-              @@version AS version,
-              @@session.sql_mode AS sqlMode`
-    );
-
-    const collations = await query<{
-      TABLE_NAME: string;
-      COLUMN_NAME: string;
-      COLLATION_NAME: string | null;
-    }>(
-      `SELECT TABLE_NAME, COLUMN_NAME, COLLATION_NAME
-       FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()`
-    );
-
-    const indexes = await query<{ INDEX_NAME: string }>(
-      `SELECT DISTINCT INDEX_NAME FROM information_schema.STATISTICS
-       WHERE TABLE_SCHEMA = DATABASE()`
-    );
-
-    return {
-      dialect,
-      serverVersion: version,
-      encoding: charset,
-      sessionTimeZone: timezone === '+00:00' ? 'UTC' : timezone,
-      strictMode: /STRICT_(ALL|TRANS)_TABLES/.test(sqlMode),
-      textColumns: CERTIFIED_TEXT_COLUMNS.map(([table, column]) => ({
-        table,
-        column,
-        collation:
-          collations.find(
-            (c) => c.TABLE_NAME === table && c.COLUMN_NAME === column
-          )?.COLLATION_NAME ?? 'unknown',
-      })),
-      indexes: indexes.map((i) => i.INDEX_NAME),
-      requiredIndexes: REQUIRED_INDEXES,
-    };
-  }
-
-  const [{ collation, version }] = await query<{
-    collation: string;
-    version: string;
-  }>(
-    `SELECT CONVERT(varchar(128), DATABASEPROPERTYEX(DB_NAME(), 'Collation')) AS collation,
-            CONVERT(varchar(128), SERVERPROPERTY('ProductVersion')) AS version`
-  );
-
-  const collations = await query<{
-    table_name: string;
-    column_name: string;
-    collation_name: string | null;
-  }>(
-    `SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name,
-            COLLATION_NAME AS collation_name
-     FROM INFORMATION_SCHEMA.COLUMNS`
-  );
-
-  const indexes = await query<{ name: string }>(
-    `SELECT name FROM sys.indexes WHERE name IS NOT NULL`
-  );
-
-  return {
-    dialect: 'mssql',
-    serverVersion: version,
-    encoding: 'UTF8', // garantido pela collation _UTF8 do perfil
-    sessionTimeZone: 'UTC',
-    strictMode: true,
-    textColumns: CERTIFIED_TEXT_COLUMNS.map(([table, column]) => ({
-      table,
-      column,
-      collation:
-        collations.find(
-          (c) => c.table_name === table && c.column_name === column
-        )?.collation_name ?? collation,
-    })),
-    indexes: indexes.map((i) => i.name),
-    requiredIndexes: REQUIRED_INDEXES,
-  };
-}

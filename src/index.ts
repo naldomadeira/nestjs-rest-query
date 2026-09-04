@@ -64,9 +64,14 @@ export {
 
 // Perfil certificado de banco
 export {
+  assertProfileFacts,
   checkPortabilityProfile,
+  collectProfileFacts,
+  type CollectProfileFactsOptions,
+  type ProfileColumnRef,
   type ProfileDialect,
   type ProfileFacts,
+  type ProfileQueryRunner,
   type ProfileViolation,
 } from './core/portability';
 
@@ -86,6 +91,7 @@ export { dqbSwaggerRequestInterceptor } from './api/swagger/swagger.interceptor'
 // Contratos — apenas tipos; nenhum runtime de ORM cruza esta fronteira
 export type {
   AdapterCapabilities,
+  PatternEscapeMode,
   AdapterResult,
   AnyQuerySource,
   CustomizeScope,

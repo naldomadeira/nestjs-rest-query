@@ -54,7 +54,20 @@ export type CorpusAdapterId = 'typeorm' | 'prisma' | 'drizzle';
 export interface CorpusDivergence {
   readonly reason: string;
   readonly expect: CorpusExpectation;
+  /**
+   * Dialetos em que a divergência vale. Omitido significa todos.
+   *
+   * Existe porque a capacidade de um ORM pode depender do banco: o Prisma
+   * torna `%` e `_` literais em Postgres e MySQL, que têm escape default no
+   * `LIKE`, e não consegue em SQLite nem SQL Server, que não têm. Sem este
+   * recorte, declarar a divergência marcaria como divergentes também as duas
+   * células onde o adapter acerta.
+   */
+  readonly dialects?: readonly CorpusDialect[];
 }
+
+/** Dialeto de uma célula — inclui o de referência, que não é célula da matriz. */
+export type CorpusDialect = 'postgres' | 'mysql' | 'mssql' | 'sqlite';
 
 export interface CorpusCase {
   /** Identificador estável usado nos relatórios da matriz. */

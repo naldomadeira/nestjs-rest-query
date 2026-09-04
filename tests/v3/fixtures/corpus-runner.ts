@@ -4,6 +4,7 @@ import { QueryBuilderService } from '@core/query-builder.v3.service';
 import type {
   CorpusAdapterId,
   CorpusCase,
+  CorpusDialect,
   CorpusExpectation,
 } from '../corpus/corpus.types';
 import { CORPUS_SEED } from '../corpus/seed';
@@ -23,17 +24,33 @@ export interface CorpusOutcome {
 const service = new QueryBuilderService({});
 
 /**
- * Expectativa que vale para este adapter (spec §5 e §24).
+ * Expectativa que vale para esta célula (spec §5 e §24).
  *
  * É a canônica, salvo quando o caso declara uma divergência intencional para
- * ele. A divergente é comparada com o mesmo rigor, então um adapter que volte
- * a concordar com o canônico quebra o teste — e a divergência tem de sair.
+ * este adapter — e, quando a divergência recorta dialetos, só nos dialetos
+ * recortados. A divergente é comparada com o mesmo rigor, então um adapter que
+ * volte a concordar com o canônico quebra o teste e obriga a remover a
+ * exceção.
  */
 export function expectationFor(
   testCase: CorpusCase,
-  adapter: CorpusAdapterId
+  adapter: CorpusAdapterId,
+  dialect?: CorpusDialect
 ): CorpusExpectation {
-  return testCase.divergences?.[adapter]?.expect ?? testCase.expect;
+  const divergence = testCase.divergences?.[adapter];
+  if (!divergence) return testCase.expect;
+
+  // Divergência com recorte de dialeto só vale nos dialetos listados. Sem o
+  // dialeto informado, o recorte não pode ser avaliado e o canônico prevalece
+  // — falhar para o lado do contrato, não da exceção.
+  if (
+    divergence.dialects &&
+    (dialect === undefined || !divergence.dialects.includes(dialect))
+  ) {
+    return testCase.expect;
+  }
+
+  return divergence.expect;
 }
 
 /** Chave observável de um root: PK simples, ou partes unidas por `|`. */

@@ -5,6 +5,7 @@ import type {
   QuerySource,
   RestQueryAdapterV3,
 } from '@contracts/v3';
+import { configurationError } from '@core/errors';
 import type { TypedQueryPlan } from '@core/query-plan';
 import type { QuerySchema } from '@core/schema';
 import { compileWhere } from './drizzle-filter.compiler';
@@ -47,6 +48,8 @@ export class DrizzleAdapter implements RestQueryAdapterV3<
       dialect: source.dialect,
       transactionalConsistency: false,
       escapeCharacter: ESCAPE_CHARACTER,
+      // O compilador emite a cláusula ESCAPE, então vale em todo dialeto.
+      patternEscape: 'clause',
     };
   }
 
@@ -148,6 +151,20 @@ export function drizzleSource(
   DrizzleNativeQuery
 > {
   const relations = options.relations ?? {};
+
+  // O executor compila SQL para um dialeto; a source declara outro. Divergir
+  // não dá erro em lugar nenhum — dá resultado errado, porque `LIMIT` versus
+  // `OFFSET/FETCH` e a coerção de boolean saem do dialeto. Falha fechado aqui.
+  if (
+    options.db.dialect !== undefined &&
+    options.db.dialect !== options.dialect
+  ) {
+    throw configurationError(
+      'SOURCE_CONFIGURATION_INVALID',
+      `Drizzle source declares dialect ${options.dialect} but its executor materializes ${options.db.dialect}`,
+      { sourceDialect: options.dialect, executorDialect: options.db.dialect }
+    );
+  }
 
   return {
     kind: 'drizzle',
