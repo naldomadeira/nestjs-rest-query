@@ -28,8 +28,11 @@ export type RestQueryErrorCodeName = (typeof REST_QUERY_ERROR_CODES)[number];
 export type CorpusExpectation =
   | {
       kind: 'rows';
-      /** IDs de root na ordem exata esperada. */
-      ids: readonly (string | number)[];
+      /**
+       * IDs de root na ordem exata esperada. Omitido quando a projeção esconde
+       * a chave primária — aí os IDs deixam de ser observáveis pelo cliente.
+       */
+      ids?: readonly (string | number)[];
       total?: number;
       lastPage?: number;
       /** Shape JSON exato da primeira linha, quando o caso testa projeção. */

@@ -30,7 +30,7 @@ describe('corpus canônico', () => {
     for (const testCase of CORPUS_CASES) {
       if (testCase.expect.kind !== 'rows') continue;
       const model = testCase.rules.split('.')[0];
-      for (const id of testCase.expect.ids) {
+      for (const id of testCase.expect.ids ?? []) {
         expect(rootIds[model].has(String(id))).toBe(true);
       }
     }

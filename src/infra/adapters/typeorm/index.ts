@@ -6,4 +6,14 @@ export {
   type JoinPlan,
 } from './typeorm-join-planner';
 export { containsPattern, escapeLiteralPattern } from './escape-pattern';
-export { compilePlan, type CompiledTypeOrmQuery } from './compile-plan';
+export {
+  compilePlan,
+  predicateOnly,
+  type CompiledTypeOrmQuery,
+} from './compile-plan';
+export { executeCompiled } from './typeorm-pagination';
+export {
+  TypeOrmAdapter,
+  typeormSource,
+  type TypeOrmSourceInput,
+} from './typeorm.adapter';

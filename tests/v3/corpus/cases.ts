@@ -279,12 +279,15 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     expect: { kind: 'rows', ids: [1, 2, 3, 4, 5, 6, 7], total: 7, lastPage: 1 },
   },
   {
+    // Autorização vem antes da validação de tipo: como as regras só podem
+    // declarar `isNull` para uma relação (`defineQueryRules` rejeita o resto
+    // na inicialização), o erro observável por HTTP é OPERATOR_NOT_ALLOWED.
     id: 'relation-one/other-operators-are-invalid',
     description: 'operador diferente de isNull aplicado à relação é inválido',
     tags: ['relation-one'],
     rules: 'user.deep',
     query: { filter: { company: { eq: '1' } } },
-    expect: { kind: 'error', status: 400, code: 'OPERATOR_TYPE_MISMATCH' },
+    expect: { kind: 'error', status: 400, code: 'OPERATOR_NOT_ALLOWED' },
   },
   {
     id: 'auth/relation-whitelist-is-exact',
@@ -398,8 +401,8 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     rules: 'user.default',
     query: { filter: { id: { eq: '1' } }, fields: 'name' },
     expect: {
+      // Sem `ids`: a PK não está na projeção, então não é observável.
       kind: 'rows',
-      ids: [1],
       total: 1,
       lastPage: 1,
       firstRow: { name: 'Ada' },
