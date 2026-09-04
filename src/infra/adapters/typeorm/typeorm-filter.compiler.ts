@@ -8,7 +8,7 @@ import { configurationError } from '@core/errors';
 import { CivilDate, DecimalValue } from '@core/coercion';
 import type { PlanFilter } from '@core/semantic-validator';
 import type { TypedQueryPlan } from '@core/query-plan';
-import { containsPattern } from './escape-pattern';
+import { containsPattern } from '../shared/escape-pattern';
 import {
   correlationColumns,
   ROOT_ALIAS,
