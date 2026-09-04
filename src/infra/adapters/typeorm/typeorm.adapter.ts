@@ -11,15 +11,20 @@ import type { ProfileFacts } from '@core/portability';
 import { configurationError } from '@core/errors';
 import type { QuerySchema } from '@core/schema';
 import type { TypedQueryPlan } from '@core/query-plan';
-import { buildSchemaRegistry, modelName } from './typeorm-schema.resolver';
+import {
+  buildSchemaRegistry,
+  modelName,
+  type SchemaResolverOptions,
+} from './typeorm-schema.resolver';
 import { compilePlan, type CompiledTypeOrmQuery } from './compile-plan';
 import { executeCompiled } from './typeorm-pagination';
 
 export interface TypeOrmSourceInput<T extends ObjectLiteral> {
   readonly repository: Repository<T>;
+  readonly schema?: SchemaResolverOptions;
 }
 
-export interface TypeOrmSourceOptions {
+export interface TypeOrmSourceOptions extends SchemaResolverOptions {
   readonly portabilityProfile?: ProfileFacts;
 }
 
@@ -64,7 +69,7 @@ export class TypeOrmAdapter<
   readonly id = 'typeorm' as const;
 
   async describe(source: TypeOrmSourceInput<T>): Promise<QuerySchema> {
-    const registry = buildSchemaRegistry(source.repository);
+    const registry = buildSchemaRegistry(source.repository, source.schema);
     return registry.get(modelName(source.repository.metadata))!;
   }
 
@@ -147,7 +152,7 @@ export function typeormSource<T extends ObjectLiteral>(
       T,
       SelectQueryBuilder<T>
     >,
-    input: { repository },
+    input: { repository, schema: { fieldKinds: options.fieldKinds } },
     portabilityProfile: options.portabilityProfile,
   };
 }

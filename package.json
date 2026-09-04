@@ -134,6 +134,7 @@
     "@nestjs/testing": "^11.1.6",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.6.0",
+    "better-sqlite3": "^12.11.1",
     "drizzle-orm": "^0.45.2",
     "eslint": "10.x",
     "eslint-config-prettier": "^10.1.8",
@@ -151,7 +152,7 @@
     "ts-node": "^10.9.2",
     "tsc-alias": "^1.8.17",
     "tsup": "^8.5.1",
-    "typeorm": "^0.3.26",
+    "typeorm": "^1.1.1",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.2"
   },
@@ -159,6 +160,7 @@
     "onlyBuiltDependencies": [
       "@nestjs/core",
       "@scarf/scarf",
+      "better-sqlite3",
       "sqlite3"
     ]
   },
