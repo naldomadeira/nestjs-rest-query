@@ -15,6 +15,26 @@ export default [
   {
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',
+      // O prefixo `_` é a declaração explícita de "existe de propósito, não é
+      // consumido": parâmetros de assinatura obrigatória, catch descartado e
+      // aliases de *type test* (`type _XIsReadonly = Expect<...>`), que valem
+      // pela checagem em tempo de compilação e nunca são referenciados.
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
+    },
+  },
+  {
+    // Fixture de consumidor CommonJS: o `require()` é o objeto do teste
+    // (provar que o pacote publicado é requerível de CJS), não um descuido.
+    files: ['tests/v3/package/consumer-fixtures/**/*.cjs'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
     },
   },
   {
@@ -22,9 +42,20 @@ export default [
       'node_modules/*',
       'dist/*',
       'coverage/*',
-      'apps/examples/*',
+      // Saída do `nest build` dos exemplos: JavaScript compilado, não fonte.
+      'apps/examples/*/dist/**',
+      // Client Prisma gerado no exemplo 04 (generator `prisma-client`), não é
+      // código do projeto.
+      'apps/examples/04-app-with-prisma/src/generated/**',
       // Client Prisma gerado pelo harness do corpus, não é código do projeto.
       'tests/v3/adapters/prisma/generated/*',
+      // Gerado pelo fumadocs-mdx no `postinstall` do apps/docs (e ignorado no
+      // git): editar à mão é inútil, volta no próximo install.
+      'apps/docs/.source/**',
+      // Artefatos de build/geração do site de docs.
+      'apps/docs/.next/**',
+      'apps/docs/out/**',
+      'apps/docs/public/skills/**',
     ],
   },
 ];
