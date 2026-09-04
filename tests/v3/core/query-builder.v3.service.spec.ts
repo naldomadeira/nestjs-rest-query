@@ -12,6 +12,7 @@ const validProfile: ProfileFacts = {
   serverVersion: '18.0',
   encoding: 'UTF8',
   sessionTimeZone: 'UTC',
+  clientDateTimeIsUtc: true,
   strictMode: true,
   textColumns: [
     { table: 'users', column: 'name', collation: 'C' },

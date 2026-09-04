@@ -111,20 +111,20 @@ cobertura.
 
 ## Gates da `3.0.0` (§23)
 
-| Gate                                            | Estado                                                                              |
-| ----------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Nove combinações reais verdes, sem skips        | **sim** — 66 casos por célula, `assert-no-skips` em todas                           |
-| Peer do Drizzle fechado nos RCs medidos         | sim — `>=1.0.0-rc.4 <1.0.0`                                                         |
-| Nenhum cast no uso público documentado          | sim                                                                                 |
-| Nenhum peer opcional carregado pelo core        | sim — provado por consumer fixture                                                  |
-| Exemplos compilam e passam smoke E2E            | **não** — fase 7                                                                    |
-| Códigos de erro e JSON canônico idênticos       | sim — mesmo runner e mesmas expectativas nas nove células                           |
-| Cobertura de branches críticos acima de 95%     | **parcial** — ver abaixo                                                            |
-| Nenhum achado de segurança alto ou crítico      | CodeQL e Scorecard rodam na CI; falta datar o resultado                             |
-| Benchmarks dentro do orçamento                  | `budget.spec.ts` mede o §18.4 em `pnpm test`; falta datar                           |
-| Migration guide validado num consumidor v2 real | **não**                                                                             |
-| Matriz pública de versões coincide com a CI     | sim — `versions.md`, comparada ao workflow por teste                                |
-| Profiles de banco passam nos checks             | **parcial** — collector existe em `src/`, mas não confere o fuso do _cliente_ (nº3) |
+| Gate                                            | Estado                                                           |
+| ----------------------------------------------- | ---------------------------------------------------------------- |
+| Nove combinações reais verdes, sem skips        | **sim** — 66 casos por célula, `assert-no-skips` em todas        |
+| Peer do Drizzle fechado nos RCs medidos         | sim — `>=1.0.0-rc.4 <1.0.0`                                      |
+| Nenhum cast no uso público documentado          | sim                                                              |
+| Nenhum peer opcional carregado pelo core        | sim — provado por consumer fixture                               |
+| Exemplos compilam e passam smoke E2E            | **não** — fase 7                                                 |
+| Códigos de erro e JSON canônico idênticos       | sim — mesmo runner e mesmas expectativas nas nove células        |
+| Cobertura de branches críticos acima de 95%     | **parcial** — ver abaixo                                         |
+| Nenhum achado de segurança alto ou crítico      | CodeQL e Scorecard rodam na CI; falta datar o resultado          |
+| Benchmarks dentro do orçamento                  | `budget.spec.ts` mede o §18.4 em `pnpm test`; falta datar        |
+| Migration guide validado num consumidor v2 real | **não**                                                          |
+| Matriz pública de versões coincide com a CI     | sim — `versions.md`, comparada ao workflow por teste             |
+| Profiles de banco passam nos checks             | sim — collector em `src/`, incluindo o fuso do cliente por sonda |
 
 ### Cobertura
 
@@ -150,11 +150,12 @@ que a própria matriz produziu.
    consumidor v2 real. São dois gates da §23.
 2. **Cobertura de branches.** `infra/adapters/typeorm` em 75% e
    `infra/adapters/drizzle` em 94.6%, contra um gate de 95%.
-3. **O perfil certificado não confere o fuso do cliente.** Achado da matriz, e
-   é de biblioteca, não de harness: o TypeORM força `useUTC: false` no driver
-   do SQL Server quando `options.useUTC` não vem marcado, e `datetime2` passa a
-   ser gravado no fuso local do processo. `assertProfileFacts` confere o fuso do
-   **servidor** e passaria assim mesmo. Ver "O que a matriz descobriu".
+3. ~~O perfil certificado não confere o fuso do cliente.~~ **Resolvido.**
+   `ProfileFacts` ganhou `clientDateTimeIsUtc`, medido por sonda: um instante
+   UTC conhecido vai como parâmetro vinculado e o servidor devolve o eco em
+   texto. Deslocado, vira violação `client-timezone`. Provado por mutação em
+   MySQL e SQL Server reais — removido o `useUTC`/`timezone`, `assertProfile`
+   falha na inicialização e nenhum caso do corpus roda.
 4. **Coleção aninhada sob outra relação no Drizzle** falha fechado.
 5. **`decimal(38,6)` não passa como parâmetro vinculado no tedious.** O
    `Decimal` do tedious 20 faz `parseFloat` na validação e `writeUInt64LE`
@@ -181,9 +182,10 @@ errado e falharam.
 Nenhuma suíte de um adapter só encontraria isso. É o mesmo dado lido por três
 compiladores que expõe o erro — que é exatamente a definição de paridade da §5.
 
-O harness passou a declarar `useUTC: true`, mas o bloqueador nº3 continua
-aberto: um consumidor que não marque a opção tem o mesmo problema, e o check de
-perfil não acusa.
+O harness passou a declarar `useUTC: true`, e o check de perfil passou a medir
+isso: `clientDateTimeIsUtc` sonda o driver em vez de confiar na configuração,
+então um consumidor que não marque a opção é reprovado na inicialização — em vez
+de descobrir meses depois que gravou tudo no fuso errado.
 
 ## Como reproduzir
 
