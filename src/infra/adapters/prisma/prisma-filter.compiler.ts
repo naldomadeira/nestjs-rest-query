@@ -1,4 +1,5 @@
-import { configurationError } from '@core/errors';
+import type { PatternEscapeMode } from '@contracts/v3';
+import { configurationError, inputError } from '@core/errors';
 import type { TypedQueryPlan } from '@core/query-plan';
 import type { PlanFilter, PlanSearchTarget } from '@core/semantic-validator';
 import {
@@ -6,8 +7,28 @@ import {
   nestThroughRelations,
   relationParentModel,
 } from './prisma-relations';
+import { escapeLiteralPattern } from '../shared/escape-pattern';
 import { toPrismaValue, toPrismaValueArray } from './prisma-value';
 import type { PrismaWhere } from './prisma-query.interface';
+
+/**
+ * Como este compilador torna `%` e `_` literais (spec §11).
+ *
+ * O Prisma não permite fornecer cláusula `ESCAPE`: `contains` compila para
+ * `LIKE ('%' || ? || '%')` e nada mais. Então só existem dois caminhos, e o
+ * dialeto decide qual:
+ *
+ * - `native` — Postgres e MySQL interpretam `\` como escape do `LIKE` por
+ *   default, então escapar o valor basta e nenhuma cláusula é necessária.
+ * - `unsupported` — SQLite e SQL Server não têm escape default. Escapar o
+ *   valor ali produziria o oposto do pretendido: medido em SQLite,
+ *   `LIKE 'a\_b'` sem cláusula casa a string literal `a\_b` e **não** `a_b`.
+ *   Recusar é a única saída honesta.
+ */
+export interface PrismaPatternEscape {
+  readonly patternEscape: PatternEscapeMode;
+  readonly escapeCharacter: string;
+}
 
 /**
  * Filtros + search -> `where` do Prisma (spec §11 e §12).
@@ -15,11 +36,14 @@ import type { PrismaWhere } from './prisma-query.interface';
  * O termo de busca compara literalmente a coluna dobrada; `mode: 'insensitive'`
  * nunca é emitido, porque MySQL e SQL Server não o expõem no client gerado.
  */
-export function compileWhere(plan: TypedQueryPlan): PrismaWhere | undefined {
+export function compileWhere(
+  plan: TypedQueryPlan,
+  escape: PrismaPatternEscape
+): PrismaWhere | undefined {
   const and: PrismaWhere[] = [];
 
   for (const filter of plan.filters) {
-    const compiled = compileFilter(plan, filter);
+    const compiled = compileFilter(plan, filter, escape);
     if (compiled) and.push(compiled);
   }
 
@@ -27,7 +51,7 @@ export function compileWhere(plan: TypedQueryPlan): PrismaWhere | undefined {
   if (search && search.targets.length > 0) {
     and.push({
       OR: search.targets.map((target) =>
-        nestSearchTarget(plan, target, search.foldedTerm)
+        nestSearchTarget(plan, target, search.foldedTerm, escape)
       ),
     });
   }
@@ -37,7 +61,8 @@ export function compileWhere(plan: TypedQueryPlan): PrismaWhere | undefined {
 
 export function compileFilter(
   plan: TypedQueryPlan,
-  filter: PlanFilter
+  filter: PlanFilter,
+  escape: PrismaPatternEscape
 ): PrismaWhere | undefined {
   // `in=[]` é sempre falso; `notIn=[]` é sempre verdadeiro e some do AND.
   //
@@ -56,21 +81,57 @@ export function compileFilter(
   }
 
   return nestThroughRelations(plan, plan.model, filter.relationPath, {
-    [leafColumn(filter.column)]: scalarCondition(filter),
+    [leafColumn(filter.column)]: scalarCondition(filter, escape),
   });
 }
 
 function nestSearchTarget(
   plan: TypedQueryPlan,
   target: PlanSearchTarget,
-  foldedTerm: string
+  foldedTerm: string,
+  escape: PrismaPatternEscape
 ): PrismaWhere {
   return nestThroughRelations(plan, plan.model, target.relationPath, {
-    [leafColumn(target.column)]: { contains: foldedTerm },
+    [leafColumn(target.column)]: {
+      contains: literalPattern(foldedTerm, 'search', target.path, escape),
+    },
   });
 }
 
-export function scalarCondition(filter: PlanFilter): unknown {
+/**
+ * Valor de um padrão literal, ou a recusa do operador.
+ *
+ * 400 e `CAPABILITY_UNAVAILABLE`, seguindo `operator-matrix.ts`: lá o código é
+ * emitido quando o *schema* não serve o operador (campo sem folded field);
+ * aqui, quando o *dialeto* não serve. Mesma forma, mesmo status — e nenhum
+ * código novo no contrato de erros (§17.1).
+ *
+ * A recusa é por requisição, não na inicialização, porque as regras do corpus
+ * permitem operador de padrão em 60 dos 66 casos: falhar na construção da
+ * source tornaria o dialeto de referência do Prisma inútil para provar tudo o
+ * que não é padrão.
+ */
+function literalPattern(
+  value: string,
+  operator: string,
+  path: string,
+  escape: PrismaPatternEscape
+): string {
+  if (escape.patternEscape === 'unsupported') {
+    throw inputError(
+      'CAPABILITY_UNAVAILABLE',
+      `Prisma cannot make % and _ literal on this dialect, so ${operator} is not available; the typed client cannot emit an ESCAPE clause and the dialect has no default escape character`,
+      { path, operator, patternEscape: escape.patternEscape }
+    );
+  }
+
+  return escapeLiteralPattern(value, escape.escapeCharacter);
+}
+
+export function scalarCondition(
+  filter: PlanFilter,
+  escape: PrismaPatternEscape
+): unknown {
   const value = toPrismaValue(filter.value);
 
   switch (filter.operator) {
@@ -93,14 +154,32 @@ export function scalarCondition(filter: PlanFilter): unknown {
       return { notIn: toPrismaValueArray(filter.value) };
     case 'isNull':
       return filter.value === true ? null : { not: null };
-    // `contains` do Prisma é literal: não interpreta `%` nem `_`, que é
-    // exatamente a semântica de `literalPattern` da v3.
+    // O `contains` do Prisma **não** é literal: ele compila para
+    // `LIKE ('%' || ? || '%')` sem cláusula `ESCAPE`, então `%` e `_` do valor
+    // chegam ao banco como coringa. Quem torna o padrão literal é o escape do
+    // valor, e ele só funciona onde o dialeto tem escape default.
     case 'like':
     case 'ilike':
-      return { contains: value };
+      return {
+        contains: literalPattern(
+          String(value),
+          filter.operator,
+          filter.path,
+          escape
+        ),
+      };
     case 'notLike':
     case 'notIlike':
-      return { not: { contains: value } };
+      return {
+        not: {
+          contains: literalPattern(
+            String(value),
+            filter.operator,
+            filter.path,
+            escape
+          ),
+        },
+      };
     default:
       throw configurationError(
         'ADAPTER_CONTRACT_VIOLATION',

@@ -19,6 +19,18 @@ import { defineQueryRules } from '@core/authorization';
 import { RULES_PRESETS } from '../../fixtures/rules';
 import { CORPUS_SCHEMAS } from '../../fixtures/schemas';
 
+/**
+ * Escape de um dialeto que tem default (Postgres/MySQL).
+ *
+ * Os casos deste arquivo que não são sobre escape usam este, porque o modo
+ * `unsupported` recusa os operadores de padrão antes de chegar ao que eles
+ * querem exercitar.
+ */
+const NATIVE_ESCAPE = {
+  patternEscape: 'native',
+  escapeCharacter: '\\',
+} as const;
+
 function manifest(registry: SchemaRegistry = CORPUS_SCHEMAS): PrismaManifest {
   return createPrismaManifest({
     provider: 'postgresql',
@@ -123,24 +135,57 @@ describe('prismaSource', () => {
 });
 
 describe('PrismaAdapter capabilities', () => {
+  /**
+   * O escape declarado tem de ser o que o adapter realmente faz.
+   *
+   * O Prisma nunca emite cláusula `ESCAPE`, então `clause` seria mentira em
+   * qualquer dialeto. Onde o banco tem escape default (`\` em Postgres e
+   * MySQL) o modo é `native`; onde não tem (SQLite e SQL Server) é
+   * `unsupported`, e o caractere fica vazio porque não existe escape possível.
+   */
   it.each([
-    ['postgresql', 'postgres'],
-    ['mysql', 'mysql'],
-    ['sqlserver', 'mssql'],
-    ['sqlite', 'sqlite'],
-  ] as const)('mapeia o provider %s para o dialeto %s', (provider, dialect) => {
-    const adapter = new PrismaAdapter();
-    const source = {
-      ...input(),
-      manifest: { ...manifest(), provider },
-    };
+    ['postgresql', 'postgres', 'native', '\\'],
+    ['mysql', 'mysql', 'native', '\\'],
+    ['sqlserver', 'mssql', 'unsupported', ''],
+    ['sqlite', 'sqlite', 'unsupported', ''],
+  ] as const)(
+    'mapeia o provider %s para o dialeto %s com escape %s',
+    (provider, dialect, patternEscape, escapeCharacter) => {
+      const adapter = new PrismaAdapter();
+      const source = {
+        ...input(),
+        manifest: { ...manifest(), provider },
+      };
 
-    expect(adapter.capabilities(source)).toEqual({
-      dialect,
-      transactionalConsistency: false,
-      escapeCharacter: '!',
-    });
-    expect(adapter.id).toBe('prisma');
+      expect(adapter.capabilities(source)).toEqual({
+        dialect,
+        transactionalConsistency: false,
+        escapeCharacter,
+        patternEscape,
+      });
+      expect(adapter.id).toBe('prisma');
+    }
+  );
+
+  it('nunca declara caractere de escape quando não há escape possível', () => {
+    const adapter = new PrismaAdapter();
+
+    for (const provider of [
+      'postgresql',
+      'mysql',
+      'sqlserver',
+      'sqlite',
+    ] as const) {
+      const capabilities = adapter.capabilities({
+        ...input(),
+        manifest: { ...manifest(), provider },
+      });
+
+      // A invariante que impede a capability de voltar a mentir.
+      expect(capabilities.patternEscape === 'unsupported').toBe(
+        capabilities.escapeCharacter === ''
+      );
+    }
   });
 });
 
@@ -342,7 +387,8 @@ describe('fail-closed do compiler', () => {
   it('recusa operador que o adapter não compila', () => {
     expect(() =>
       scalarCondition(
-        filterWith({ operator: 'search' as PlanFilter['operator'] })
+        filterWith({ operator: 'search' as PlanFilter['operator'] }),
+        NATIVE_ESCAPE
       )
     ).toThrow('Prisma adapter cannot compile operator search');
   });
@@ -363,7 +409,8 @@ describe('fail-closed do compiler', () => {
     expect(() =>
       compileFilter(
         plan,
-        filterWith({ target: 'relation', path: 'ghost', value: true })
+        filterWith({ target: 'relation', path: 'ghost', value: true }),
+        NATIVE_ESCAPE
       )
     ).toThrow('No Prisma relation ghost on user');
   });

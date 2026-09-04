@@ -179,7 +179,14 @@ export async function closeSqlite(): Promise<void> {
   client = undefined;
 }
 
-const MANIFEST: PrismaManifest = createPrismaManifest({
+/**
+ * Manifesto escrito à mão (spec §15.2).
+ *
+ * Exportado para que `manifest-matches-schema.spec.ts` valide **este** objeto
+ * contra o `schema.prisma`, e não uma cópia dele: uma cópia validaria a si
+ * mesma e a divergência que o gate existe para pegar passaria.
+ */
+export const MANIFEST: PrismaManifest = createPrismaManifest({
   provider: 'sqlite',
   registry: CORPUS_SCHEMAS,
   models: {

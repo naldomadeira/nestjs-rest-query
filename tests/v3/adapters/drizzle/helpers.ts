@@ -42,7 +42,11 @@ export function openSqlite(): DrizzleClientLike {
 
   sqlite = new Database(':memory:');
   const db = drizzle({ client: sqlite });
-  client = db as unknown as DrizzleClientLike;
+  // Sem cast: o `db` do SQLite satisfaz `DrizzleClientLike` estruturalmente,
+  // porque é ele que expõe `all()`. Um `db` de Postgres, MySQL ou SQL Server
+  // não satisfaz — e é justamente isso que o cast antigo escondia, deixando o
+  // corpus verde num único dialeto parecer cobertura dos quatro.
+  client = db;
 
   for (const entry of Object.values(DRIZZLE_CORPUS)) {
     db.run(sql.raw(createTable(entry.table)));
@@ -64,7 +68,7 @@ export function sourceFor(preset: string) {
   const entry = DRIZZLE_CORPUS[model];
 
   return drizzleSource({
-    db: drizzleDatabase({ client: openSqlite() }),
+    db: drizzleDatabase({ client: openSqlite(), dialect: 'sqlite' }),
     dialect: 'sqlite',
     table: entry.table,
     relations: entry.relations,

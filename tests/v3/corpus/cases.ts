@@ -1,4 +1,30 @@
-import type { CorpusCase } from './corpus.types';
+import type { CorpusCase, CorpusDivergence } from './corpus.types';
+
+/**
+ * Prisma recusa operador de padrao onde o dialeto nao tem escape default.
+ *
+ * O Prisma nunca emite clausula `ESCAPE` - `contains` compila para
+ * `LIKE ('%' || ? || '%')` e o client tipado nao permite acrescentar nada.
+ * Em Postgres e MySQL isso nao e problema: a barra invertida ja e o escape
+ * default, entao o valor escapado basta e o adapter produz o resultado
+ * canonico. Em SQLite e SQL Server nao existe default - medido em SQLite, um
+ * padrao escapado com barra invertida casa a string literal, nao o caractere
+ * pretendido - entao o adapter recusa em vez de devolver o conjunto errado de
+ * linhas (ADR-001, emenda 2).
+ *
+ * O recorte por dialeto e o que impede esta excecao de marcar como divergentes
+ * as duas celulas onde o Prisma acerta.
+ */
+const PRISMA_PATTERN_REFUSAL: CorpusDivergence = {
+  reason:
+    'O Prisma nao emite clausula ESCAPE, e SQLite e SQL Server nao tem ' +
+    'caractere de escape default no LIKE. Sem os dois, % e _ nao podem ser ' +
+    'literais como a §11 exige, entao o adapter recusa o operador com ' +
+    'CAPABILITY_UNAVAILABLE em vez de aproximar silenciosamente. Em Postgres ' +
+    'e MySQL o escape default resolve, e o resultado canonico vale.',
+  expect: { kind: 'error', status: 400, code: 'CAPABILITY_UNAVAILABLE' },
+  dialects: ['sqlite', 'mssql'],
+};
 
 /**
  * Corpus canônico de paridade.
@@ -140,6 +166,7 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     rules: 'user.default',
     query: { filter: { name: { like: '100%' } } },
     expect: { kind: 'rows', ids: [7], total: 1, lastPage: 1 },
+    divergences: { prisma: PRISMA_PATTERN_REFUSAL },
   },
   {
     id: 'like/underscore-is-literal',
@@ -148,23 +175,7 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     rules: 'user.default',
     query: { filter: { name: { like: '_' } } },
     expect: { kind: 'rows', ids: [10], total: 1, lastPage: 1 },
-    divergences: {
-      prisma: {
-        reason:
-          "O Prisma compila `contains` para LIKE ('%' || ? || '%') sem " +
-          'cláusula ESCAPE e não escapa metacaracteres, e o client tipado não ' +
-          'expõe ESCAPE. `_` casa qualquer caractere, então o filtro devolve ' +
-          'todos os roots. Vale para like, notLike, ilike, notIlike e search; ' +
-          '`%` só não aparece vermelho porque um único nome do seed contém ' +
-          '"100". Diverge da §11.',
-        expect: {
-          kind: 'rows',
-          ids: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-          total: 11,
-          lastPage: 1,
-        },
-      },
-    },
+    divergences: { prisma: PRISMA_PATTERN_REFUSAL },
   },
   {
     id: 'like/backslash-is-literal',
@@ -173,6 +184,7 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     rules: 'user.default',
     query: { filter: { name: { like: '\\' } } },
     expect: { kind: 'rows', ids: [11], total: 1, lastPage: 1 },
+    divergences: { prisma: PRISMA_PATTERN_REFUSAL },
   },
   {
     id: 'like/is-case-sensitive',
@@ -181,6 +193,7 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     rules: 'user.default',
     query: { filter: { name: { like: 'AÇÃO' } } },
     expect: { kind: 'rows', ids: [9], total: 1, lastPage: 1 },
+    divergences: { prisma: PRISMA_PATTERN_REFUSAL },
   },
   {
     id: 'ilike/case-fold',
@@ -189,6 +202,7 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     rules: 'user.default',
     query: { filter: { name: { ilike: 'ação' } } },
     expect: { kind: 'rows', ids: [8, 9], total: 2, lastPage: 1 },
+    divergences: { prisma: PRISMA_PATTERN_REFUSAL },
   },
   {
     id: 'ilike/nfd-input-matches-nfc-storage',
@@ -197,6 +211,7 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     rules: 'user.default',
     query: { filter: { name: { ilike: 'AÇÃO'.normalize('NFD') } } },
     expect: { kind: 'rows', ids: [8, 9], total: 2, lastPage: 1 },
+    divergences: { prisma: PRISMA_PATTERN_REFUSAL },
   },
   {
     id: 'search/or-across-configured-fields',
@@ -205,6 +220,7 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     rules: 'user.default',
     query: { search: 'ada' },
     expect: { kind: 'rows', ids: [1, 4, 5], total: 3, lastPage: 1 },
+    divergences: { prisma: PRISMA_PATTERN_REFUSAL },
   },
   {
     id: 'search/not-configured',

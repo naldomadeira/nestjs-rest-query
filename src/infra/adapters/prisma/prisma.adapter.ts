@@ -3,6 +3,7 @@ import type {
   AdapterResult,
   CustomizeScope,
   QuerySource,
+  PatternEscapeMode,
   RestQueryAdapterV3,
   SqlDialect,
 } from '@contracts/v3';
@@ -26,6 +27,32 @@ const DIALECT_BY_PROVIDER: Readonly<Record<PrismaProvider, SqlDialect>> = {
   mysql: 'mysql',
   sqlserver: 'mssql',
   sqlite: 'sqlite',
+};
+
+/**
+ * Como cada dialeto torna `%` e `_` literais sob o Prisma (ADR-001, emenda 2).
+ *
+ * O Prisma nunca emite cláusula `ESCAPE` — `contains` compila para
+ * `LIKE ('%' || ? || '%')` e o client tipado não permite acrescentar nada. Só
+ * sobra o escape default do dialeto:
+ *
+ * - Postgres e MySQL têm `\` como default, então escapar o valor resolve.
+ * - SQLite e SQL Server **não têm default**. Medido em SQLite:
+ *   `LIKE 'a\_b'` sem cláusula casa a string literal `a\_b`, não `a_b`. Ali
+ *   os cinco operadores de padrão são recusados com `CAPABILITY_UNAVAILABLE`,
+ *   em vez de devolverem o conjunto errado de linhas.
+ *
+ * `$queryRaw` não é saída: a API tipada não aceita fragmento SQL dentro do
+ * `where`, e pré-resolver para um conjunto de PKs bate no limite de 2100
+ * parâmetros do SQL Server.
+ */
+const PATTERN_ESCAPE: Readonly<
+  Record<SqlDialect, { mode: PatternEscapeMode; character: string }>
+> = {
+  postgres: { mode: 'native', character: '\\' },
+  mysql: { mode: 'native', character: '\\' },
+  sqlite: { mode: 'unsupported', character: '' },
+  mssql: { mode: 'unsupported', character: '' },
 };
 
 /**
@@ -56,10 +83,14 @@ export class PrismaAdapter implements RestQueryAdapterV3<
   }
 
   capabilities(source: PrismaSourceInput): AdapterCapabilities {
+    const dialect = DIALECT_BY_PROVIDER[source.manifest.provider];
+    const escape = PATTERN_ESCAPE[dialect];
+
     return {
-      dialect: DIALECT_BY_PROVIDER[source.manifest.provider],
+      dialect,
       transactionalConsistency: false,
-      escapeCharacter: '!',
+      escapeCharacter: escape.character,
+      patternEscape: escape.mode,
     };
   }
 
@@ -67,7 +98,8 @@ export class PrismaAdapter implements RestQueryAdapterV3<
     plan: TypedQueryPlan,
     source: PrismaSourceInput
   ): CompiledPrismaQuery {
-    const where = compileWhere(plan);
+    const { escapeCharacter, patternEscape } = this.capabilities(source);
+    const where = compileWhere(plan, { escapeCharacter, patternEscape });
     const data: PrismaQueryArgs = {
       ...(where ? { where } : {}),
       select: compileSelect(plan),

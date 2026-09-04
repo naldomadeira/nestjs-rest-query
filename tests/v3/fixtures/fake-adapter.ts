@@ -66,6 +66,7 @@ export function fakeSource(
         dialect: 'postgres',
         transactionalConsistency: true,
         escapeCharacter: '\\',
+        patternEscape: 'clause',
         ...capabilities,
       },
       schema,
