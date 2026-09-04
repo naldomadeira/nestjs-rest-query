@@ -7,12 +7,12 @@ import type { RestQueryAdapterV3 } from './rest-query-adapter.v3.interface';
  * `execute()` inferir o tipo da linha e o do callback de `customize` sem cast
  * no uso público.
  */
-export interface QuerySource<TSource, TCompiled, TRow> {
+export interface QuerySource<TSource, TCompiled, TRow, TNative = TCompiled> {
   readonly kind: 'typeorm' | 'prisma' | 'drizzle';
-  readonly adapter: RestQueryAdapterV3<TSource, TCompiled, TRow>;
+  readonly adapter: RestQueryAdapterV3<TSource, TCompiled, TRow, TNative>;
   readonly input: TSource;
 }
 
 /** Qualquer source, para posições onde os parâmetros não importam. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AnyQuerySource = QuerySource<any, any, any>;
+export type AnyQuerySource = QuerySource<any, any, any, any>;

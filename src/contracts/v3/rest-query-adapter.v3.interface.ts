@@ -21,7 +21,18 @@ export type CustomizeScope = 'data' | 'count' | 'both';
  * a §5.4 proíbe. O adapter hidrata (`AdapterResult`) e o núcleo produz o JSON
  * canônico para os três. Registrado no migration guide.
  */
-export interface RestQueryAdapterV3<TSource, TCompiled, TRow> {
+/**
+ * `TNative` é o contexto que `customize` entrega ao consumidor — para o
+ * TypeORM, o `SelectQueryBuilder` (spec §15.1). É distinto de `TCompiled`
+ * porque um plano compila para *duas* queries, data e count, e o callback age
+ * sobre uma de cada vez.
+ */
+export interface RestQueryAdapterV3<
+  TSource,
+  TCompiled,
+  TRow,
+  TNative = TCompiled,
+> {
   readonly id: 'typeorm' | 'prisma' | 'drizzle';
 
   /** Deriva o schema lógico a partir da metadata da source. */
@@ -31,10 +42,16 @@ export interface RestQueryAdapterV3<TSource, TCompiled, TRow> {
 
   compile(plan: TypedQueryPlan, source: TSource): TCompiled;
 
-  /** Aplica o callback do consumidor ao contexto nativo tipado. */
+  /**
+   * Aplica o callback ao contexto nativo, uma vez por query do escopo.
+   *
+   * Chamar uma vez por query — em vez de entregar as duas juntas — é o que faz
+   * `both`, o default seguro, realmente atingir data e count com um único
+   * `qb.andWhere(...)`.
+   */
   customize(
     compiled: TCompiled,
-    callback: (value: TCompiled) => void,
+    callback: (native: TNative) => void,
     scope?: CustomizeScope
   ): void;
 

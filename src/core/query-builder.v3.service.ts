@@ -15,14 +15,18 @@ import {
 import type { QueryInputLike } from './query-parser';
 import { StructuredLogger } from '@infra/structured-logger';
 
-export interface ExecuteOptions<TCompiled = unknown> {
+export interface ExecuteOptions<TNative = unknown> {
   /**
    * Hook comum a todos os adapters: tenant, soft delete, políticas internas.
    * Roda antes do congelamento, então é a última chance de alterar o plano.
    */
   transformPlan?: (plan: TypedQueryPlan) => TypedQueryPlan;
-  /** Hook específico do adapter, para capacidades fora do contrato REST. */
-  customize?: (compiled: TCompiled) => void;
+  /**
+   * Hook específico do adapter, para capacidades fora do contrato REST.
+   * Recebe o contexto nativo — no TypeORM, o `SelectQueryBuilder` — uma vez
+   * por query do escopo.
+   */
+  customize?: (native: TNative) => void;
   /** @default 'both' — o default seguro (spec §16). */
   customizeScope?: CustomizeScope;
 }
@@ -60,11 +64,11 @@ export class QueryBuilderService {
     return freezePlan(options.transformPlan?.(plan) ?? plan);
   }
 
-  async execute<TSource, TCompiled, TRow>(
-    source: QuerySource<TSource, TCompiled, TRow>,
+  async execute<TSource, TCompiled, TRow, TNative>(
+    source: QuerySource<TSource, TCompiled, TRow, TNative>,
     query: QueryInputLike,
     rules: CompiledQueryRules,
-    options: ExecuteOptions<TCompiled> = {}
+    options: ExecuteOptions<TNative> = {}
   ): Promise<NormalizedQueryResult<TRow>> {
     try {
       const plan = this.buildPlan(query, rules, options as ExecuteOptions);
@@ -95,8 +99,8 @@ export class QueryBuilderService {
     }
   }
 
-  private assertConsistencySupported<TSource, TCompiled, TRow>(
-    source: QuerySource<TSource, TCompiled, TRow>,
+  private assertConsistencySupported<TSource, TCompiled, TRow, TNative>(
+    source: QuerySource<TSource, TCompiled, TRow, TNative>,
     plan: TypedQueryPlan
   ): void {
     if (plan.consistency !== 'transactional') return;
@@ -111,8 +115,8 @@ export class QueryBuilderService {
   }
 
   /** Só metadados: paths, operadores e contagens, nunca valores. */
-  private logPlan<TSource, TCompiled, TRow>(
-    source: QuerySource<TSource, TCompiled, TRow>,
+  private logPlan<TSource, TCompiled, TRow, TNative>(
+    source: QuerySource<TSource, TCompiled, TRow, TNative>,
     plan: TypedQueryPlan
   ): void {
     this.logger.debug('executing query plan', {
