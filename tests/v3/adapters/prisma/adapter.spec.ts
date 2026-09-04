@@ -124,6 +124,35 @@ describe('prismaSource', () => {
     ).toThrow('Prisma delegate user for model user is missing from the client');
   });
 
+  /**
+   * O tipo do client passou a ser `object` para que o `PrismaClient` gerado
+   * seja atribuível sem cast (era `Readonly<Record<string, PrismaDelegate>>`,
+   * e classe não recebe index signature implícita). O que o tipo deixou de
+   * garantir, estes dois casos garantem: quem valida a forma do delegate é
+   * `prismaSource`, na construção, não a primeira request.
+   */
+  it('recusa objeto que tem a propriedade mas não é delegate', () => {
+    expect(() =>
+      prismaSource({
+        client: { user: { findMany: 'não é função' } },
+        model: 'user',
+        manifest: manifest(),
+      })
+    ).toThrow('Prisma delegate user for model user is missing from the client');
+  });
+
+  it('recusa delegate sem count, que só falharia ao paginar', () => {
+    // `findMany` sozinho passaria a primeira consulta e estouraria só na
+    // contagem — ou seja, só em request paginada, longe da configuração.
+    expect(() =>
+      prismaSource({
+        client: { user: { findMany: jest.fn() } },
+        model: 'user',
+        manifest: manifest(),
+      })
+    ).toThrow('Prisma delegate user for model user is missing from the client');
+  });
+
   it('reporta model do manifesto sem schema no describe', async () => {
     const adapter = new PrismaAdapter();
     const broken = { ...input(), model: 'ghost' };
@@ -186,6 +215,48 @@ describe('PrismaAdapter capabilities', () => {
         capabilities.escapeCharacter === ''
       );
     }
+  });
+});
+
+/**
+ * `findMany` chega ao adapter como `Promise<unknown>` — preço de o delegate
+ * aceitar o client gerado. Estes casos provam que o estreitamento é checagem
+ * e não afirmação: dado fora do protocolo do Prisma é recusado aqui, perto da
+ * causa, em vez de seguir para o normalizador.
+ */
+describe('PrismaAdapter execute', () => {
+  it('recusa retorno que não é lista', async () => {
+    const adapter = new PrismaAdapter();
+    const compiled = {
+      delegate: {
+        findMany: jest.fn().mockResolvedValue({ id: 1 }),
+        count: jest.fn().mockResolvedValue(1),
+      },
+      data: {},
+      count: {},
+      paginate: false,
+    };
+
+    await expect(adapter.execute(compiled)).rejects.toThrow(
+      'Prisma findMany did not return an array of rows'
+    );
+  });
+
+  it('recusa lista com item que não é linha', async () => {
+    const adapter = new PrismaAdapter();
+    const compiled = {
+      delegate: {
+        findMany: jest.fn().mockResolvedValue([{ id: 1 }, null]),
+        count: jest.fn().mockResolvedValue(2),
+      },
+      data: {},
+      count: {},
+      paginate: false,
+    };
+
+    await expect(adapter.execute(compiled)).rejects.toThrow(
+      'Prisma findMany did not return an array of rows'
+    );
   });
 });
 
@@ -291,10 +362,38 @@ describe('PrismaAdapter compile', () => {
   });
 
   it('aninha orderBy pela cadeia de relações', () => {
-    const plan = buildQueryPlan({ sort: '-name' }, RULES_PRESETS['user.deep']);
-    const compiled = new PrismaAdapter().compile(plan, input());
+    // O caso que antes tinha este nome ordenava por `-name`, coluna do root:
+    // nunca passou pelo aninhamento, e metade do compilador de ordenação
+    // ficava sem execução nenhuma. Ordenar por relação `one` é da §14 — o
+    // plano só recusa quando o caminho cruza uma relação `many`.
+    const relationSort = defineQueryRules(CORPUS_SCHEMAS, 'user', {
+      filters: [{ path: 'id', operators: ['eq'] }],
+      sorts: ['company.name', 'id'],
+      fields: {
+        root: { allowed: ['id', 'name'], default: ['id', 'name'] },
+        relations: {
+          company: { allowed: ['id', 'name'], default: ['id', 'name'] },
+        },
+      },
+      includes: ['company'],
+    });
+    const nested = new PrismaAdapter().compile(
+      buildQueryPlan({ sort: '-company.name' }, relationSort),
+      input()
+    );
+    const rootOnly = new PrismaAdapter().compile(
+      buildQueryPlan({ sort: '-name' }, RULES_PRESETS['user.deep']),
+      input()
+    );
 
-    expect(compiled.data.orderBy).toEqual([{ name: 'desc' }, { id: 'asc' }]);
+    // A relação vira objeto aninhado, e o tie-break por PK continua no root:
+    // achatar `company.name` numa chave de coluna faria o Prisma recusar o
+    // argumento, e usar o path inteiro como coluna ordenaria pela coisa errada.
+    expect(nested.data.orderBy).toEqual([
+      { company: { name: 'desc' } },
+      { id: 'asc' },
+    ]);
+    expect(rootOnly.data.orderBy).toEqual([{ name: 'desc' }, { id: 'asc' }]);
   });
 
   it('traduz todos os operadores escalares', () => {
@@ -320,6 +419,25 @@ describe('PrismaAdapter compile', () => {
       { name_folded: { not: { contains: 'y' } } },
       { nickname: { not: null } },
     ]);
+  });
+
+  it('repassa gt, gte, lt e lte com o próprio nome do operador', () => {
+    // Os quatro caem no mesmo ramo do compilador, e o nome do operador é a
+    // própria chave do Prisma. Sem `gt` medido, trocar a chave por outra
+    // passaria: os demais casos do arquivo só usam três dos quatro.
+    expect(
+      compile(
+        { filter: { id: { gt: '1', gte: '2', lt: '3', lte: '4' } } },
+        'user.default'
+      ).where
+    ).toEqual({
+      AND: [
+        { id: { gt: 1 } },
+        { id: { gte: 2 } },
+        { id: { lt: 3 } },
+        { id: { lte: 4 } },
+      ],
+    });
   });
 
   it('marca in vazio como sempre falso e omite notIn vazio', () => {
@@ -466,6 +584,20 @@ describe('PrismaAdapter execute', () => {
     expect(userDelegate.count).not.toHaveBeenCalled();
     expect(result.total).toBeUndefined();
     expect(result.queryCount).toBe(1);
+  });
+
+  it('customize sem escopo alcança data e count', () => {
+    const adapter = new PrismaAdapter();
+    const plan = buildQueryPlan({}, RULES_PRESETS['user.default']);
+    const compiled = adapter.compile(plan, input());
+    const seen: string[] = [];
+
+    // O default é `both`: quem chama `customize(compiled, cb)` sem escopo
+    // espera o filtro extra também no count, senão `total` conta linhas que a
+    // página nunca devolve.
+    adapter.customize(compiled, (native) => seen.push(native.kind));
+
+    expect(seen).toEqual(['data', 'count']);
   });
 
   it('customize com escopo data não toca o count', () => {

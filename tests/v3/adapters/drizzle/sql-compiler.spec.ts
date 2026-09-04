@@ -12,8 +12,14 @@ import {
   type DrizzleClientLike,
   type DrizzleStatement,
 } from '@infra/adapters/drizzle';
+import { defineQueryRules } from '@core/authorization';
 import { RULES_PRESETS } from '../../fixtures/rules';
-import { userRelations, usersTable } from '../../fixtures/drizzle-tables';
+import { CORPUS_SCHEMAS } from '../../fixtures/schemas';
+import {
+  postRelations,
+  userRelations,
+  usersTable,
+} from '../../fixtures/drizzle-tables';
 
 const dialect = new SQLiteDialect();
 
@@ -149,6 +155,85 @@ describe('toDataSql', () => {
     expect(sql).toContain('"users"."id" in (?, ?)');
     expect(sql).toContain('"users"."id" between ? and ?');
     expect(sql).toContain('"users"."nickname" is null');
+  });
+
+  it('emite is not null quando isNull vem false', () => {
+    const { data } = statementFor(
+      { filter: { nickname: { isNull: 'false' } } },
+      'user.default'
+    );
+
+    const { sql } = render(toDataSql(data));
+
+    // `isNull=false` é "tem valor". Cair no ramo positivo devolveria o
+    // conjunto complementar — resultado errado, não erro — e nenhum outro
+    // caso distingue os dois lados desta condição.
+    expect(sql).toContain('"users"."nickname" is not null');
+    expect(sql).not.toContain('not (');
+  });
+
+  it('rende grupo booleano vazio como tautologia, não como parêntese vazio', () => {
+    const { data } = statementFor({}, 'user.default');
+
+    // `where` é o único campo mutável do statement: é por ele que `customize`
+    // entra. Um consumidor que monte o AND a partir de uma lista que acabou
+    // vazia produziria `where ()`, erro de sintaxe no banco; a redução mantém
+    // o statement válido e sem efeito sobre o conjunto.
+    data.where = { op: 'and', terms: [] };
+
+    expect(render(toDataSql(data)).sql).toContain('where 1 = 1');
+  });
+
+  it('encadeia o join dentro do EXISTS quando o filtro cruza duas coleções', () => {
+    const twoCollections = defineQueryRules(CORPUS_SCHEMAS, 'user', {
+      filters: [{ path: 'posts.tags.label', operators: ['eq'] }],
+      sorts: ['id'],
+      fields: { root: { allowed: ['id'], default: ['id'] } },
+    });
+    const source = drizzleSource({
+      db: drizzleDatabase({ client: { all: () => [] }, dialect: 'sqlite' }),
+      dialect: 'sqlite',
+      table: usersTable,
+      // A cadeia `posts.tags` precisa estar declarada na source; o mapa do
+      // corpus para o root `user` só vai até `posts`.
+      relations: { ...userRelations, 'posts.tags': postRelations.tags },
+    }).input;
+    const { data } = new DrizzleAdapter().compile(
+      buildQueryPlan(
+        { filter: { 'posts.tags.label': { eq: 'urgent' } } },
+        twoCollections
+      ),
+      source
+    );
+
+    const { sql } = render(toDataSql(data));
+
+    // Um único EXISTS, correlacionado com o root uma só vez, e o segundo salto
+    // como join *dentro* da subconsulta. Correlacionar o segundo salto por
+    // fora inflaria os roots e estragaria o `total` — que é justamente o que
+    // o EXISTS existe para evitar.
+    expect(sql).toContain(
+      'exists (select 1 from "posts" as "users__posts__x" inner join "tags" as "users__posts__tags__x" on "users__posts__x"."id" = "users__posts__tags__x"."post_id" where "users"."id" = "users__posts__x"."user_id" and "users__posts__tags__x"."label" = ?'
+    );
+    expect(sql).not.toContain('join "tags" as "users__posts__tags"');
+  });
+
+  it('pagina do começo quando o statement traz limit sem offset', () => {
+    const { data } = statementFor(
+      { page: '2', perPage: '5' },
+      'user.default',
+      'postgres'
+    );
+    // `limit` e `offset` são opcionais e independentes no tipo do statement:
+    // um statement montado à mão pode trazer só o limite. Sem o default, o
+    // `offset` iria para o bind como `undefined` e o driver erraria tarde.
+    const { offset, ...withoutOffset } = data;
+
+    const { sql, params } = render(toDataSql(withoutOffset));
+
+    expect(offset).toBe(5);
+    expect(sql).toContain('limit ? offset ?');
+    expect(params.slice(-2)).toEqual([5, 0]);
   });
 
   it('pagina com limit e offset fora do SQL Server', () => {
@@ -357,6 +442,43 @@ describe('drizzleDatabase', () => {
     await drizzleDatabase({ client, dialect: 'sqlite' }).executeData(data);
 
     expect(all).toHaveBeenCalledTimes(1);
+  });
+
+  it('não consulta a coleção quando nenhum root tem a chave de correlação', async () => {
+    const { data } = statementFor({
+      includes: 'posts',
+      fields: 'id,nickname,posts.title',
+    });
+    // Uma coleção pode ser declarada sobre coluna anulável (`sourceColumn` é
+    // qualquer coluna do root). Aqui `nickname` faz esse papel: nenhum root da
+    // página tem valor, então não existe chave para o `IN`.
+    const overNullable: DrizzleStatement = {
+      ...data,
+      manyProjections: [
+        { ...data.manyProjections[0], sourceColumn: 'nickname' },
+      ],
+    };
+    const raw = (id: number): Record<string, unknown> => {
+      const row: Record<string, unknown> = {};
+      data.select.forEach((selection, index) => {
+        row[`c${index}`] = selection.column === 'nickname' ? null : id;
+      });
+      return row;
+    };
+    const { client, all } = clientReturning([raw(1), raw(2)]);
+
+    const rows = await drizzleDatabase({
+      client,
+      dialect: 'sqlite',
+    }).executeData(overNullable);
+
+    // A coleção vazia é a resposta certa, e `toManySql` recusa lista de chaves
+    // vazia: sem esta saída o root sem chave viraria erro de contrato.
+    expect(all).toHaveBeenCalledTimes(1);
+    expect(rows).toEqual([
+      { id: 1, nickname: null, posts: [] },
+      { id: 2, nickname: null, posts: [] },
+    ]);
   });
 
   it('devolve zero quando a contagem não traz linha', async () => {

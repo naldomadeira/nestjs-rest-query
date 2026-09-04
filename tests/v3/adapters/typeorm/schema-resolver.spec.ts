@@ -1,6 +1,11 @@
 import type { DataSource } from 'typeorm';
 import { buildSchemaRegistry } from '@infra/adapters/typeorm';
 import { closeSqlite, corpusEntities, openSqlite } from './helpers';
+import {
+  closeLocalSqlite,
+  localRepository,
+  openLocalSqlite,
+} from './local-schemas';
 
 let dataSource: DataSource;
 
@@ -143,5 +148,69 @@ describe('buildSchemaRegistry', () => {
     } finally {
       (column as { type: unknown }).type = original;
     }
+  });
+});
+
+/**
+ * Formas de declaração que o corpus não produz.
+ *
+ * O corpus fixa o tipo físico de cada coluna por dialeto, porque é o que torna
+ * as nove células comparáveis — e por isso ele nunca exercita as duas formas
+ * mais comuns em app real: `@Column()` sem `type`, que chega como construtor
+ * refletido, e o enum portável do TypeORM.
+ */
+describe('buildSchemaRegistry sobre declarações não canônicas', () => {
+  beforeAll(async () => {
+    await openLocalSqlite();
+  });
+  afterAll(closeLocalSqlite);
+
+  it('resolve colunas declaradas por construtor', () => {
+    // `@Column()` sem `type` deixa o construtor da propriedade na metadata.
+    // Tratá-lo como desconhecido faria o resolver recusar toda entidade escrita
+    // do jeito idiomático do NestJS; tratá-lo como `string` por omissão traria
+    // de volta a coerção errada da v2.
+    const article = buildSchemaRegistry(localRepository('article')).get(
+      'article'
+    )!;
+
+    expect(article.fields.get('id')?.kind).toBe('integer');
+    expect(article.fields.get('title')?.kind).toBe('string');
+    expect(article.fields.get('live')?.kind).toBe('boolean');
+    // `Date` é instante, não data civil: o construtor não distingue os dois, e
+    // o lado seguro é o que carrega hora.
+    expect(article.fields.get('published_at')?.kind).toBe('datetime');
+  });
+
+  it('mapeia o enum portável do TypeORM e preserva os valores declarados', () => {
+    // `simple-enum` é o nome que o TypeORM dá ao enum portável (varchar +
+    // CHECK) e o único que ele aceita no SQLite; sem ele no mapa, uma entidade
+    // com enum portável fazia o registry inteiro falhar como tipo não mapeado.
+    const article = buildSchemaRegistry(localRepository('article')).get(
+      'article'
+    )!;
+    const status = article.fields.get('status')!;
+
+    expect(status.kind).toBe('enum');
+    expect(status.enumValues).toEqual(['draft', 'review', 'published']);
+  });
+
+  it('descreve a cardinalidade many-to-many como many', () => {
+    // O planner e o compilador dependem disso para não juntar a relação: a
+    // recusa explícita da many-to-many acontece depois, no compilador.
+    const article = buildSchemaRegistry(localRepository('article')).get(
+      'article'
+    )!;
+    expect(article.relations.get('labels')?.cardinality).toBe('many');
+  });
+
+  it('descobre PK composta e a FK composta que a referencia', () => {
+    const registry = buildSchemaRegistry(localRepository('ledger'));
+
+    expect(registry.get('ledger')?.primaryKey).toEqual(['tenant_id', 'code']);
+    expect(registry.get('ledger')?.relations.get('entries')?.cardinality).toBe(
+      'many'
+    );
+    expect(registry.get('entry')?.fields.get('note')?.nullable).toBe(true);
   });
 });
