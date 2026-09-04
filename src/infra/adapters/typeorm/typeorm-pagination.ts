@@ -48,8 +48,8 @@ export async function executeCompiled<T extends ObjectLiteral>(
   keysQuery.select(primaryKey.map((column) => `${ROOT_ALIAS}.${column}`));
   compileFilters(keysQuery, context);
   compileSort(keysQuery, plan, context);
+  for (const customize of compiled.keyCustomizers) customize(keysQuery);
   keysQuery.limit(perPage).offset(offset);
-
   const keyRows = await keysQuery.getRawMany<Record<string, unknown>>();
   const keys = keyRows.map((row) =>
     primaryKey.map((column) => row[`${ROOT_ALIAS}_${column}`])

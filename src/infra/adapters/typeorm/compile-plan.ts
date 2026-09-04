@@ -17,6 +17,8 @@ export interface CompiledTypeOrmQuery<T extends ObjectLiteral> {
   readonly data: SelectQueryBuilder<T>;
   /** Query de contagem, derivada do mesmo plano. */
   readonly count: SelectQueryBuilder<T>;
+  /** Callbacks de data que também precisam restringir a fase de keys. */
+  readonly keyCustomizers: Array<(query: SelectQueryBuilder<T>) => void>;
 }
 
 /**
@@ -44,7 +46,15 @@ export function compilePlan<T extends ObjectLiteral>(
   compileJoins(count, predicateOnly(joins));
   compileFilters(count, { ...context, joins: predicateOnly(joins) });
 
-  return { plan, repository, joins, escapeCharacter, data, count };
+  return {
+    plan,
+    repository,
+    joins,
+    escapeCharacter,
+    data,
+    count,
+    keyCustomizers: [],
+  };
 }
 
 /**
