@@ -40,6 +40,22 @@ export type CorpusExpectation =
     }
   | { kind: 'error'; status: number; code: RestQueryErrorCodeName };
 
+export type CorpusAdapterId = 'typeorm' | 'prisma' | 'drizzle';
+
+/**
+ * Divergência intencional de um adapter num caso do corpus (spec §5 e §24).
+ *
+ * Existe porque um ORM pode não *conseguir* expressar a semântica canônica.
+ * Fica aqui, junto do caso, e não num skip: o resultado divergente é
+ * comparado com o mesmo rigor do canônico, então um adapter que volte a
+ * concordar quebra o teste e obriga a remover a divergência. `reason` é
+ * obrigatório — declarar uma sem justificar é impossível.
+ */
+export interface CorpusDivergence {
+  readonly reason: string;
+  readonly expect: CorpusExpectation;
+}
+
 export interface CorpusCase {
   /** Identificador estável usado nos relatórios da matriz. */
   id: string;
@@ -49,4 +65,6 @@ export interface CorpusCase {
   rules: string;
   query: Record<string, unknown>;
   expect: CorpusExpectation;
+  /** Adapters que não conseguem produzir `expect`, com o porquê. */
+  divergences?: Readonly<Partial<Record<CorpusAdapterId, CorpusDivergence>>>;
 }

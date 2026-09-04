@@ -1,5 +1,5 @@
 import { CORPUS_CASES } from '../../corpus/cases';
-import { runCorpusCase } from '../../fixtures/corpus-runner';
+import { expectationFor, runCorpusCase } from '../../fixtures/corpus-runner';
 import { closeSqlite, openSqlite, sourceFor } from './helpers';
 
 /**
@@ -22,28 +22,30 @@ describe.each(CORPUS_CASES.map((testCase) => [testCase.id, testCase] as const))(
     it(testCase.description, async () => {
       const actual = await runCorpusCase(testCase, sourceFor(testCase.rules));
 
-      if (testCase.expect.kind === 'error') {
+      const expected = expectationFor(testCase, 'drizzle');
+
+      if (expected.kind === 'error') {
         expect(actual).toEqual({
           kind: 'error',
-          status: testCase.expect.status,
-          code: testCase.expect.code,
+          status: expected.status,
+          code: expected.code,
         });
         return;
       }
 
       expect(actual.kind).toBe('rows');
 
-      if (testCase.expect.ids !== undefined) {
-        expect(actual.ids).toEqual(testCase.expect.ids);
+      if (expected.ids !== undefined) {
+        expect(actual.ids).toEqual(expected.ids);
       }
-      if (testCase.expect.total !== undefined) {
-        expect(actual.total).toBe(testCase.expect.total);
+      if (expected.total !== undefined) {
+        expect(actual.total).toBe(expected.total);
       }
-      if (testCase.expect.lastPage !== undefined) {
-        expect(actual.lastPage).toBe(testCase.expect.lastPage);
+      if (expected.lastPage !== undefined) {
+        expect(actual.lastPage).toBe(expected.lastPage);
       }
-      if (testCase.expect.firstRow !== undefined) {
-        expect(actual.firstRow).toEqual(testCase.expect.firstRow);
+      if (expected.firstRow !== undefined) {
+        expect(actual.firstRow).toEqual(expected.firstRow);
       }
     });
   }

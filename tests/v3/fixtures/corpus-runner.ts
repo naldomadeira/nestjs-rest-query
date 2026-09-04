@@ -1,7 +1,11 @@
 import type { DataSource } from 'typeorm';
 import type { AnyQuerySource } from '@contracts/v3';
 import { QueryBuilderService } from '@core/query-builder.v3.service';
-import type { CorpusCase } from '../corpus/corpus.types';
+import type {
+  CorpusAdapterId,
+  CorpusCase,
+  CorpusExpectation,
+} from '../corpus/corpus.types';
 import { CORPUS_SEED } from '../corpus/seed';
 import { RULES_PRESETS } from './rules';
 import type { CorpusEntities } from './entity-schemas';
@@ -17,6 +21,20 @@ export interface CorpusOutcome {
 }
 
 const service = new QueryBuilderService({});
+
+/**
+ * Expectativa que vale para este adapter (spec §5 e §24).
+ *
+ * É a canônica, salvo quando o caso declara uma divergência intencional para
+ * ele. A divergente é comparada com o mesmo rigor, então um adapter que volte
+ * a concordar com o canônico quebra o teste — e a divergência tem de sair.
+ */
+export function expectationFor(
+  testCase: CorpusCase,
+  adapter: CorpusAdapterId
+): CorpusExpectation {
+  return testCase.divergences?.[adapter]?.expect ?? testCase.expect;
+}
 
 /** Chave observável de um root: PK simples, ou partes unidas por `|`. */
 function rootKey(
