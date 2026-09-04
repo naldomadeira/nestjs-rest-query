@@ -7,6 +7,9 @@ import {
   type CorpusEntities,
 } from '../../fixtures/entity-schemas';
 
+/** Mesmo caractere de escape que o adapter escolhe para todos os dialetos. */
+export const ESCAPE_CHARACTER = '!';
+
 let dataSource: DataSource | undefined;
 let entities: CorpusEntities | undefined;
 
@@ -57,7 +60,7 @@ export function compileToQueryBuilder(
   preset = 'user.default'
 ): CompiledSnapshot {
   const plan = buildQueryPlan(query, RULES_PRESETS[preset]);
-  const compiled = compilePlan(plan, repositoryFor(preset), '\\');
+  const compiled = compilePlan(plan, repositoryFor(preset), ESCAPE_CHARACTER);
 
   return {
     sql: compiled.data.getQuery(),

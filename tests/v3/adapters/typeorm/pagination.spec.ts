@@ -7,6 +7,7 @@ import { seedCorpus } from '../../fixtures/corpus-runner';
 import {
   closeSqlite,
   corpusEntities,
+  ESCAPE_CHARACTER,
   openSqlite,
   repositoryFor,
 } from './helpers';
@@ -28,7 +29,7 @@ async function run(
   data: Record<string, unknown>[];
 }> {
   const plan = buildQueryPlan(query, RULES_PRESETS[preset]);
-  const compiled = compilePlan(plan, repositoryFor(preset), '\\');
+  const compiled = compilePlan(plan, repositoryFor(preset), ESCAPE_CHARACTER);
   const result = await executeCompiled(compiled);
   const normalized = normalizeResult<ObjectLiteral>(
     result.rows,

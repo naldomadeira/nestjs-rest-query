@@ -19,17 +19,21 @@ export interface TypeOrmSourceInput<T extends ObjectLiteral> {
 }
 
 /**
- * Caractere de escape por dialeto.
+ * Caractere de escape dos padrões literais, por dialeto.
  *
- * A barra invertida serve às três famílias com a cláusula ESCAPE explícita.
- * Mantê-lo aqui, e não no núcleo, é o que permite trocar a escolha por
+ * Não é a barra invertida: o MySQL processa `\` dentro de literais de string,
+ * então `ESCAPE '\'` deixa a aspas sem fechar e o SQL não compila. `!` não tem
+ * significado em literal nem em LIKE em nenhuma das famílias, o que dá o mesmo
+ * comportamento nas quatro pontas com uma única escolha.
+ *
+ * Mantê-lo no adapter, e não no núcleo, é o que permite trocar a escolha por
  * dialeto sem tocar na semântica.
  */
 const ESCAPE_CHARACTER: Readonly<Record<SqlDialect, string>> = {
-  postgres: '\\',
-  mysql: '\\',
-  mssql: '\\',
-  sqlite: '\\',
+  postgres: '!',
+  mysql: '!',
+  mssql: '!',
+  sqlite: '!',
 };
 
 const DIALECT_BY_DRIVER: Readonly<Record<string, SqlDialect>> = {
