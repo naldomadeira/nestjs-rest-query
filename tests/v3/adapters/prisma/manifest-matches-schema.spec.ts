@@ -30,7 +30,18 @@ import { MANIFEST } from './helpers';
  * manter correto que derivar — e é o comparador que protege a paridade.
  */
 
-const SCHEMA_PATH = join(__dirname, 'schema', 'schema.prisma');
+/**
+ * Um schema por provider, porque o `provider` do `datasource` tem de ser
+ * literal — `env()` não é aceito ali.
+ *
+ * Validar os quatro contra o **mesmo** manifesto é o que torna o drift entre
+ * eles impossível de passar calado: acrescentar um campo só no de Postgres,
+ * ou trocar uma cardinalidade só no de SQL Server, quebra aqui.
+ */
+const SCHEMAS = ['sqlite', 'postgres', 'mysql', 'sqlserver'] as const;
+
+const schemaPath = (name: string) =>
+  join(__dirname, 'schema', `${name}.prisma`);
 
 interface DmmfField {
   name: string;
@@ -51,8 +62,8 @@ interface DmmfModel {
 const delegateOf = (model: string) =>
   model.charAt(0).toLowerCase() + model.slice(1);
 
-describe('o manifesto do Prisma acompanha o schema.prisma', () => {
-  const datamodel = readFileSync(SCHEMA_PATH, 'utf8');
+describe.each(SCHEMAS)('%s.prisma acompanha o manifesto', (schema) => {
+  const datamodel = readFileSync(schemaPath(schema), 'utf8');
   let byDelegate: Map<string, DmmfModel>;
 
   beforeAll(async () => {
@@ -65,7 +76,7 @@ describe('o manifesto do Prisma acompanha o schema.prisma', () => {
     );
   }, 60_000);
 
-  it('declara o provider do datasource, não outro', () => {
+  it('declara um provider coerente com o nome do arquivo', () => {
     // O provider decide dialeto e, com ele, se `%` e `_` podem ser literais.
     // Declarar o errado no manifesto tornaria as capabilities uma ficção.
     //
@@ -76,7 +87,24 @@ describe('o manifesto do Prisma acompanha o schema.prisma', () => {
       datamodel
     );
 
-    expect(declared?.[1]).toBe(MANIFEST.provider);
+    // `postgres.prisma` declara `postgresql`: o nome do arquivo segue o
+    // vocabulário de dialeto da biblioteca, o provider segue o do Prisma.
+    const EXPECTED_PROVIDER: Record<string, string> = {
+      sqlite: 'sqlite',
+      postgres: 'postgresql',
+      mysql: 'mysql',
+      sqlserver: 'sqlserver',
+    };
+
+    expect(declared?.[1]).toBe(EXPECTED_PROVIDER[schema]);
+  });
+
+  it('o manifesto do dialeto de referência aponta para este provider', () => {
+    // O `MANIFEST` do harness rápido é o de SQLite. Os outros três descrevem
+    // as células da matriz, e é o `DQB_PRISMA_SCHEMA` que escolhe qual gerar.
+    if (schema !== 'sqlite') return;
+
+    expect(MANIFEST.provider).toBe('sqlite');
   });
 
   const models = Object.entries(MANIFEST.models);

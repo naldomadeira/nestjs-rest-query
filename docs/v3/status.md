@@ -2,9 +2,10 @@
 
 **Versão-alvo:** `3.0.0` · **Última verificação:** 2026-09-04
 
-> A `3.0.0` estável **não** pode ser publicada a partir deste estado. Os gates
-> da §23 do design não passam, e a lista está no fim desta página. Qualquer
-> publicação hoje é pré-release.
+> A `3.0.0` estável **não** pode ser publicada a partir deste estado — mas o
+> motivo mudou. A matriz de paridade está verde nas nove células; o que falta é
+> a fase 7 (exemplos, migração validada, cobertura). A lista está no fim desta
+> página.
 
 Esta página descreve o que existe e o que falta. O
 [design aprovado](../superpowers/specs/2026-09-03-v3-paridade-orm-bancos-design.md)
@@ -21,34 +22,40 @@ as duas é a forma mais fácil de superestimar o estado:
   célula da matriz de paridade.
 - **Matriz de paridade (PostgreSQL, MySQL, SQL Server).** É a promessa da §5:
   mesma query, mesmo resultado nas nove combinações. Roda em
-  `pnpm test:integration`, exige os bancos do perfil certificado no ar, e
-  **não foi executada** contra Prisma nem Drizzle.
+  `pnpm test:integration`, uma célula por execução
+  (`DQB_ADAPTER` × `DQB_DIALECT`), e exige os bancos do perfil certificado no
+  ar. **As nove rodaram**, 66 casos cada, sem skip.
+
+Verde na matriz também não é auto-evidente: três células verdes de primeira
+foram conferidas pelo SQL realmente executado — digest e general log no MySQL,
+cache de planos no SQL Server — porque uma célula que não chega ao banco
+passaria igual.
 
 ## Fases de entrega
 
-| Fase | Escopo                | Estado                    | Evidência                                                                                          |
-| ---- | --------------------- | ------------------------- | -------------------------------------------------------------------------------------------------- |
-| 0    | Contrato e baseline   | **completa**              | corpus congelado em `tests/v3/corpus/`, perfis em `test/profiles/`                                 |
-| 1    | Core semântico        | **completa**              | parser, AST, autorização exata, codecs, plano, normalizador                                        |
-| 2    | API e distribuição    | **completa**              | sources discriminadas, `transformPlan`, `customize` com escopo, 4 subpaths, `verify:package` verde |
-| 3    | TypeORM de referência | **dialeto de referência** | corpus 66/66 em SQLite, com TypeORM `0.3.x` e `1.1.x`                                              |
-| 4    | Prisma                | **dialeto de referência** | corpus 66/66 contra client gerado; sem generator, com 1 divergência declarada                      |
-| 5    | Drizzle               | **dialeto de referência** | corpus 66/66 em SQLite; **não executa em banco real** — ver bloqueador nº2                         |
-| 6    | Paridade completa     | **não iniciada**          | nenhuma célula real rodou contra Prisma ou Drizzle                                                 |
-| 7    | Hardening e release   | **não iniciada**          | exemplos, migration validado, alpha/rc (codemod saiu do escopo — ADR-001)                          |
+| Fase | Escopo                | Estado           | Evidência                                                                                          |
+| ---- | --------------------- | ---------------- | -------------------------------------------------------------------------------------------------- |
+| 0    | Contrato e baseline   | **completa**     | corpus congelado em `tests/v3/corpus/`, perfis em `test/profiles/`                                 |
+| 1    | Core semântico        | **completa**     | parser, AST, autorização exata, codecs, plano, normalizador                                        |
+| 2    | API e distribuição    | **completa**     | sources discriminadas, `transformPlan`, `customize` com escopo, 4 subpaths, `verify:package` verde |
+| 3    | TypeORM de referência | **completa**     | 66/66 em SQLite e nas três células reais                                                           |
+| 4    | Prisma                | **completa**     | 66/66 em SQLite e nas três células reais; manifesto validado contra os 4 `schema.prisma`           |
+| 5    | Drizzle               | **completa**     | 66/66 em SQLite e nas três células reais, via `postgres-js`, `mysql2` e `node-mssql`               |
+| 6    | Paridade completa     | **completa**     | nove células verdes, 66 casos cada, `assert-no-skips` em todas                                     |
+| 7    | Hardening e release   | **não iniciada** | exemplos, migration validado, alpha/rc (codemod saiu do escopo — ADR-001)                          |
 
-Nenhuma fase de adapter está _completa_: completa exigiria as três células
-reais, que é a fase 6.
+As fases de adapter fecharam junto com a 6: completa exigia as três células
+reais de cada um, e é o que existe agora.
 
 ## Estado por adapter
 
-|                                 | TypeORM                             | Prisma                                | Drizzle                            |
-| ------------------------------- | ----------------------------------- | ------------------------------------- | ---------------------------------- |
-| Corpus no dialeto de referência | 66/66                               | 66/66                                 | 66/66                              |
-| Usa o ORM de verdade            | sim                                 | sim, client gerado                    | sim                                |
-| PostgreSQL / MySQL / SQL Server | MySQL verde; PG e MSSQL não rodaram | **não rodou**                         | **não executa** (ver abaixo)       |
-| Divergências declaradas         | nenhuma                             | 1 (`like` literal)                    | nenhuma                            |
-| Lacuna própria                  | —                                   | generator a partir de `schema.prisma` | coleção aninhada sob outra relação |
+|                                 | TypeORM        | Prisma                                          | Drizzle                            |
+| ------------------------------- | -------------- | ----------------------------------------------- | ---------------------------------- |
+| Corpus no dialeto de referência | 66/66          | 66/66                                           | 66/66                              |
+| Usa o ORM de verdade            | sim            | sim, client gerado por dialeto                  | sim                                |
+| PostgreSQL / MySQL / SQL Server | 66/66 nas três | 66/66 nas três                                  | 66/66 nas três                     |
+| Divergências declaradas         | nenhuma        | 5 operadores de padrão em SQLite e MSSQL        | nenhuma                            |
+| Lacuna própria                  | —              | generator a partir de `schema.prisma` (`3.1.0`) | coleção aninhada sob outra relação |
 
 ### TypeORM
 
@@ -104,20 +111,20 @@ cobertura.
 
 ## Gates da `3.0.0` (§23)
 
-| Gate                                            | Estado                                                                                 |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Nove combinações reais verdes, sem skips        | **não** — só TypeORM × MySQL rodou; o Drizzle não executa em banco real                |
-| Peer do Drizzle fechado nos RCs medidos         | **não** — a faixa `<2.0.0` admitiria o GA não testado (ADR-001)                        |
-| Nenhum cast no uso público documentado          | sim                                                                                    |
-| Nenhum peer opcional carregado pelo core        | sim — provado por consumer fixture                                                     |
-| Exemplos compilam e passam smoke E2E            | **não** — fase 7                                                                       |
-| Códigos de erro e JSON canônico idênticos       | sim no dialeto de referência; não medido na matriz                                     |
-| Cobertura de branches críticos acima de 95%     | **parcial** — ver abaixo                                                               |
-| Nenhum achado de segurança alto ou crítico      | CodeQL e Scorecard rodam na CI; falta datar o resultado                                |
-| Benchmarks dentro do orçamento                  | `budget.spec.ts` mede o §18.4 em `pnpm test`; falta datar                              |
-| Migration guide validado num consumidor v2 real | **não**                                                                                |
-| Matriz pública de versões coincide com a CI     | **não** — a CI não roda Prisma/Drizzle                                                 |
-| Profiles de banco passam nos checks             | **parcial** — o runtime valida fatos fornecidos pelo chamador, sem collector por banco |
+| Gate                                            | Estado                                                                              |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Nove combinações reais verdes, sem skips        | **sim** — 66 casos por célula, `assert-no-skips` em todas                           |
+| Peer do Drizzle fechado nos RCs medidos         | sim — `>=1.0.0-rc.4 <1.0.0`                                                         |
+| Nenhum cast no uso público documentado          | sim                                                                                 |
+| Nenhum peer opcional carregado pelo core        | sim — provado por consumer fixture                                                  |
+| Exemplos compilam e passam smoke E2E            | **não** — fase 7                                                                    |
+| Códigos de erro e JSON canônico idênticos       | sim — mesmo runner e mesmas expectativas nas nove células                           |
+| Cobertura de branches críticos acima de 95%     | **parcial** — ver abaixo                                                            |
+| Nenhum achado de segurança alto ou crítico      | CodeQL e Scorecard rodam na CI; falta datar o resultado                             |
+| Benchmarks dentro do orçamento                  | `budget.spec.ts` mede o §18.4 em `pnpm test`; falta datar                           |
+| Migration guide validado num consumidor v2 real | **não**                                                                             |
+| Matriz pública de versões coincide com a CI     | sim — `versions.md`, comparada ao workflow por teste                                |
+| Profiles de banco passam nos checks             | **parcial** — collector existe em `src/`, mas não confere o fuso do _cliente_ (nº3) |
 
 ### Cobertura
 
@@ -135,46 +142,77 @@ que é o de referência, está em 75% — é a maior dívida de cobertura aberta
 
 ## Bloqueadores nomeados
 
-1. **Nenhum banco real rodou contra Prisma ou Drizzle.** É a fase 6 inteira e o
-   principal motivo de nada aqui poder ser chamado de paridade. Do TypeORM, só
-   a célula MySQL rodou verde.
-2. **O adapter Drizzle não executa em banco real.** `client.all()` só existe no
-   SQLite; Postgres, MySQL e SQL Server expõem `execute()`, com três formas de
-   retorno diferentes. Exige um executor por dialeto antes de qualquer célula.
-   É o bloqueador mais sério, e não estava nesta lista.
-3. **Manifesto do Prisma escrito à mão** pode divergir do `schema.prisma` sem
-   que nada acuse. Fecha com validador; o generator foi para a `3.1.0`
-   (ADR-001).
-4. **`like` literal no Prisma.** Divergência declarada. O ADR-001 decide
-   resolvê-la por escape por dialeto, com a medição na célula real pendente.
-5. **Collector de perfil não está em `src/`.** Existe e funciona em
-   `tests/v3/integration/setup.ts:108`, mas enquanto os fatos vierem do
-   chamador, `PORTABILITY_PROFILE_MISMATCH` passa com fatos mentidos.
-6. **Coleção aninhada sob outra relação no Drizzle** falha fechado.
-7. **Cobertura de branches do adapter TypeORM** em 75%.
-8. **Versão de Node incoerente.** `.nvmrc` pina `v20.19.4`, `engines.node` pede
-   `>=22`, a CI roda `[22, 24]` e o §6.1 elege 24. A última medição verde saiu
-   numa versão que o pacote declara não suportar.
-9. **SQL Server exige runner Linux x64.** Falhas locais em ARM estão
-   registradas e não substituem a célula.
+A paridade deixou de ser um deles. O que resta é fase 7, mais um achado novo
+que a própria matriz produziu.
 
-`drizzle-orm` em RC **não** é mais bloqueador da estável: ver ADR-001.
+1. **Fase 7 não iniciada.** Os quatro exemplos em `apps/examples/` usam a API
+   v2 e não compilam contra a v3; o `MIGRATION.md` não foi exercido num
+   consumidor v2 real. São dois gates da §23.
+2. **Cobertura de branches.** `infra/adapters/typeorm` em 75% e
+   `infra/adapters/drizzle` em 94.6%, contra um gate de 95%.
+3. **O perfil certificado não confere o fuso do cliente.** Achado da matriz, e
+   é de biblioteca, não de harness: o TypeORM força `useUTC: false` no driver
+   do SQL Server quando `options.useUTC` não vem marcado, e `datetime2` passa a
+   ser gravado no fuso local do processo. `assertProfileFacts` confere o fuso do
+   **servidor** e passaria assim mesmo. Ver "O que a matriz descobriu".
+4. **Coleção aninhada sob outra relação no Drizzle** falha fechado.
+5. **`decimal(38,6)` não passa como parâmetro vinculado no tedious.** O
+   `Decimal` do tedious 20 faz `parseFloat` na validação e `writeUInt64LE`
+   depois, então os 8 bytes altos da forma de 16 saem zerados. O seed contorna
+   com literal SQL; um consumidor que grave decimal de alta precisão em SQL
+   Server pelo TypeORM encontra o mesmo teto.
+6. **Operadores de padrão do Prisma em SQLite e SQL Server** são recusados com
+   `CAPABILITY_UNAVAILABLE`. É decisão declarada (ADR-001, emenda 2), não
+   pendência, e está em [`versions.md`](./versions.md) como não suportado.
+
+## O que a matriz descobriu
+
+A paridade pagou o próprio custo na primeira execução completa, e vale
+registrar porque é o argumento de por que existem nove células em vez de uma
+suíte por adapter.
+
+**`coercion/datetime-offset-normalized-to-utc` passava no TypeORM × SQL Server
+com o dado errado.** O TypeORM força `useUTC: false` no tedious, então
+`2026-01-02T03:04:05Z` foi gravado como `2026-01-02 00:04:05` — o fuso local do
+processo. A célula passava porque escrevia e lia com o mesmo deslocamento: um
+erro auto-consistente. Prisma e Drizzle, que ficam em UTC, leram o instante
+errado e falharam.
+
+Nenhuma suíte de um adapter só encontraria isso. É o mesmo dado lido por três
+compiladores que expõe o erro — que é exatamente a definição de paridade da §5.
+
+O harness passou a declarar `useUTC: true`, mas o bloqueador nº3 continua
+aberto: um consumidor que não marque a opção tem o mesmo problema, e o check de
+perfil não acusa.
 
 ## Como reproduzir
 
 ```bash
 pnpm install
-pnpm test              # 42 suites, 656 testes — inclui os 3 corpus de referência
-pnpm typecheck
+pnpm test              # inclui os 3 corpus no dialeto de referência
+pnpm typecheck         # só `src/**`
+pnpm typecheck:tests   # `tests/**`, que o typecheck e o ts-jest não cobrem
 pnpm lint
 pnpm verify:package    # build + publint + attw + consumidores CJS/ESM
 
-# matriz real: exige os bancos do perfil certificado
+# Uma célula da matriz. Cada execução é um par (adapter, dialeto): o
+# `test:integration` roda um só, e é `assert-no-skips` que impede uma
+# célula de passar sem ter rodado caso nenhum.
 pnpm db:up
-DQB_DIALECT=postgres DQB_PG_URL=postgres://dqb:dqb@localhost:55432/dqb pnpm test:integration
+DQB_ADAPTER=prisma DQB_PRISMA_SCHEMA=postgres pnpm prisma:generate:cell
+DQB_ADAPTER=prisma DQB_DIALECT=postgres \
+  DQB_PG_URL=postgres://dqb:dqb@localhost:55432/dqb \
+  pnpm test:integration
+node scripts/assert-no-skips.mjs integration.xml
 pnpm db:down
 ```
 
-`pnpm test` gera o client Prisma antes de rodar (`pretest`) e usa
+`pnpm test` gera o client Prisma de SQLite antes de rodar (`pretest`) e usa
 `--experimental-vm-modules`, porque o runtime do Prisma 7 se carrega por
-`import()` dinâmico.
+`import()` dinâmico. O `test:integration` precisa da mesma flag — sem ela, 42
+dos 66 casos da célula do Prisma falham por callback de import dinâmico.
+
+O `provider` do `datasource` do Prisma tem de ser literal, então existe um
+`schema.prisma` por dialeto em `tests/v3/adapters/prisma/schema/` e o client da
+célula é gerado por `DQB_PRISMA_SCHEMA`. Os quatro são validados contra o mesmo
+manifesto por `manifest-matches-schema.spec.ts`.

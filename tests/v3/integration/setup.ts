@@ -10,6 +10,8 @@ export type IntegrationDialect = ProfileDialect;
 
 export interface IntegrationContext {
   readonly dialect: IntegrationDialect;
+  /** URL da célula, para os adapters que abrem conexão própria. */
+  readonly url: string;
   readonly dataSource: DataSource;
   readonly entities: CorpusEntities;
   repositoryFor(preset: string): Repository<ObjectLiteral>;
@@ -46,7 +48,21 @@ export async function openDialect(
     synchronize: false,
     logging: false,
     ...(dialect === 'mssql'
-      ? { options: { encrypt: false, trustServerCertificate: true } }
+      ? {
+          options: {
+            encrypt: false,
+            trustServerCertificate: true,
+            // `useUTC` é o análogo do `timezone: 'Z'` do MySQL, e precisa ser
+            // explícito: o driver do TypeORM força `useUTC: false` quando a
+            // opção não vem marcada, e aí o `tedious` grava e lê `datetime2`
+            // pelos componentes locais do processo. Num runner fora do UTC o
+            // seed entra deslocado — e a célula do TypeORM ainda passa, porque
+            // escreve e lê com o mesmo deslocamento, enquanto Prisma e Drizzle
+            // (que ficam em UTC) leem o instante errado. O perfil certificado
+            // é UTC; a sessão do cliente tem de ser também.
+            useUTC: true,
+          },
+        }
       : {}),
     ...(dialect === 'mysql' ? { timezone: 'Z' } : {}),
   } as never);
@@ -55,6 +71,7 @@ export async function openDialect(
 
   return {
     dialect,
+    url,
     dataSource,
     entities,
     repositoryFor: (preset) =>

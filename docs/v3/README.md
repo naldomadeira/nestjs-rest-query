@@ -12,6 +12,7 @@ que não funciona e o que bloqueia a `3.0.0`.
 | [`status.md`](./status.md)                                                          | Estado por fase, por adapter, gates e bloqueadores       |
 | [`migration-from-v2.md`](./migration-from-v2.md)                                    | Guia de migração v2 → v3, com antes/depois               |
 | [`parity.md`](./parity.md)                                                          | Como a paridade é medida e como declarar uma divergência |
+| [`versions.md`](./versions.md)                                                      | Matriz pública de versões e o que não é suportado        |
 | [design aprovado](../superpowers/specs/2026-09-03-v3-paridade-orm-bancos-design.md) | A decisão original, congelada                            |
 | [ADR-001](../superpowers/specs/2026-09-04-v3-adr-001-matriz-e-escopo-da-3.0.0.md)   | O que mudou no design, e por quê                         |
 | [plano de entrega](../superpowers/specs/2026-09-04-v3-plano-de-entrega.md)          | Como as fases 6 e 7 são entregues, PR a PR               |

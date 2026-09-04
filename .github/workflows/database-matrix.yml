@@ -1,11 +1,19 @@
 name: database-matrix
 
-# Matriz ORM x banco (spec §19). Uma célula vermelha bloqueia o merge, e skips
-# são proibidos: o gate `assert-no-skips` falha se algum caso do corpus não
-# tiver rodado.
+# Matriz ORM × banco (spec §19). Uma célula vermelha bloqueia o release, e
+# skips são proibidos: o gate `assert-no-skips` falha se algum caso do corpus
+# não tiver rodado.
+#
+# O escopo muda com o evento, e é decisão de design, não economia:
+#
+# - **pull request**: uma célula por ORM, no Postgres, que é o alvo principal
+#   da §6.1. Dá diagnóstico rápido sem manter três containers por ORM.
+# - **push em `main` e tag**: as nove células. O §6.2 diz que célula vermelha
+#   bloqueia *release*, não PR — então é aqui que o gate vale.
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
     branches: [main]
 
@@ -17,14 +25,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  typeorm:
-    name: typeorm / ${{ matrix.dialect }}
+  cell:
+    name: ${{ matrix.adapter }} / ${{ matrix.dialect }}
     # SQL Server exige runner Linux x64 (spec §19).
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        dialect: [postgres, mysql, mssql]
+        adapter: [typeorm, prisma, drizzle]
+        dialect: ${{ github.event_name == 'pull_request' && fromJSON('["postgres"]') || fromJSON('["postgres","mysql","mssql"]') }}
 
     steps:
       - uses: actions/checkout@v6
@@ -39,6 +48,14 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+
+      # O `provider` do datasource do Prisma tem de ser literal, então existe
+      # um schema por dialeto e o client é gerado por célula.
+      - name: generate the Prisma client for this cell
+        if: matrix.adapter == 'prisma'
+        run: pnpm prisma:generate:cell
+        env:
+          DQB_PRISMA_SCHEMA: ${{ matrix.dialect == 'mssql' && 'sqlserver' || matrix.dialect }}
 
       - name: start the certified profile
         run: |
@@ -55,6 +72,7 @@ jobs:
       - name: run the parity corpus
         run: pnpm test:integration
         env:
+          DQB_ADAPTER: ${{ matrix.adapter }}
           DQB_DIALECT: ${{ matrix.dialect }}
           DQB_PG_URL: postgres://dqb:dqb@localhost:55432/dqb
           DQB_MYSQL_URL: mysql://dqb:dqb@localhost:53306/dqb
@@ -71,3 +89,20 @@ jobs:
       - name: stop the profile
         if: always()
         run: docker compose -f test/profiles/docker-compose.yml down -v
+
+  # Ponto único de required status check.
+  #
+  # Não verifica nada por si: quem verifica é o `needs: cell`, que só libera
+  # este job se **todas** as células da matriz tiverem passado. Existe porque
+  # uma matriz dinâmica muda de tamanho entre `pull_request` e `push`, e um
+  # required check não pode apontar para um nome de job que varia.
+  #
+  # Só roda em `push` porque é ali que a matriz é completa: o gate da §23 é
+  # "nove combinações reais verdes, sem skips", e o pull request roda três.
+  matrix-complete:
+    name: matrix complete
+    needs: cell
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "todas as células da matriz passaram"
