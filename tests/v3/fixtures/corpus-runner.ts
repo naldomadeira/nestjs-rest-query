@@ -43,7 +43,12 @@ export async function runCorpusCase(
 
   try {
     const result = await service.execute(
-      typeormSource(repository),
+      typeormSource(repository, {
+        fieldKinds: {
+          post: { id: 'uuid' },
+          tag: { post_id: 'uuid' },
+        },
+      }),
       testCase.query,
       rules
     );

@@ -18,7 +18,7 @@ export async function openSqlite(): Promise<DataSource> {
 
   entities = buildCorpusEntities('sqlite');
   dataSource = new DataSource({
-    type: 'sqlite',
+    type: 'better-sqlite3',
     database: ':memory:',
     synchronize: true,
     entities: entities.all,
