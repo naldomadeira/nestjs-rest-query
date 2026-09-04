@@ -12,4 +12,4 @@ deixa de ser orientada pela aparência do texto, `%`/`_`/`\` viram literais,
 `in=[]` retorna zero linhas, a projeção deixa de injetar a PK no JSON e os erros
 ganham um envelope com código estável.
 
-Breaking. Ver `docs/migration/v2-to-v3.md`.
+Breaking. Ver `docs/v3/migration-from-v2.md`.
