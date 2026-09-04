@@ -38,7 +38,7 @@ describe.each(CORPUS_CASES.map((testCase) => [testCase.id, testCase] as const))(
         })
       );
 
-      const expected = expectationFor(testCase, 'typeorm');
+      const expected = expectationFor(testCase, 'typeorm', 'sqlite');
 
       if (expected.kind === 'error') {
         expect(actual).toEqual({

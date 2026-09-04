@@ -30,6 +30,7 @@ describe('TypeOrmAdapter', () => {
       dialect: 'sqlite',
       transactionalConsistency: false,
       escapeCharacter: '!',
+      patternEscape: 'clause',
     });
   });
 
