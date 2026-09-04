@@ -135,7 +135,7 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^25.6.0",
     "better-sqlite3": "^12.11.1",
-    "drizzle-orm": "^0.45.2",
+    "drizzle-orm": "1.0.0-rc.4",
     "eslint": "10.x",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
@@ -172,7 +172,7 @@
     "@nestjs/core": "^11.0.0",
     "@nestjs/swagger": "^11.0.0",
     "@prisma/client": "^6.19.0 || ^7.0.0",
-    "drizzle-orm": "^1.0.0",
+    "drizzle-orm": ">=1.0.0-rc.4 <2.0.0",
     "reflect-metadata": "^0.2.0",
     "typeorm": "^0.3.26 || ^1.0.0"
   },
