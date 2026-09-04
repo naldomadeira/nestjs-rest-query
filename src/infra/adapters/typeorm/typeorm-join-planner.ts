@@ -85,6 +85,10 @@ export function planJoins(plan: TypedQueryPlan): JoinPlan {
   }
 
   for (const target of plan.search?.targets ?? []) {
+    // Mesma regra do filtro, e pela mesma razão: alvo de busca por relação
+    // `many` vira EXISTS no compilador. Juntá-lo aqui duplicaria o root uma
+    // vez por item casado e o LIMIT da página cairia sobre as duplicatas.
+    if (target.existential) continue;
     if (target.relationPath.length === 0) continue;
     ensure(target.relationPath.join('.'), 'predicate');
   }
@@ -131,6 +135,16 @@ function relationAt(plan: TypedQueryPlan, path: string): 'one' | 'many' {
 /**
  * Colunas que correlacionam uma relação `many` com o root, para a subquery
  * existencial. TypeORM guarda as join columns no lado dono da relação.
+ *
+ * Many-to-many é recusada de propósito. O teste que existia aqui era
+ * `joinColumns.length === 0`, e ele nunca disparava: numa many-to-many o lado
+ * dono *tem* join columns — só que são as colunas da tabela de junção, e
+ * `entityMetadata` é a entidade que declara a relação, não a junção. A
+ * correlação montada com esse par produzia um `EXISTS` sobre a tabela errada
+ * (a própria tabela do root, comparada a uma coluna da junção) em vez do erro
+ * que o texto da mensagem já prometia. Enquanto a junção não for suportada, a
+ * recusa tem de ser explícita — SQL silenciosamente errado é pior que a
+ * capacidade ausente.
  */
 export function correlationColumns(relation: RelationMetadata): {
   readonly owner: EntityMetadata;
@@ -139,15 +153,18 @@ export function correlationColumns(relation: RelationMetadata): {
     readonly referencedColumn: string;
   }[];
 } {
-  const owning = relation.isOwning ? relation : relation.inverseRelation;
-
-  if (!owning || owning.joinColumns.length === 0) {
+  if (relation.isManyToMany) {
     throw configurationError(
-      'SOURCE_CONFIGURATION_INVALID',
-      `Relation ${relation.propertyPath} has no join columns; many-to-many existential filters are not supported yet`,
+      'CAPABILITY_UNAVAILABLE',
+      `Existential filters through many-to-many relations are not supported yet: ${relation.propertyPath}`,
       { path: relation.propertyPath }
     );
   }
+
+  // Sobra one-to-many, a única outra cardinalidade `many`: o lado dono é o
+  // many-to-one inverso, que é onde a FK vive. TypeORM exige `inverseSide` numa
+  // one-to-many, então o inverso sempre existe e sempre tem join columns.
+  const owning = relation.inverseRelation!;
 
   return {
     owner: owning.entityMetadata,

@@ -9,6 +9,11 @@ import type { PlanSearch } from './plan-terms';
  * comparação vira igualdade de substring sobre valores já normalizados — o que
  * dá o mesmo resultado no Prisma com MySQL e SQL Server, onde não existe
  * `mode: 'insensitive'`.
+ *
+ * Cada alvo carrega a marca `existential` das regras compiladas, do mesmo jeito
+ * que `validate-filter.ts` a carrega para os filtros: é o plano — não cada
+ * adapter — quem diz que um alvo por relação `many` significa "algum item casa
+ * o termo".
  */
 export function validateSearch(
   resolved: ResolvedSearch | null
@@ -24,6 +29,7 @@ export function validateSearch(
           path: target.path,
           column: target.column,
           relationPath: target.relationPath,
+          existential: target.existential,
         })
       )
     ),
