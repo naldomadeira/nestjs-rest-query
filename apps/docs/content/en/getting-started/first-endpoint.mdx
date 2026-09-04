@@ -3,95 +3,330 @@ title: First endpoint
 description: The shortest path to getting nestjs-rest-query working.
 ---
 
-If you want to validate the library quickly, this is the shortest path:
+The shortest working path in v3 is five steps:
 
-1. install the package
-2. configure the NestJS prerequisites
-3. decorate an endpoint with `@ApiDynamicQuery`
-4. inject `@QueryRules()`
-5. call `queryBuilderService.execute()`
+1. install the package and configure the NestJS prerequisites
+2. declare the **logical schema** of every model the endpoint can reach
+3. compile the **endpoint rules** with `defineQueryRules`
+4. decorate the handler with `@ApiDynamicQuery(rules)` and inject `@QueryRules()`
+5. call `execute()` with a **source**, not a repository
 
-## Minimal example
+Everything below is
+[`apps/examples/01-starter-app`](https://github.com/naldomadeira/nestjs-rest-query/tree/main/apps/examples/01-starter-app)
+(TypeORM + SQLite), which compiles under `tsc --strict` and has a green smoke
+E2E against a real database.
 
-```typescript title="users.controller.ts"
+## 1. The entity, with its folded column
+
+```typescript title="product/entities/product.entity.ts"
+@Entity()
+export class Product {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column()
+  name: string;
+
+  // Folded value of `name`: normalize('NFC').toLowerCase().
+  // Under the TypeORM adapter the name is a convention, not a choice: the
+  // resolver recognises the companion as `<property>_folded`. Calling it
+  // `nameFolded` makes the derived schema disagree with the declared one and
+  // execution fails with SOURCE_CONFIGURATION_INVALID.
+  @Column({ select: false })
+  name_folded: string;
+
+  @Column('decimal', { precision: 10, scale: 2 })
+  price: number;
+
+  @ManyToOne(() => Category, (category) => category.products, {
+    eager: true,
+    // categoryId is NOT NULL; without this the relation metadata would say
+    // otherwise and diverge from the declared schema.
+    nullable: false,
+  })
+  category: Relation<Category>;
+
+  @Column({ nullable: false })
+  categoryId: number;
+
+  @CreateDateColumn({ type: 'datetime' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ type: 'datetime' })
+  updatedAt: Date;
+}
+```
+
+Your application fills `name_folded` on write. `foldText(value)` is exported
+from the root and is the exact function the core applies to the incoming search
+term, so use it rather than reimplementing it. Example 01 writes it in the seed
+migration; example 02 uses an entity listener, which is what a real application
+usually wants:
+
+```typescript
+import { foldText } from 'nestjs-rest-query';
+
+@BeforeInsert()
+@BeforeUpdate()
+foldSearchableColumns(): void {
+  this.name_folded = foldText(this.name ?? '');
+}
+```
+
+<Callout type="warn">
+  `foldText` is `NFC` + `toLowerCase`. **It does not strip diacritics.**
+  `?search=eletrica` does not find "Elétrica". What folding buys you is that the
+  case of the term never changes the result set, on any database and any
+  collation — nothing more.
+</Callout>
+
+## 2. Schema and rules
+
+Two declarations, kept out of the controller on purpose: the schema says what
+the model **is**, the rules say what **this endpoint** authorises. The same
+schema can serve endpoints with different authorisations.
+
+```typescript title="product/product.query.ts"
+import { defineQueryRules, defineQuerySchema } from 'nestjs-rest-query';
+import type { QuerySchema, SchemaRegistry } from 'nestjs-rest-query';
+
+const categorySchema: QuerySchema = defineQuerySchema({
+  model: 'category',
+  primaryKey: ['id'],
+  fields: [
+    { path: 'id', kind: 'integer', nullable: false, primaryKey: true },
+    {
+      path: 'name',
+      kind: 'string',
+      nullable: false,
+      primaryKey: false,
+      foldedField: 'name_folded',
+    },
+    // The folded companion has to be declared, and has to be internal.
+    {
+      path: 'name_folded',
+      kind: 'string',
+      nullable: false,
+      primaryKey: false,
+      internal: true,
+    },
+  ],
+  relations: [],
+});
+
+const productSchema: QuerySchema = defineQuerySchema({
+  model: 'product',
+  primaryKey: ['id'],
+  fields: [
+    { path: 'id', kind: 'integer', nullable: false, primaryKey: true },
+    {
+      path: 'name',
+      kind: 'string',
+      nullable: false,
+      primaryKey: false,
+      foldedField: 'name_folded',
+    },
+    {
+      path: 'name_folded',
+      kind: 'string',
+      nullable: false,
+      primaryKey: false,
+      internal: true,
+    },
+    // The kind decides coercion, not the shape of the incoming text:
+    // "10.50" stays an exact decimal and never becomes a float.
+    { path: 'price', kind: 'decimal', nullable: false, primaryKey: false },
+    { path: 'categoryId', kind: 'integer', nullable: false, primaryKey: false },
+    { path: 'createdAt', kind: 'datetime', nullable: false, primaryKey: false },
+    { path: 'updatedAt', kind: 'datetime', nullable: false, primaryKey: false },
+  ],
+  relations: [
+    {
+      path: 'category',
+      target: 'category',
+      cardinality: 'one',
+      nullable: false,
+    },
+  ],
+});
+
+// Every model reachable from the root must be in the registry.
+export const PRODUCT_SCHEMAS: SchemaRegistry = new Map([
+  ['product', productSchema],
+  ['category', categorySchema],
+]);
+
+export const productRules = defineQueryRules(PRODUCT_SCHEMAS, 'product', {
+  filters: [
+    { path: 'id', operators: ['eq', 'in'] },
+    { path: 'name', operators: ['eq', 'like', 'ilike'] },
+    { path: 'price', operators: ['eq', 'gt', 'gte', 'lt', 'lte', 'between'] },
+    { path: 'categoryId', operators: ['eq', 'in'] },
+    { path: 'createdAt', operators: ['gt', 'lt', 'between'] },
+    { path: 'category.name', operators: ['eq', 'ilike'] },
+  ],
+  sorts: ['id', 'name', 'price', 'createdAt'],
+  fields: {
+    root: {
+      allowed: ['id', 'name', 'price', 'categoryId', 'createdAt'],
+      default: ['id', 'name', 'price', 'categoryId', 'createdAt'],
+    },
+    relations: {
+      category: { allowed: ['id', 'name'], default: ['id', 'name'] },
+    },
+  },
+  includes: ['category'],
+  search: ['name'],
+});
+```
+
+`updatedAt` is in the schema and in no whitelist. That is the point of splitting
+the two: the model knowing a column does not authorise a client to ask for it.
+`?fields=id,updatedAt` is a `400 FIELD_NOT_ALLOWED` that never touches the
+database.
+
+<Callout type="warn" title="Compile the rules outside the class">
+  `@ApiDynamicQuery` is a **method decorator**: it is evaluated when the
+  controller class loads, before Nest has a container or a `Repository`. So the
+  rules must be built at module scope. That is also why all four examples
+  declare the schema by hand instead of using `buildSchemaRegistry(repository)`,
+  which needs a live repository.
+</Callout>
+
+## 3. The controller
+
+```typescript title="product/product.controller.ts"
 import { Controller, Get, Query } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiDynamicQuery,
   DynamicQueryDto,
   QueryRules,
-  RulesConfig,
+  type CompiledQueryRules,
 } from 'nestjs-rest-query';
-import { UsersService } from './users.service';
+import { ProductService } from './product.service';
+import { productRules } from './product.query';
+import { Product } from './entities/product.entity';
 
-@ApiTags('users')
-@Controller('users')
-export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+@Controller('products')
+@ApiTags('products')
+export class ProductController {
+  constructor(private readonly productService: ProductService) {}
 
   @Get()
-  @ApiDynamicQuery({
-    filters: ['name', 'email', 'status'],
-    sorts: ['name', 'createdAt'],
-    fields: ['id', 'name', 'email', 'status', 'createdAt'],
-  })
-  findAll(@Query() query: DynamicQueryDto, @QueryRules() rules: RulesConfig) {
-    return this.usersService.findAll(query, rules);
+  @ApiOperation({ summary: 'Search products with dynamic filters' })
+  // The compiled rules are the single source: the decorator registers them on
+  // the handler and generates the documentation from them, so Swagger and
+  // authorisation cannot diverge.
+  @ApiDynamicQuery(productRules)
+  @ApiOkResponse({ type: Product })
+  async findAll(
+    @Query() query: DynamicQueryDto,
+    @QueryRules() rules: CompiledQueryRules
+  ) {
+    return this.productService.findAll(query, rules);
   }
 }
 ```
 
-```typescript title="users.service.ts"
+## 4. The service
+
+```typescript title="product/product.service.ts"
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
   DynamicQueryDto,
   QueryBuilderService,
-  QueryResult,
-  RulesConfig,
+  type CompiledQueryRules,
+  type NormalizedQueryResult,
 } from 'nestjs-rest-query';
-import { User } from './user.entity';
+import { typeormSource } from 'nestjs-rest-query/typeorm';
+import { Product } from './entities/product.entity';
 
 @Injectable()
-export class UsersService {
+export class ProductService {
   constructor(
-    @InjectRepository(User)
-    private readonly usersRepo: Repository<User>,
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
     private readonly queryBuilderService: QueryBuilderService
   ) {}
 
-  findAll(
+  async findAll(
     query: DynamicQueryDto,
-    rules: RulesConfig
-  ): Promise<QueryResult<User>> {
-    return this.queryBuilderService.execute(this.usersRepo, query, rules);
+    rules: CompiledQueryRules
+  ): Promise<NormalizedQueryResult<Product>> {
+    return this.queryBuilderService.execute(
+      typeormSource(this.productRepository),
+      query,
+      rules
+    );
   }
 }
 ```
 
+`execute()` takes a **discriminated source**, not the raw repository. That is
+what lets one core serve TypeORM, Prisma and Drizzle without the service knowing
+which is in use — and the adapter enters through the
+`nestjs-rest-query/typeorm` subpath, because the root package loads no ORM.
+
+Its return type is `NormalizedQueryResult<T>`. `QueryResult<T>` is still
+exported and structurally identical, so a `2.x` annotation keeps compiling — it
+is `@deprecated`, and `NormalizedQueryResult` is the canonical name.
+
 ## Usage example
 
 ```http
-GET /users?filter[name][like]=ana&page=1&perPage=10
+GET /products?filter[name][ilike]=elétrica&sort=-price&perPage=2
 ```
 
-Expected response:
+The envelope, with illustrative rows (the example's seed is generated, so the
+exact values depend on it):
 
 ```json
 {
   "data": [
     {
-      "id": 1,
-      "name": "Ana Lima",
-      "email": "ana@email.com",
-      "status": "active"
+      "id": 4,
+      "name": "Cafeteira Elétrica",
+      "price": "489.90",
+      "categoryId": 1,
+      "createdAt": "2025-06-14T13:04:00.000Z"
+    },
+    {
+      "id": 8,
+      "name": "Panela Elétrica",
+      "price": "212.50",
+      "categoryId": 6,
+      "createdAt": "2025-03-08T09:15:00.000Z"
     }
   ],
   "page": 1,
-  "perPage": 10,
-  "total": 1,
+  "perPage": 2,
+  "total": 2,
   "lastPage": 1
+}
+```
+
+Three things in that response are worth naming, and all three are locked by the
+example's smoke E2E:
+
+- `name_folded` is absent even though `ilike` compared against it. Internal
+  columns are dropped by the core's normalizer, together with primary keys the
+  client did not ask for — `?fields=id,name` returns exactly `id` and `name`.
+- `price` is a string. `decimal` is carried as an exact decimal, never as a
+  float.
+- `?search=elétrica` and `?search=ELÉTRICA` return the same `total`, on any
+  database and any collation.
+
+A rejection carries a `code`, and you branch on the code — never on the message:
+
+```json
+{
+  "statusCode": 400,
+  "code": "OPERATOR_NOT_ALLOWED",
+  "message": "Operator gt is not allowed for id",
+  "details": { "path": "id", "operator": "gt", "allowed": ["eq", "in"] }
 }
 ```
 
@@ -104,18 +339,40 @@ sequenceDiagram
   participant Ctrl as Controller
   participant Svc as Service
   participant DQB as QueryBuilderService
-  participant ORM as TypeORM
+  participant AD as Adapter (source)
+  participant DB as Database
 
-  Client->>Ctrl: GET /users?filter[name][like]=Ana&page=1&perPage=10
-  Note over Ctrl: @ApiDynamicQuery receives and checks the query parameters<br/>defined in the endpoint whitelist
+  Client->>Ctrl: GET /products?filter[name][ilike]=cable&perPage=2
+  Note over Ctrl: @ApiDynamicQuery(productRules) registered the compiled rules;<br/>@QueryRules() hands them to the handler
   Ctrl->>Svc: findAll(query, rules)
-  Svc->>DQB: execute(userRepository, query, rules)
-  Note over DQB: validates fields and operators<br/>against the endpoint RulesConfig
-  DQB->>ORM: SelectQueryBuilder<br/>.where("name LIKE :name")<br/>.take(10).skip(0)
-  ORM-->>DQB: [User[], total: 1]
-  DQB-->>Svc: { data: [...], page: 1, perPage: 10, total: 1, lastPage: 1 }
-  Svc-->>Ctrl: QueryResult
-  Ctrl-->>Client: 200 OK — QueryResult
+  Svc->>DQB: execute(typeormSource(repo), query, rules)
+  Note over DQB: parse → authorise against exact paths →<br/>coerce by declared kind → build and freeze the plan
+  Note over DQB: describe the source and compare it to the<br/>declared schema, field by field
+  DQB->>AD: compile(plan, source)
+  AD->>DB: data query + count query, from the same frozen plan
+  DB-->>AD: rows, total
+  AD-->>DQB: AdapterResult { rows, total }
+  DQB-->>Svc: normalized { data, page, perPage, total, lastPage }
+  Svc-->>Ctrl: NormalizedQueryResult
+  Ctrl-->>Client: 200 OK
 ```
 
-If it worked, continue to the [Usage Guide](/docs/usage) to see all parameters, operators, and whitelist options.
+## Things that stop the application from booting
+
+All three came out of migrating the example apps, and all three fail at startup
+rather than on a request — which is the intent:
+
+- **`sorts` over an `enum` or `uuid` with no `portableOrderField`.**
+  `defineQueryRules` runs the portable-order check on every `sorts` entry, so
+  `sorts: ['status']` on an enum throws
+  `SOURCE_CONFIGURATION_INVALID: sorts.status: Field status has no portable total order`.
+- **`search` over a field with no `foldedField`**:
+  `Search field <path> declares no folded field`.
+- **A `uuid` primary key with no `portableOrderField`** kills every request,
+  even a bare `GET /posts`, with
+  `CAPABILITY_UNAVAILABLE: Primary key part id of post has no portable total order` —
+  the pagination tie-break is always applied over the full primary key.
+
+If it worked, continue to the [Usage Guide](/docs/usage) for every parameter and
+operator, or to [Endpoint whitelist rules](/docs/usage/endpoint-whitelist-rules)
+for the full rules reference.

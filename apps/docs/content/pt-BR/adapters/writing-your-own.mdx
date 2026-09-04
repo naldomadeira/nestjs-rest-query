@@ -1,325 +1,185 @@
 ---
-title: Escrevendo seu próprio Adapter
-description: Suporte customizado para Prisma, Kysely, raw SQL, ou qualquer outro ORM.
+title: Escrevendo o seu Adapter
+description: O contrato de adapter da v3, o que o núcleo garante antes de um adapter rodar, e por que adapters de terceiros ainda não são um ponto de extensão suportado.
 ---
 
-O `nestjs-rest-query` é agnóstico a ORM. Se você quer suportar Prisma, Kysely, raw SQL, ou qualquer outro banco/ORM, você pode implementar a interface `RestQueryAdapter`.
+<Callout type="warn" title="Não é um ponto de extensão suportado">
 
-## Interface RestQueryAdapter
+Na v3 a identidade do adapter é uma **união fechada**. Tanto
+`RestQueryAdapterV3.id` quanto `QuerySource.kind` são tipados
+`'typeorm' | 'prisma' | 'drizzle'`, então um adapter para um quarto ORM não pode
+ser tipado sem reutilizar um desses três ids ou escrever um cast — e "nenhum cast
+no uso documentado" é gate de release desta biblioteca. Também não existe
+`forRoot({ adapter })` para registrar um.
 
-```typescript
-export interface RestQueryAdapter<TQB = any, TSource = any> {
-  /**
-   * Cria um query builder acumulador.
-   * Chamado uma vez por request.
-   *
-   * @param source — objeto descrevendo a tabela/modelo raiz (formato é definido por você)
-   * @param alias — identificador para a tabela raiz nos resultados
-   * @returns um query builder opaco (seu tipo interno)
-   */
-  createQueryBuilder(source: TSource, alias: string): TQB;
+Então esta página documenta o contrato como ele existe, para ler as três
+implementações e para contribuir uma quarta. Não é receita para publicar um
+adapter privado.
 
-  /**
-   * Aplica um filtro.
-   * O valor já foi coerced (números como números, arrays como arrays, datas como Dates).
-   *
-   * @param qb — query builder
-   * @param alias — alias da entidade
-   * @param fieldPath — caminho do campo (ex: "name", "company.name")
-   * @param operator — operador (eq, ne, gt, gte, lt, lte, like, ilike, in, notIn, between, isNull, notLike, notIlike)
-   * @param value — valor já coerced
-   */
-  applyFilter(
-    qb: TQB,
-    alias: string,
-    fieldPath: string,
-    operator: QueryOperator,
-    value: unknown
-  ): void;
+</Callout>
 
-  /**
-   * Aplica ordenação.
-   *
-   * @param qb — query builder
-   * @param alias — alias
-   * @param fieldPath — campo a ordenar
-   * @param direction — 'ASC' ou 'DESC'
-   */
-  applySort(
-    qb: TQB,
-    alias: string,
-    fieldPath: string,
-    direction: 'ASC' | 'DESC'
-  ): void;
+## O que o núcleo faz antes de um adapter rodar
 
-  /**
-   * Define as colunas a serem retornadas.
-   * Se fields está vazio, use todas as colunas da tabela raiz.
-   *
-   * @param qb — query builder
-   * @param alias — alias
-   * @param fields — lista de caminhos de campo (ex: ["id", "name", "company.name"])
-   * @param includes — relações a incluir (ex: ["company", "posts"])
-   */
-  applySelect(
-    qb: TQB,
-    alias: string,
-    fields: string[],
-    includes: string[]
-  ): void;
+Um adapter nunca vê uma query string, e nunca precisa adivinhar um tipo. Quando
+`compile()` é chamado, o núcleo já:
 
-  /**
-   * Registra uma relação a ser joinada (para includes ou presentation).
-   *
-   * @param qb — query builder
-   * @param alias — alias
-   * @param joinPath — caminho de relação (ex: "company")
-   */
-  applyInclude(qb: TQB, alias: string, joinPath: string): void;
+1. **Fez o parse** da entrada contra um alfabeto seguro de paths. `*`, `;`,
+   `..`, path vazio e qualquer caractere que pudesse escapar para o SQL são
+   recusados como `QUERY_SYNTAX_INVALID` — é isso que mantém o wildcard de
+   projeção fora do alcance do cliente. (`QUERY_SYNTAX_UNKNOWN_PARAM` está no
+   contrato de erros mas não é emitido hoje: um parâmetro de query que a
+   gramática não conhece é ignorado, não recusado.)
+2. **Autorizou** cada path contra as regras compiladas do endpoint, por
+   correspondência **exata**, e cada operador contra a lista do campo.
+3. **Coagiu** cada valor pelo `kind` declarado do campo — nunca pela aparência
+   do texto. Entrada ruim é `FILTER_VALUE_INVALID`; `decimal` chega como
+   `DecimalValue` exato, `date` como `CivilDate`, `datetime` como `Date`,
+   `bigint` como `bigint`.
+4. **Resolveu a coluna efetiva**: o próprio campo, o `foldedField` dele para
+   `ilike`/`notIlike`, ou o `portableOrderField` para comparações de ordem.
+5. **Marcou os termos existenciais.** Um filtro ou alvo de `search` cujo path
+   atravessa uma relação `many` carrega `existential: true`, então "alguma linha
+   relacionada corresponde" é decidido pelo plano, não pela esperteza de cada
+   adapter.
+6. **Construiu e congelou** o plano. Dados e contagem derivam do mesmo plano
+   congelado, então as duas queries sempre descrevem a mesma pergunta.
 
-  /**
-   * Aplica busca full-text (search).
-   * Procure o termo em uma lista de colunas, usando OR lógico.
-   *
-   * @param qb — query builder
-   * @param alias — alias
-   * @param columns — lista de caminhos de campo (ex: ["name", "email"])
-   * @param term — termo de busca (substring match esperado)
-   */
-  applySearch(qb: TQB, alias: string, columns: string[], term: string): void;
+Depois do `execute()`, o núcleo normaliza: colunas internas e chaves primárias
+não pedidas são descartadas, e cada `kind` é serializado da mesma forma
+independentemente do que o driver devolveu. **Normalizar não é trabalho do
+adapter** — isso é deliberado, porque três normalizações seriam três chances de
+divergir.
 
-  /**
-   * Aplica paginação e executa a query.
-   * Retorna { data: [...], total: number }.
-   *
-   * @param qb — query builder
-   * @param offset — skip count
-   * @param limit — take count
-   * @returns objeto com data e total
-   */
-  applyPagination(
-    qb: TQB,
-    offset: number,
-    limit: number
-  ): Promise<{ data: any[]; total: number }>;
-
-  /**
-   * Executa a query sem paginação.
-   * Retorna apenas os dados, sem count.
-   *
-   * @param qb — query builder
-   * @returns lista de linhas
-   */
-  getMany(qb: TQB): Promise<any[]>;
-
-  /**
-   * Hook de customização.
-   * Permite que o consumer aplique operações customizadas ao query builder.
-   *
-   * @param qb — query builder
-   * @param fn — função que recebe qb e pode modificá-lo
-   */
-  customize(qb: TQB, fn: (qb: TQB) => void): void;
-}
-```
-
-## Responsabilidades do Adapter
-
-Seu adapter recebe **parâmetros já normalizados e coerced**:
-
-- **Coerção de valores** — a biblioteca já converteu `"18"` em `18`, `"2024-01-01,2024-12-31"` em `[Date, Date]`, etc. Seu adapter recebe valores no tipo correto.
-- **Validação de whitelist** — campos não autorizados foram rejeitados antes de chegar ao seu adapter.
-- **Parsing de operadores** — você recebe um `QueryOperator` válido, nunca uma string arbitrária.
-
-Seu adapter precisa apenas:
-
-1. Traduzir cada operação para a sintaxe nativa do seu ORM.
-2. Garantir que caminhos com pontos (ex: `company.name`) resultem em JOINs corretos (sua implementação é livre).
-3. Retornar dados na forma esperada pela aplicação (ex: paginação retorna `{ data, total }`).
-
-## Exemplo — Prisma Adapter (pseudo-código)
+## O contrato
 
 ```typescript
-import { RestQueryAdapter } from 'nestjs-rest-query';
-
-export class PrismaAdapter implements RestQueryAdapter<
-  PrismaQueryBuilder,
-  PrismaSource
+export interface RestQueryAdapterV3<
+  TSource,
+  TCompiled,
+  TRow,
+  TNative = TCompiled,
 > {
-  createQueryBuilder(source: PrismaSource, alias: string) {
-    return {
-      source,
-      alias,
-      whereConditions: [],
-      orderBy: [],
-      select: undefined,
-      include: {},
-    };
-  }
+  readonly id: 'typeorm' | 'prisma' | 'drizzle';
 
-  applyFilter(qb, alias, fieldPath, operator, value) {
-    // Traduzir para Prisma's where conditions
-    const where = this.translateOperator(fieldPath, operator, value);
-    qb.whereConditions.push(where);
-  }
+  /** Deriva o schema lógico a partir da metadata da source. */
+  describe(source: TSource): Promise<QuerySchema>;
 
-  applySort(qb, alias, fieldPath, direction) {
-    qb.orderBy.push({ [fieldPath]: direction === 'ASC' ? 'asc' : 'desc' });
-  }
+  capabilities(source: TSource): AdapterCapabilities;
 
-  applySelect(qb, alias, fields, includes) {
-    // Mapear para Prisma select e include
-    qb.select = fields;
-    for (const inc of includes) {
-      qb.include[inc] = true;
-    }
-  }
+  compile(plan: TypedQueryPlan, source: TSource): TCompiled;
 
-  applyInclude(qb, alias, joinPath) {
-    qb.include[joinPath] = true;
-  }
+  /**
+   * Aplica o callback ao contexto nativo, uma vez por query do escopo.
+   * Chamar uma vez por query — em vez de entregar as duas juntas — é o que faz
+   * o 'both', o default seguro, realmente atingir dados e contagem.
+   */
+  customize(
+    compiled: TCompiled,
+    callback: (native: TNative) => void,
+    scope?: CustomizeScope
+  ): void;
 
-  applySearch(qb, alias, columns, term) {
-    const orConditions = columns.map((col) => ({
-      [col]: { contains: term, mode: 'insensitive' },
-    }));
-    qb.whereConditions.push({ OR: orConditions });
-  }
+  execute(compiled: TCompiled): Promise<AdapterResult<TRow>>;
+}
 
-  async applyPagination(qb, offset, limit) {
-    const data = await qb.source.client[qb.source.modelName].findMany({
-      where: qb.whereConditions.length
-        ? { AND: qb.whereConditions }
-        : undefined,
-      orderBy: qb.orderBy,
-      skip: offset,
-      take: limit,
-      select: qb.select,
-      include: qb.include,
-    });
-
-    const total = await qb.source.client[qb.source.modelName].count({
-      where: qb.whereConditions.length
-        ? { AND: qb.whereConditions }
-        : undefined,
-    });
-
-    return { data, total };
-  }
-
-  async getMany(qb) {
-    return qb.source.client[qb.source.modelName].findMany({
-      where: qb.whereConditions.length
-        ? { AND: qb.whereConditions }
-        : undefined,
-      orderBy: qb.orderBy,
-      select: qb.select,
-      include: qb.include,
-    });
-  }
-
-  customize(qb, fn) {
-    fn(qb);
-  }
-
-  private translateOperator(
-    fieldPath: string,
-    operator: string,
-    value: unknown
-  ) {
-    switch (operator) {
-      case 'eq':
-        return { [fieldPath]: value };
-      case 'ne':
-        return { NOT: { [fieldPath]: value } };
-      case 'gt':
-        return { [fieldPath]: { gt: value } };
-      // ... etc
-      default:
-        return {};
-    }
-  }
+export interface AdapterResult<TRow> {
+  /** Linhas já hidratadas em forma aninhada, ainda com colunas internas. */
+  readonly rows: readonly TRow[];
+  /** Ausente quando o plano pediu paginate=false. */
+  readonly total?: number;
+  /** Quantas queries foram emitidas; usado pelos testes de orçamento. */
+  readonly queryCount?: number;
 }
 ```
 
-## Padrão Source
+`TNative` é o contexto que o `customize` entrega ao consumidor, e ele é distinto
+de `TCompiled` porque um plano compila para **duas** queries: o callback age
+sobre uma de cada vez. No TypeORM `TNative` é o `SelectQueryBuilder`; no Prisma
+é `{ kind: 'data' | 'count', args }`.
 
-O `TSource` genérico é seu contrato. Defina-o como se encaixe melhor:
+### O `describe()` sustenta a garantia
+
+Antes de compilar, o núcleo compara o schema que o adapter deriva com o schema
+que as regras do endpoint declaram, campo a campo: `model`, `primaryKey`, e por
+campo `kind`, `nullable`, `primaryKey`, `foldedField`, `portableOrderField`,
+`internal`; por relação `target`, `cardinality`, `nullable`. Qualquer diferença é
+`SOURCE_CONFIGURATION_INVALID`. Só o schema do **root** é comparado.
+
+Um adapter que não consiga derivar metadata honestamente enfraquece essa garantia
+em vez da checagem: o adapter Prisma devolve o schema do manifesto na íntegra, e
+a consequência está documentada na
+[página dele](/pt-BR/docs/adapters/prisma) — nada ali valida a declaração contra
+o banco.
+
+### O `capabilities()` é uma promessa que o núcleo cobra
 
 ```typescript
-interface PrismaSource {
-  client: PrismaClient;
-  modelName: string;
-}
-
-interface KyselySource {
-  db: Database;
-  tableName: string;
-}
-
-interface RawSqlSource {
-  connection: PoolClient;
-  table: string;
-  schema: ColumnSchema[];
+export interface AdapterCapabilities {
+  readonly dialect: 'postgres' | 'mysql' | 'mssql' | 'sqlite';
+  readonly transactionalConsistency: boolean;
+  readonly escapeCharacter: string;
+  readonly patternEscape: 'clause' | 'native' | 'unsupported';
 }
 ```
 
-Seu adapter sabe como usar o `TSource`; o consumer passa-o:
+O `patternEscape` é o que mais importa, e ele existe porque um caractere sozinho
+não distingue "eu emito a cláusula" de "eu confio no default do banco":
+
+| Valor           | Significado                                                                                                                                         |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `'clause'`      | Emite `ESCAPE '<escapeCharacter>'` explicitamente. Correto em todo dialeto.                                                                         |
+| `'native'`      | Confia no caractere de escape default do dialeto, sem cláusula. Só correto em Postgres e MySQL.                                                     |
+| `'unsupported'` | Sem escape default e sem cláusula possível: os operadores de padrão são recusados com `CAPABILITY_UNAVAILABLE` em vez de devolverem linhas erradas. |
+
+Declarar `escapeCharacter` e nunca emitir `ESCAPE` é exatamente o defeito que
+essa separação foi introduzida para tornar impossível.
+
+`transactionalConsistency: false` faz `consistency: 'transactional'` falhar cedo
+em vez de rodar dados e contagem sob snapshots diferentes. Os três adapters
+entregues reportam `false` hoje.
+
+## A source
 
 ```typescript
-@Get()
-list(@Query() query: QueryInput, @QueryRules() rules: RulesConfig) {
-  return this.qb.execute(
-    {
-      client: this.prisma,
-      modelName: 'User',
-    },
-    query,
-    rules
-  );
+export interface QuerySource<TSource, TCompiled, TRow, TNative = TCompiled> {
+  readonly kind: 'typeorm' | 'prisma' | 'drizzle';
+  readonly adapter: RestQueryAdapterV3<TSource, TCompiled, TRow, TNative>;
+  readonly input: TSource;
+  /** Fatos do perfil certificado, coletados na subida — nunca no request. */
+  readonly portabilityProfile?: ProfileFacts;
 }
 ```
 
-## Registrando seu Adapter
+Carregar adapter, entrada nativa e discriminante juntos é o que permite ao
+`execute()` inferir o tipo da linha e o tipo do callback de `customize` sem cast
+no ponto de chamada. É também por isso que não existe configuração global de
+adapter: a source já sabe.
 
-```typescript
-import { Module } from '@nestjs/common';
-import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
-import { PrismaAdapter } from './adapters/prisma.adapter';
+## Contribuindo um adapter
 
-@Module({
-  imports: [
-    DynamicQueryBuilderModule.forRoot({
-      adapter: new PrismaAdapter(),
-    }),
-  ],
-})
-export class AppModule {}
-```
+Se você quer um quarto ORM suportado, o caminho é um pull request, não um
+plugin:
 
-## Checklist de implementação
+1. Abra uma
+   [Discussion](https://github.com/naldomadeira/nestjs-rest-query/discussions)
+   descrevendo o ORM.
+2. Siga a estrutura de `src/infra/adapters/` — `typeorm/` é a implementação de
+   referência, `prisma/` e `drizzle/` mostram duas estratégias de compilação
+   diferentes.
+3. Faça o corpus de paridade em `tests/v3/corpus/` passar primeiro no dialeto de
+   referência, depois nas células reais. Uma divergência tem de ser declarada
+   como dado no próprio caso, com justificativa obrigatória — o inventário do
+   corpus recusa uma nova que ninguém revisou.
+4. Acrescente o id do adapter às uniões e exporte-o como subpath, por exemplo
+   `nestjs-rest-query/kysely`.
 
-- [ ] Implementar todos os 7 métodos da interface
-- [ ] Coerção de valor — seu adapter assume valores já tipados
-- [ ] Operadores — traduzir `QueryOperator` para a sintaxe do seu ORM
-- [ ] Paginação — retornar `{ data, total }` com linhas e contagem
-- [ ] Caminhos com pontos — garantir JOINs automáticos (ou erro claro se não suportado)
-- [ ] Teste manual — executar um request com filtro, sort, include, search, pagination
-- [ ] Considere contribuir de volta — se for uma ORM popular (Prisma, Kysely), abra uma issue para discussão!
+O piso de cobertura de branches dos diretórios de adapter é 100%, em catraca: a
+paridade passa pelos adapters, e catraca é o único regime que impede erosão
+silenciosa.
 
-## Contribuindo um Adapter
+## Referências
 
-Se você implementar um adapter para uma ORM popular (Prisma, Kysely, etc.), considere contribuir:
-
-1. Abra uma [Discussion](https://github.com/naldomadeira/nestjs-rest-query/discussions) descrevendo a ORM e seu interesse.
-2. Siga a estrutura de `src/infra/adapters/` (see TypeORM e Drizzle como referência).
-3. Adicione testes unitários em `tests/adapters/`.
-4. Envie um PR vinculado à discussion.
-
-Cada adapter aprovado será mantido no core e exportado como subpath (ex: `nestjs-rest-query/prisma`).
-
-## Recursos
-
-- [TypeORM Adapter source](https://github.com/naldomadeira/nestjs-rest-query/blob/main/src/infra/adapters/typeorm.adapter.ts)
-- [Drizzle Adapter source](https://github.com/naldomadeira/nestjs-rest-query/blob/main/src/infra/adapters/drizzle.adapter.ts)
-- [RestQueryAdapter interface](https://github.com/naldomadeira/nestjs-rest-query/blob/main/src/contracts/rest-query-adapter.interface.ts)
+- [`RestQueryAdapterV3`](https://github.com/naldomadeira/nestjs-rest-query/blob/main/src/contracts/v3/rest-query-adapter.v3.interface.ts)
+- [`QuerySource`](https://github.com/naldomadeira/nestjs-rest-query/blob/main/src/contracts/v3/query-source.interface.ts)
+- [`AdapterCapabilities`](https://github.com/naldomadeira/nestjs-rest-query/blob/main/src/contracts/v3/adapter-capabilities.interface.ts)
+- [Fonte do adapter TypeORM](https://github.com/naldomadeira/nestjs-rest-query/tree/main/src/infra/adapters/typeorm)

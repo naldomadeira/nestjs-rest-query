@@ -1,36 +1,103 @@
 ---
 title: Adapters
-description: Escolha o ORM que combina com seu projeto — o nestjs-rest-query trabalha com TypeORM, Drizzle e permite adapters customizados.
+description: Como o nestjs-rest-query conversa com TypeORM, Prisma e Drizzle - um núcleo semântico, três compiladores e os limites que cada um declara.
 ---
 
-O `nestjs-rest-query` separa a **lógica de parsing de query params** da **implementação específica do ORM**. Isso é feito através de adapters — cada adapter traduz queries normalizadas em chamadas nativas do ORM.
+O `nestjs-rest-query` separa **o que uma requisição significa** de **como um ORM
+a executa**. O núcleo faz o parse da query string, autoriza contra as regras do
+endpoint, coage cada valor pelo tipo declarado e produz um `TypedQueryPlan`
+congelado. O adapter apenas compila esse plano.
 
-## O padrão Adapter
+## O plano, depois o adapter
 
-Quando você decorar um endpoint com `@ApiDynamicQuery` ou `@DynamicQuery`, a biblioteca:
+```mermaid
+flowchart LR
+  Q["query string"] --> C["núcleo:<br/>parse · autorização · coerção · plano"]
+  C --> P["TypedQueryPlan<br/>congelado, sem ORM"]
+  P --> A["adapter.compile(plan, source)"]
+  A --> E["adapter.execute(compiled)"]
+  E --> N["normalizador do núcleo:<br/>um JSON canônico"]
+```
 
-1. **Valida** a query string contra o `RulesConfig` (whitelist de segurança)
-2. **Normaliza** os parâmetros: filtros, sorts, fields, includes
-3. **Delega ao adapter** — que transforma essa normalização em SQL/query nativa
+Duas consequências que vale dizer sem rodeio:
 
-O adapter é registrado uma vez via `DynamicQueryBuilderModule.forRoot({ adapter })`. A partir daí, a mesma `RulesConfig` funciona identicamente em qualquer ORM suportado.
+- **Normalizar é trabalho do núcleo, não do adapter.** O adapter hidrata as
+  linhas; o núcleo as transforma no JSON canônico. É o único ponto onde o
+  `bigint` do PostgreSQL, o `number` do MySQL e a `string` do SQL Server para a
+  mesma coluna viram a mesma saída.
+- **Não existe configuração global de adapter.** `forRoot({ adapter })` é
+  recusado na inicialização. O adapter chega junto com a source que você passa
+  ao `execute()`.
 
-## Quando usar cada adapter
+## Escolhendo um adapter
 
-| ORM         | Quando usar                                                                                                                     | Status                                           |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| **TypeORM** | Você já usa TypeORM e `@nestjs/typeorm`. É o padrão — sem configuração extra.                                                   | ✅ Stable                                        |
-| **Drizzle** | Você prefere tipagem estrita, geração de schema type-safe, ou quer um ORM mais moderno. Requer configuração de `relations` map. | ✅ Stable                                        |
-| **Prisma**  | Você já tem um schema Prisma. O adapter retorna o grafo aninhado nativo do Prisma e `@prisma/client` é peer dep opcional.       | ✅ Stable                                        |
-| **Custom**  | Você quer suportar Kysely, raw SQL, ou qualquer outro ORM. Implemente a interface `RestQueryAdapter`.                           | 📖 [Saiba mais](/docs/adapters/writing-your-own) |
+| ORM         | Fábrica da source                                  | Subpath                     | O que você declara                                                                                                                   |
+| ----------- | -------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| **TypeORM** | `typeormSource(repository)`                        | `nestjs-rest-query/typeorm` | O schema lógico, ou derive-o com `buildSchemaRegistry(repository)`. As colunas companheiras seguem a convenção `_folded` / `_order`. |
+| **Prisma**  | `prismaSource({ client, model, manifest })`        | `nestjs-rest-query/prisma`  | O schema lógico **e** um manifesto escrito à mão (`provider`, `registry`, `models`).                                                 |
+| **Drizzle** | `drizzleSource({ db, dialect, table, relations })` | `nestjs-rest-query/drizzle` | Um descritor lógico da tabela mais as relações por path pontuado; `drizzleDatabase({ client, dialect })` uma vez.                    |
 
-## Primeiros passos
+Só `typeormSource<T>(repository)` é genérico no tipo da linha. `prismaSource` e
+`drizzleSource` o fixam em `object`, então esses serviços anotam
+`Promise<NormalizedQueryResult<object>>` — apertar mais exigiria um cast.
 
-Escolha seu ORM:
+## Paridade, e como ela é medida
+
+A promessa é que a mesma requisição produza o mesmo resultado observável em nove
+combinações — TypeORM, Prisma e Drizzle × PostgreSQL, MySQL e SQL Server —
+medidas por um corpus único com um conjunto único de expectativas, incluindo
+mensagens `400` byte a byte.
+
+O SQLite **não** é célula da matriz. Ele é o dialeto de referência: prova que o
+compilador de cada adapter implementa a semântica do plano, roda sem container,
+e um verde ali não é paridade.
+
+O estado atual por célula, incluindo quais gates seguem abertos, está em
+[`docs/v3/status.md`](https://github.com/naldomadeira/nestjs-rest-query/blob/main/docs/v3/status.md);
+a matriz de versões suportadas está em
+[`docs/v3/versions.md`](https://github.com/naldomadeira/nestjs-rest-query/blob/main/docs/v3/versions.md).
+
+## Divergências e limites declarados
+
+Divergência — mesma entrada, resultado observável diferente por adapter — só é
+permitida onde o modelo subjacente torna "igual ao TypeORM" ambíguo ou inseguro.
+Cada uma fica declarada como dado no próprio caso do corpus, com justificativa
+obrigatória, então um adapter que volte a concordar quebra o build e força a
+remoção da exceção.
+
+| Adapter     | Caso                                                                                                                                         | Resultado                                                                                                                                                                                                                        |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Prisma**  | `like`, `notLike`, `ilike`, `notIlike`, `search` em `sqlite` e `sqlserver`                                                                   | Recusado, `400 CAPABILITY_UNAVAILABLE`. O Prisma compila `contains` sem cláusula `ESCAPE` e esses dois dialetos não têm caractere de escape default, então `%` e `_` não podem ser literais. Funciona em `postgresql` e `mysql`. |
+| **TypeORM** | Condição existencial (filtro **ou** `search`) que atravessa uma relação `many` e depois continua por outra relação, ex. `items.company.name` | Recusado, `CAPABILITY_UNAVAILABLE`. Prisma e Drizzle compilam.                                                                                                                                                                   |
+| **TypeORM** | Condição existencial através de uma relação **many-to-many**                                                                                 | Recusado, `CAPABILITY_UNAVAILABLE`. Prisma e Drizzle compilam.                                                                                                                                                                   |
+| **Drizzle** | Projetar uma coleção `many` aninhada sob outra relação                                                                                       | Recusado, `ADAPTER_CONTRACT_VIOLATION`. Coleções de primeiro nível são suportadas.                                                                                                                                               |
+| **Drizzle** | `DrizzleColumn.name`                                                                                                                         | Declarado e **ignorado**: o compilador emite a **chave** de `columns` como identificador SQL. Mantenha chave e nome físico idênticos até isto ser corrigido.                                                                     |
+
+As duas linhas do TypeORM são **lacuna aberta**, não comportamento pretendido:
+um único salto `many` compila como `EXISTS` correlacionado nos três adapters, e
+isso é caso de corpus. Qualquer coisa mais profunda é recusada em vez de
+compilada errado — uma revisão anterior emitia `EXISTS` sintaticamente válido
+contra a tabela errada no caso many-to-many, o que é pior.
+
+<Callout type="info">
+  A whitelist de `search` do
+  [`02-app-with-postgres`](https://github.com/naldomadeira/nestjs-rest-query/blob/main/apps/examples/02-app-with-postgres/src/access-requests/access-requests.query.ts)
+  ilustra bem: ela mantém `user.firstName` (um salto `one`) e deixa
+  `items.company.name` fora exatamente por causa do limite do TypeORM acima,
+  embora o mesmo path funcione sob Prisma e Drizzle.
+</Callout>
+
+Todo o resto — operadores de filtro, `search`, forma da paginação,
+`paginate=false`, o hook `customize`, `isNull` sobre relação `one` ou `many`,
+filtros repetidos, recusa por whitelist, filtros por path pontuado — é
+exercitado pelo corpus de paridade e produz resultados idênticos nos três
+adapters.
+
+## Comece por aqui
 
 <Cards>
-  <Card title="TypeORM (default)" href="/docs/adapters/typeorm" />
-  <Card title="Drizzle" href="/docs/adapters/drizzle" />
-  <Card title="Prisma" href="/docs/adapters/prisma" />
-  <Card title="Escrevendo seu próprio" href="/docs/adapters/writing-your-own" />
+  <Card title="TypeORM" href="/pt-BR/docs/adapters/typeorm" />
+  <Card title="Drizzle" href="/pt-BR/docs/adapters/drizzle" />
+  <Card title="Prisma" href="/pt-BR/docs/adapters/prisma" />
+  <Card title="Escrevendo o seu" href="/pt-BR/docs/adapters/writing-your-own" />
 </Cards>

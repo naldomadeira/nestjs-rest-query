@@ -1,19 +1,20 @@
 ---
-title: TypeORM Adapter
-description: Usar nestjs-rest-query com TypeORM — o adapter padrão.
+title: Adapter TypeORM
+description: Use o nestjs-rest-query com TypeORM - o adapter de referência.
 ---
 
-TypeORM é o adapter padrão. Se você já está usando TypeORM e `@nestjs/typeorm`, tudo funciona sem configuração adicional.
+O TypeORM é o **adapter de referência**: é contra ele que os outros dois são
+comparados. Ele não é um default, porém — não existe adapter default na v3.
 
 ## Instalação
 
 ```bash
-pnpm add typeorm
-# ou
-npm install typeorm
+pnpm add typeorm @nestjs/typeorm
 ```
 
-Se você ainda não tiver TypeORM instalado, a biblioteca o puxará automaticamente (é uma peer dependency).
+A faixa suportada é `^0.3.26 || ^1.0.0`; as duas majors passam o corpus de
+paridade. O `typeorm` é peer dependency opcional, então ele não é instalado por
+você.
 
 ## Configuração do módulo
 
@@ -31,77 +32,199 @@ import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
 export class AppModule {}
 ```
 
-Nenhuma configuração de adapter é necessária — TypeORM é o padrão. Se você quer ser explícito:
-
-```typescript
-import { TypeOrmAdapter } from 'nestjs-rest-query/typeorm';
-
-DynamicQueryBuilderModule.forRoot({
-  adapter: new TypeOrmAdapter(),
-  pagination: { defaultPerPage: 20, maxPerPage: 100 },
-});
-```
+Nenhum adapter entra aqui. `forRoot({ adapter: new TypeOrmAdapter() })` é
+recusado na inicialização com `SOURCE_CONFIGURATION_INVALID`.
 
 ## Uso
 
-```typescript title="users.controller.ts"
-import { Controller, Get, Query } from '@nestjs/common';
+```typescript title="users.business.ts"
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
-  ApiDynamicQuery,
-  QueryRules,
+  DynamicQueryDto,
   QueryBuilderService,
-  RulesConfig,
-  QueryInput,
+  type CompiledQueryRules,
+  type NormalizedQueryResult,
 } from 'nestjs-rest-query';
-import { User } from './user.entity';
+import { typeormSource } from 'nestjs-rest-query/typeorm';
+import { User } from './entities/user.entity';
 
-const rules: RulesConfig = {
-  alias: 'user',
-  filters: ['email', 'name', 'createdAt', 'status'],
-  sorts: ['name', 'createdAt'],
-  fields: ['id', 'name', 'email'],
-  includes: ['company'],
-  search: ['name', 'email'],
-};
-
-@Controller('users')
-export class UsersController {
+@Injectable()
+export class UsersBusiness {
   constructor(
-    @InjectRepository(User) private readonly users: Repository<User>,
-    private readonly qb: QueryBuilderService
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    private readonly queryBuilderService: QueryBuilderService
   ) {}
 
-  @Get()
-  @ApiDynamicQuery(rules)
-  list(@Query() query: QueryInput, @QueryRules() endpointRules = rules) {
-    return this.qb.execute(this.users, query, endpointRules);
+  async findAll(
+    query: DynamicQueryDto,
+    rules: CompiledQueryRules
+  ): Promise<NormalizedQueryResult<User>> {
+    return this.queryBuilderService.execute(
+      typeormSource(this.userRepository),
+      query,
+      rules
+    );
   }
 }
 ```
 
-## Resultado
+O `typeormSource` é a única fábrica de source **genérica no tipo da linha**,
+então uma anotação `Promise<NormalizedQueryResult<User>>` funciona aqui e não
+funciona sob Prisma ou Drizzle.
 
-```json
-{
-  "data": [
-    {
-      "id": "u_1",
-      "name": "Ana",
-      "email": "ana@acme.com",
-      "company": { "id": "c_1", "name": "Acme" }
-    }
-  ],
-  "page": 1,
-  "perPage": 20,
-  "total": 42,
-  "lastPage": 3
-}
+### Opções da source
+
+```typescript
+typeormSource(repository, {
+  // Tipos lógicos que o banco não expressa — um char(36) que guarda UUID.
+  fieldKinds: { user: { id: 'uuid' } },
+  // Fatos do perfil certificado, coletados uma vez na subida.
+  portabilityProfile: facts,
+});
 ```
+
+## Derivando o schema
+
+Este é o único adapter com um derivador de schema:
+
+```typescript
+import { buildSchemaRegistry } from 'nestjs-rest-query/typeorm';
+
+const registry = buildSchemaRegistry(userRepository, {
+  fieldKinds: { user: { id: 'uuid' } },
+});
+```
+
+Ele percorre o grafo de relações transitivamente, então todo model alcançável
+cai no registry. A restrição está em _onde_ ele pode rodar: exige um
+`Repository` vivo, e as regras do endpoint são consumidas por
+`@ApiDynamicQuery(rules)` — um decorator de método, avaliado quando a classe do
+controller carrega, antes de o Nest montar o container. Dentro de uma factory de
+provider ele é utilizável; ao lado de um decorator, não — e é por isso que os
+quatro exemplos declaram o schema à mão.
+
+O correspondente do Drizzle é o `buildSourceSchema`, que deriva do descritor
+declarado e não do ORM. O Prisma não tem equivalente nenhum.
+
+## Convenções que o resolver cobra
+
+O schema declarado é comparado com o derivado, campo a campo, antes da primeira
+query. São comparados: `model`, `primaryKey`, e por campo `kind`, `nullable`,
+`primaryKey`, `foldedField`, `portableOrderField`, `internal`; por relação
+`target`, `cardinality`, `nullable`. Qualquer diferença é
+`SOURCE_CONFIGURATION_INVALID`. Só o schema do **root** é comparado — os
+schemas das relações no registry não são.
+
+Então três detalhes não são escolha de estilo:
+
+**Nome das colunas companheiras.** O resolver reconhece a companheira dobrada
+como `<path do campo>_folded` e a de ordem portável como `<path do campo>_order`,
+sobre o **nome da propriedade da entidade**, não sobre a coluna física. Para
+`firstName` mapeado em `first_name`, a propriedade tem de ser
+`firstName_folded` — a coluna física pode continuar `first_name_folded`.
+Qualquer propriedade cujo nome termine em `_folded` ou `_order` é marcada como
+interna automaticamente.
+
+```typescript
+@Column({ name: 'first_name' })
+firstName: string;
+
+@Column({ name: 'first_name_folded', select: false })
+firstName_folded: string;
+```
+
+**O nome do model é derivado, não escolhido:**
+`metadata.name.replace(/Entity$/, '').toLowerCase()`. `AccessRequestItem` vira
+`accessrequestitem` — não `access_request_item`, não `accessRequestItem`. A
+divergência aparece na primeira requisição como
+`Source model X does not match query rules model Y`.
+
+**A nulabilidade da relação tem de bater com a derivação**, que é
+`relation.isNullable || relation.isOneToMany`: uma coleção `OneToMany` é sempre
+`nullable: true`, e um `ManyToOne` sobre uma chave estrangeira `NOT NULL` tem de
+ser `nullable: false`.
+
+## O que o compilador faz
+
+- **Junções idempotentes** para filtro, `search`, `sort` e `fields`, mesmo sem
+  `includes`; joins de predicado ficam separados dos de apresentação.
+- **Chaves primárias compostas**, inclusive no desempate de paginação sobre
+  todas as partes.
+- **Paginação em duas fases** quando a projeção inclui relação `many`, então uma
+  página nunca é inflada pelo join.
+- **`EXISTS` correlacionado** — com correlação por chave estrangeira composta —
+  para filtro ou alvo de `search` que atravesse **uma** relação `many`. O
+  `total` continua contando roots e a página continua com o tamanho pedido.
+
+## Limites
+
+Duas formas existenciais são recusadas em vez de compiladas, com
+`CAPABILITY_UNAVAILABLE`:
+
+| Forma                                                        | Mensagem                                                                             |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| Path que atravessa uma relação `many` e depois outra relação | `Existential conditions through nested many relations are not supported yet: <path>` |
+| Path através de uma relação **many-to-many**                 | `Existential filters through many-to-many relations are not supported yet: <path>`   |
+
+Prisma e Drizzle compilam as duas. É lacuna aberta declarada, registrada em
+[`docs/v3/status.md`](https://github.com/naldomadeira/nestjs-rest-query/blob/main/docs/v3/status.md),
+não comportamento pretendido — e recusar é deliberado: até o PR5 o caminho
+many-to-many emitia `EXISTS` sintaticamente válido contra a tabela errada, o que
+devolvia linhas erradas em silêncio.
+
+Note que isso atinge as **regras** que você pode declarar na prática, não só as
+requisições que os clientes mandam: colocar `search: ['items.company.name']` nas
+regras de um endpoint compila bem na subida e só falha na primeira busca.
+
+## ESM: `@nestjs/typeorm` 12
+
+O `@nestjs/typeorm@12` é `"type": "module"` sem entrada CommonJS, o que mata os
+globs baseados em `__dirname` que toda aplicação NestJS + TypeORM tem:
+
+```diff
+- entities: [path.join(__dirname, '/../**/*.entity{.ts,.js}')],
+- migrations: [path.join(__dirname, '/migrations/*{.ts,.js}')],
++ entities: [User, Company, AccessRequest],
++ migrations: MIGRATIONS, // um array explícito e ordenado
+```
+
+`__dirname` não existe em ESM, então sob runtime ESM a aplicação sobe com zero
+entidades e zero migrations — sem erro, apenas um schema vazio. Listar
+explicitamente tem um segundo benefício: uma entidade renomeada quebra o build
+em vez da subida.
+
+Entidades num ciclo de relação também querem o próprio `Relation<T>` do
+TypeORM; sem ele o `emitDecoratorMetadata` avalia uma classe ainda em TDZ e a
+inicialização estoura com `Cannot access 'Category' before initialization`.
+
+## O `customize` recebe o `SelectQueryBuilder`
+
+No TypeORM o contexto nativo entregue ao `customize` é o `SelectQueryBuilder`
+tipado, uma vez por query do escopo:
+
+```typescript
+await this.queryBuilderService.execute(
+  typeormSource(this.userRepository),
+  query,
+  rules,
+  {
+    customize: (qb) => {
+      qb.andWhere('root.tenant_id = :tenant', { tenant });
+    },
+    customizeScope: 'both',
+  }
+);
+```
+
+`'both'` é o default e o seguro — veja
+[Customizando a Query](/pt-BR/docs/advanced/customizing).
 
 ## Próximos passos
 
-Se você quer mudar para Drizzle, veja o [Drizzle Adapter](/docs/adapters/drizzle).
-
-Para um guia completo de parâmetros e operadores, consulte [Guia de Uso](/docs/usage).
+- [Adapter Prisma](/pt-BR/docs/adapters/prisma) e
+  [adapter Drizzle](/pt-BR/docs/adapters/drizzle) para os mesmos conceitos por
+  outro ângulo.
+- [Guia de Uso](/pt-BR/docs/usage) para todos os parâmetros e operadores.

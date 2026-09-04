@@ -1,168 +1,336 @@
 ---
-title: Regras de permissões do endpoint
-description: Referência completa dos parâmetros de query suportados — filtros, operadores, sorts, fields, includes e paginação.
+title: Regras de whitelist do endpoint
+description: Referência completa de defineQuerySchema e defineQueryRules — o que você declara, o que é validado na subida e as colunas que o perfil portável exige.
 ---
 
-## Filtros e operadores
+Na v3 a autorização vem de duas declarações, e o `RulesConfig` não existe mais.
 
-Formato: `filter[campo][operador]=valor`
+| Declaração          | Escopo           | Responde                           |
+| ------------------- | ---------------- | ---------------------------------- |
+| `defineQuerySchema` | por **model**    | o que o modelo **é**               |
+| `defineQueryRules`  | por **endpoint** | o que aquele endpoint **autoriza** |
 
-O campo deve estar listado em `filters` do `RulesConfig` do endpoint — campos não autorizados geram `400 Bad Request`.
+A separação é o ponto: o modelo conhecer uma coluna não autoriza o cliente a
+pedi-la, e o mesmo schema pode servir a endpoints com autorizações diferentes. O
+`defineQueryRules` devolve `CompiledQueryRules` — validadas e compiladas na
+construção, então uma configuração impossível falha quando a aplicação sobe, em
+vez de na primeira requisição que a tocar.
 
-### Operadores disponíveis
-
-| Operador   | Descrição                                        |
-| ---------- | ------------------------------------------------ |
-| `eq`       | Igual                                            |
-| `ne`       | Diferente                                        |
-| `gt`       | Maior que                                        |
-| `gte`      | Maior ou igual                                   |
-| `lt`       | Menor que                                        |
-| `lte`      | Menor ou igual                                   |
-| `like`     | Contém (case-sensitive, wildcards automáticos)   |
-| `ilike`    | Contém (case-insensitive, portável entre bancos) |
-| `notLike`  | Não contém (case-sensitive)                      |
-| `notIlike` | Não contém (case-insensitive)                    |
-| `in`       | Dentro de uma lista (CSV)                        |
-| `notIn`    | Fora de uma lista (CSV)                          |
-| `between`  | Entre dois valores (`val1,val2`)                 |
-| `isNull`   | Nulo (`true`) ou não nulo (`false`)              |
-
-### Operadores com comportamento especial
-
-**`in` e `notIn`** — o valor é uma lista CSV. Cada item é tratado como elemento separado:
-
-```
-filter[status][in]=active,pending
-filter[status][notIn]=deleted,banned
-```
-
-**`between`** — dois valores separados por vírgula, aplicados como `BETWEEN val1 AND val2`:
-
-```
-filter[createdAt][between]=2024-01-01,2024-12-31
-filter[price][between]=10,99
-```
-
-**`isNull`** — `true` gera `IS NULL`, `false` gera `IS NOT NULL`. Não há operador separado `isNotNull`:
-
-```
-filter[deletedAt][isNull]=true
-filter[photoUrl][isNull]=false
-```
-
-**`ilike`** — usa `LOWER()` para garantir portabilidade entre PostgreSQL, MySQL e SQLite. Para PostgreSQL com grandes volumes, considere criar um índice funcional `LOWER(campo)` para melhor desempenho:
-
-```
-filter[name][ilike]=joao
-```
-
-### Restringindo operadores globalmente
-
-Por padrão todos os operadores são permitidos. Para restringir, configure `operators.allowed` no `forRoot`:
+## `defineQuerySchema`
 
 ```typescript
-DynamicQueryBuilderModule.forRoot({
-  operators: {
-    allowed: ['eq', 'ne', 'like', 'in'],
-  },
+const userSchema: QuerySchema = defineQuerySchema({
+  model: 'user',
+  primaryKey: ['id'],
+  fields: [
+    { path: 'id', kind: 'integer', nullable: false, primaryKey: true },
+    {
+      path: 'email',
+      kind: 'string',
+      nullable: false,
+      primaryKey: false,
+      foldedField: 'email_folded',
+    },
+    {
+      path: 'email_folded',
+      kind: 'string',
+      nullable: false,
+      primaryKey: false,
+      internal: true,
+    },
+    {
+      path: 'status',
+      kind: 'enum',
+      nullable: false,
+      primaryKey: false,
+      enumValues: ['active', 'suspended'],
+      portableOrderField: 'status_order',
+    },
+    {
+      path: 'status_order',
+      kind: 'integer',
+      nullable: false,
+      primaryKey: false,
+      internal: true,
+    },
+  ],
+  relations: [
+    { path: 'company', target: 'company', cardinality: 'one', nullable: true },
+    { path: 'posts', target: 'post', cardinality: 'many', nullable: true },
+  ],
 });
 ```
 
-Operadores fora da lista lançam `BadRequestException`.
+### `FieldDescriptor`
 
-### Restringindo operadores por endpoint
+| Propriedade          | Obrigatória | Significado                                                                                            |
+| -------------------- | ----------- | ------------------------------------------------------------------------------------------------------ |
+| `path`               | sim         | O nome do campo como a API o expõe.                                                                    |
+| `kind`               | sim         | O tipo lógico. Decide coerção, ordenação e quais operadores se aplicam.                                |
+| `nullable`           | sim         | Tem de bater com a source. `isNull` só é válido em campo nulável.                                      |
+| `primaryKey`         | sim         | Faz parte da chave primária.                                                                           |
+| `enumValues`         | para `enum` | Os membros aceitos. Valor fora deles é `FILTER_VALUE_INVALID`.                                         |
+| `foldedField`        | não         | A coluna interna com o valor dobrado. Obrigatória para `ilike`, `notIlike` e `search`.                 |
+| `portableOrderField` | não         | A coluna interna que dá ordem total portável. Obrigatória para comparação de ordem em `uuid` e `enum`. |
+| `internal`           | não         | Nunca filtrável, projetável nem ordenável, e nunca presente no JSON.                                   |
 
-Se uma rota definir `operators` dentro do seu `RulesConfig`, essa whitelist específica do endpoint sobrescreve a configuração global do `forRoot` apenas naquela rota.
+Os onze kinds são `string`, `uuid`, `enum`, `integer`, `bigint`, `decimal`,
+`boolean`, `date`, `datetime`, `json`, `binary`. Sete deles — `string`,
+`integer`, `bigint`, `decimal`, `boolean`, `date`, `datetime` — já têm ordem
+total idêntica nas três famílias de banco e não precisam de companheira. `uuid` e
+`enum` não têm: a representação física de um UUID difere (o SQL Server ordena
+`UNIQUEIDENTIFIER` por grupos de bytes) e a ordem de um enum depende do
+provider. `json` e `binary` são opacos e não recebem operador inferido nenhum.
+
+### `RelationDescriptor`
+
+`path`, `target` (o nome do model no registry), `cardinality`
+(`'one' | 'many'`) e `nullable`, todos obrigatórios.
+
+### O que o `defineQuerySchema` recusa
+
+Todos estes são `SOURCE_CONFIGURATION_INVALID`, na subida:
+
+- `path` duplicado em `fields`;
+- campo `enum` sem `enumValues`;
+- relação cujo `path` colide com um campo de mesmo nome;
+- `primaryKey` vazia;
+- parte da `primaryKey` que não é campo declarado, ou que é `nullable`;
+- `foldedField` ou `portableOrderField` que não existe, ou que existe mas
+  **não** está marcado `internal`.
+
+### O registry
 
 ```typescript
-const rules: RulesConfig = {
-  filters: ['name', 'status'],
-  operators: {
-    allowed: ['eq', 'like'],
-  },
-};
+export const USER_SCHEMAS: SchemaRegistry = new Map([
+  ['user', userSchema],
+  ['company', companySchema],
+  ['post', postSchema],
+]);
 ```
 
-Use isso quando um endpoint precisar de uma whitelist mais restrita que o restante da aplicação. Um objeto vazio no endpoint, `operators: {}`, significa "permitir todos os operadores" para aquela rota, mesmo que a configuração global esteja restrita.
+Todo model alcançável a partir do root precisa estar nele, indexado pelo nome do
+model. Entrada ausente é `SOURCE_CONFIGURATION_INVALID`:
+`Schema registry has no entry for model <model>`.
 
----
+Um schema por model, não um por endpoint — reutilize o mesmo objeto entre
+endpoints e troque apenas as regras.
 
-## Sorts
+## `defineQueryRules`
 
-Formato: `sort=campo,-outro` (prefixo `-` para desc, sem prefixo para asc)
+```typescript
+export const userRules = defineQueryRules(USER_SCHEMAS, 'user', {
+  filters: [
+    { path: 'id', operators: ['eq', 'in'] },
+    { path: 'email', operators: ['eq', 'ilike'] },
+    { path: 'createdAt', operators: ['gt', 'gte', 'lt', 'lte', 'between'] },
+    // Relação como alvo aceita só isNull.
+    { path: 'company', operators: ['isNull'] },
+    { path: 'company.name', operators: ['eq', 'ilike'] },
+    { path: 'posts', operators: ['isNull'] },
+    { path: 'posts.title', operators: ['eq', 'ilike'] },
+  ],
+  sorts: ['name', 'email', 'createdAt', 'company.name'],
+  fields: {
+    root: {
+      allowed: ['id', 'name', 'email', 'companyId', 'createdAt'],
+      default: ['id', 'name', 'email', 'createdAt'],
+    },
+    relations: {
+      company: { allowed: ['id', 'name'], default: ['id', 'name'] },
+      posts: {
+        allowed: ['id', 'title', 'createdAt'],
+        default: ['id', 'title'],
+      },
+    },
+  },
+  includes: ['company', 'posts'],
+  search: ['name', 'email', 'company.name'],
+});
+```
 
-O campo deve estar listado em `sorts` do `RulesConfig`.
+### `filters`
 
-<Callout type="warn">
-  **Atenção:** quando `fields` está definido no `RulesConfig`, os campos de
-  `sort` também precisam estar em `fields`. Se um campo estiver em `sorts` mas
-  ausente de `fields`, o TypeORM gera erro porque o campo não foi selecionado na
-  query. Mantenha `sorts` e `fields` em sincronia, ou omita `fields` se não
-  precisar restringir a seleção de colunas.
+Uma lista de `{ path, operators }`, não uma lista de strings — **não existe
+lista global de operadores na v3**. O `forRoot({ operators })` é recusado na
+inicialização, e a documentação Swagger mostra a união do que os campos
+realmente autorizam.
+
+Recusado na construção:
+
+- regra duplicada para o mesmo `path`;
+- `operators: []`;
+- operador que o kind do campo não atende (`like` num integer, `gt` num `uuid`
+  sem `portableOrderField`, `ilike` sem `foldedField`, `isNull` em campo não
+  nulável, qualquer operador em `json`/`binary`);
+- operador diferente de `isNull` num path que termina numa relação.
+
+### `sorts`
+
+Uma lista de paths. O `-` na requisição significa descendente; as regras não
+codificam direção.
+
+Recusado na construção:
+
+- path que atravessa relação `many`:
+  `Sort <path> crosses a many relation, which has no deterministic order`. Na
+  `2.x` o TypeORM aceitava isso e devolvia uma linha arbitrária do join.
+- path sem ordem total portável:
+  `Field <path> has no portable total order`.
+
+<Callout
+  type="warn"
+  title="A checagem de sorts é a quebra mais comum na subida de versão"
+>
+  O `sorts` herda a checagem de ordem portável da matriz de operadores, então
+  uma linha comum da `2.x` como `sorts: ['name', 'slug', 'status', 'createdAt']`
+  — com `status` sendo enum — impede a aplicação de subir. Ou tire o path, ou dê
+  ao campo um `portableOrderField`.
 </Callout>
 
----
+O `fields` não restringe mais o `sorts`. Na `2.x` um path em `sorts` ausente de
+`fields` era recusado; agora as duas listas são independentes.
 
-## Fields
+### `fields`
 
-Formato: `fields=id,name,email`
+**`fields.root` é obrigatório**, com `allowed` e um `default` não vazio. Na
+`2.x` o `fields` era opcional.
 
-Restringe as colunas retornadas pela query (`SELECT`). Quando omitido, todas as colunas da entidade são retornadas.
+- `default` é o que a resposta contém quando a requisição não traz `fields`.
+- Toda entrada de `default` tem de estar em `allowed`.
+- Toda relação em `includes` precisa de uma projeção declarada com `default` não
+  vazio — e o inverso: uma projeção para relação que **não** está em `includes`
+  também é recusada.
+- Projeções de relação são indexadas pelo path da relação, inclusive os
+  profundos: `'items.company'`.
 
-O campo deve estar listado em `fields` do `RulesConfig`; a resposta fica limitada à whitelist de campos declarada.
+Existe wildcard, mas só na construção e só na forma explícita
+`'<relacao>.*'`. Ele tem de ser a **única** entrada do `allowed` daquela
+relação, expande para os campos não internos do model alvo, e nunca é aceito do
+cliente — o alfabeto de paths do parser recusa `*` de saída.
+
+```typescript
+relations: {
+  company: { allowed: ['company.*'], default: ['id', 'name'] },
+}
+```
+
+### `includes`
+
+Paths de relação que um cliente pode carregar com `?includes=`. Não há eager
+load implícito: uma relação só é juntada e hidratada quando a requisição pede
+(ou quando um filtro, sort ou busca precisa dela internamente).
+
+Include profundo exige o pai: `includes: ['items.company']` sem `'items'` é
+recusado com `Include items.company requires its parent include items`, e a
+mesma regra vale para a requisição — `?includes=items.company` sozinho é
+`400 FIELD_NOT_ALLOWED`.
+
+### `search`
+
+Paths contra os quais um único termo `?search=` é comparado, combinados com
+`OR`.
+
+Recusado na construção:
+
+- campo não textual: `Search field <path> must be textual` (só `string`, `uuid`
+  e `enum` qualificam);
+- campo sem coluna dobrada:
+  `Search field <path> declares no folded field`.
+
+Um alvo que atravessa **uma** relação `many` compila como `EXISTS` correlacionado
+nos três adapters, então a página mantém o tamanho pedido e o `total` continua
+contando roots. No TypeORM, um alvo que atravessa uma relação `many` e depois
+continua por outra relação é recusado no momento da requisição — veja
+[Adapters](/pt-BR/docs/adapters).
+
+## As duas famílias de coluna
+
+### Colunas dobradas
+
+Sob o perfil textual `portable-strict`, `search`, `ilike` e `notIlike` nunca
+emitem `ILIKE` nem o `mode: 'insensitive'` do Prisma. Eles comparam uma coluna
+pré-normalizada com um termo normalizado pela mesma função, e é isso que faz a
+mesma requisição devolver as mesmas linhas em PostgreSQL, MySQL e SQL Server,
+qualquer que seja a collation do servidor.
+
+Quem preenche a coluna na escrita é a sua aplicação, com o `foldText(value)`
+exportado pela raiz — exatamente a função que o núcleo aplica ao termo recebido.
+
+```typescript
+import { foldText } from 'nestjs-rest-query';
+
+@BeforeInsert()
+@BeforeUpdate()
+foldSearchableColumns(): void {
+  this.email_folded = foldText(this.email ?? '');
+}
+```
 
 <Callout type="warn">
-  Definir `fields` no `RulesConfig` afeta também os sorts — veja o aviso acima.
+
+**`foldText` é `NFC` + `toLowerCase`. Ele não remove diacrítico.**
+`?search=eletrica` não encontra "Elétrica". O que a dobra compra é que a caixa do
+termo nunca muda o conjunto devolvido — nada além disso. Se um endpoint da `2.x`
+dependia de collation insensível a acento, isso é regressão observável, e o
+conserto é uma segunda coluna, sua, explicitamente sem acento.
+
 </Callout>
 
----
+Nomes: no **TypeORM** o nome é convenção, não escolha — o resolver reconhece a
+companheira como `<path do campo>_folded` sobre o **nome da propriedade da
+entidade**. No **Drizzle** e no **Prisma** o schema é declarado em vez de
+derivado, então qualquer nome serve desde que a declaração e a coluna física
+concordem; os exemplos usam `nameFolded`.
 
-## Includes
+Sobre índices: `like` e `search` compilam para "contém", ou seja
+`LIKE '%termo%'`, que um índice b-tree comum não acelera. O que a coluna dobrada
+muda é que a comparação passa a ser um `LIKE` literal em vez de `ILIKE`, então um
+índice comum agora serve padrões **ancorados**; busca por substring continua
+querendo trigrama ou full-text. Não medido aqui.
 
-Formato: `includes=company,roles`
+### Colunas de ordem portável
 
-Carrega relações pelo adapter configurado. Cada relação precisa estar listada em `includes` do `RulesConfig` — relações não autorizadas geram `400 Bad Request`.
+`uuid` e `enum` não ordenam igual nas três famílias de banco, então a v3 recusa
+ordenar por eles diretamente e ordena pelo `portableOrderField` que você
+declara. No TypeORM a companheira segue o sufixo `_order` sobre o path da
+propriedade e também é marcada interna automaticamente.
 
-Não há eager load implícito: includes só são aplicados quando o parâmetro `includes` estiver presente na query string.
+A armadilha está na paginação. O desempate é sempre anexado sobre a **chave
+primária inteira**, mesmo quando a URL não traz `sort` algum, então uma chave
+primária `uuid` sem coluna de ordem portável derruba um `GET /posts` pelado:
 
----
+```
+CAPABILITY_UNAVAILABLE: Primary key part id of post has no portable total order
+```
+
+Isso atinge quase todo consumidor Prisma, porque `@id @default(uuid())` é o
+default idiomático do Prisma, e todo consumidor Drizzle com chave primária
+`uuid`. O conserto é outra coluna mais um backfill — veja `posts.id_order` no
+exemplo 04 e `idOrder` no exemplo 03.
 
 ## Paginação
 
-| Parâmetro  | Tipo             | Padrão | Descrição                                               |
-| ---------- | ---------------- | ------ | ------------------------------------------------------- |
-| `page`     | número           | `1`    | Página atual                                            |
-| `perPage`  | número           | `10`   | Itens por página (máximo: `100`)                        |
-| `paginate` | `true` / `false` | `true` | `false` desativa paginação e retorna todos os registros |
+| Parâmetro  | Tipo             | Default | Observações                                         |
+| ---------- | ---------------- | ------- | --------------------------------------------------- |
+| `page`     | inteiro positivo | `1`     |                                                     |
+| `perPage`  | inteiro positivo | `20`    | Acima do `maxPerPage` (default `100`) é `400`.      |
+| `paginate` | literal booleano | `true`  | `false` devolve `{ data }` sem metadados de página. |
 
-Os defaults e o máximo de `perPage` são configuráveis via `forRoot`:
+Os dois defaults são definidos no `forRoot` — veja
+[Instalação](/pt-BR/docs/getting-started/installation). A ordenação é sempre
+determinística: sem uma chave total, única e não nula anexada ao final, duas
+páginas poderiam repetir ou perder linhas, e é por isso que o desempate por
+chave primária é obrigatório e não opcional.
 
-```typescript
-DynamicQueryBuilderModule.forRoot({
-  pagination: {
-    defaultPerPage: 20,
-    maxPerPage: 200,
-  },
-});
-```
+## Migrando uma whitelist da `2.x`
 
-### Resposta com paginação ativa
+Releia todas elas; podem estar expondo mais do que você pretendia.
 
-```json
-{
-  "data": [...],
-  "page": 1,
-  "perPage": 10,
-  "total": 42,
-  "lastPage": 5
-}
-```
-
-### Resposta com `paginate=false`
-
-```json
-{
-  "data": [...]
-}
-```
+| `2.x`                                                   | `3.x`                                                             |
+| ------------------------------------------------------- | ----------------------------------------------------------------- |
+| `filters: ['company']` também aceitava `company.*`      | declare `company.name` explicitamente — a correspondência é exata |
+| `operators: { allowed: [...] }`, global ou por endpoint | `operators` por campo, em cada regra de filtro                    |
+| `fields` opcional, e ele restringia `sorts`             | `fields.root` obrigatório; `fields` e `sorts` independentes       |
+| `alias`                                                 | não existe mais                                                   |
+| `RulesConfig`                                           | `CompiledQueryRules`, devolvido por `defineQueryRules`            |
