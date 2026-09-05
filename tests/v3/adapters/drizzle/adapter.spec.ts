@@ -202,8 +202,8 @@ describe('DrizzleAdapter compile', () => {
     expect(data.table).toBe('users');
     expect(data.alias).toBe('users');
     expect(data.select).toEqual([
-      { alias: 'users', column: 'id', path: '' },
-      { alias: 'users', column: 'name', path: '' },
+      { alias: 'users', field: 'id', column: 'id', path: '' },
+      { alias: 'users', field: 'name', column: 'name', path: '' },
     ]);
     expect(data.joins).toEqual([]);
   });
@@ -231,6 +231,7 @@ describe('DrizzleAdapter compile', () => {
     ]);
     expect(data.select).toContainEqual({
       alias: 'users__company',
+      field: 'name',
       column: 'name',
       path: 'company',
     });
@@ -254,6 +255,7 @@ describe('DrizzleAdapter compile', () => {
     ]);
     expect(data.select).toContainEqual({
       alias: 'users__company__owner',
+      field: 'name',
       column: 'name',
       path: 'company.owner',
     });
@@ -575,14 +577,21 @@ describe('DrizzleAdapter compile', () => {
     );
 
     expect(data.joins).toEqual([]);
-    expect(data.select).toEqual([{ alias: 'users', column: 'id', path: '' }]);
+    expect(data.select).toEqual([
+      { alias: 'users', field: 'id', column: 'id', path: '' },
+    ]);
     expect(data.manyProjections).toEqual([
       {
         path: 'posts',
         table: 'posts',
-        sourceColumn: 'id',
+        sourceField: 'id',
         targetColumn: 'user_id',
-        columns: ['id', 'title', 'user_id'],
+        targetField: 'user_id',
+        columns: [
+          { field: 'id', column: 'id' },
+          { field: 'title', column: 'title' },
+          { field: 'user_id', column: 'user_id' },
+        ],
         orderBy: ['id'],
       },
     ]);
@@ -600,6 +609,7 @@ describe('DrizzleAdapter compile', () => {
     // caso da coleção sobre chave natural, logo abaixo.
     expect(data.select).toContainEqual({
       alias: 'users',
+      field: 'id',
       column: 'id',
       path: '',
     });
@@ -617,13 +627,19 @@ describe('DrizzleAdapter compile', () => {
     // coleção voltaria vazia em todo root — sem erro nenhum.
     expect(data.select).toContainEqual({
       alias: 'users',
+      field: 'code',
       column: 'code',
       path: '',
     });
     expect(data.manyProjections[0]).toMatchObject({
-      sourceColumn: 'code',
+      sourceField: 'code',
       targetColumn: 'user_code',
-      columns: ['id', 'title', 'user_code'],
+      targetField: 'user_code',
+      columns: [
+        { field: 'id', column: 'id' },
+        { field: 'title', column: 'title' },
+        { field: 'user_code', column: 'user_code' },
+      ],
     });
   });
 
@@ -880,6 +896,40 @@ describe('DrizzleAdapter execute', () => {
     adapter.customize(compiled, (native) => seen.push(native.kind), 'count');
 
     expect(seen).toEqual(['data', 'count']);
+  });
+
+  /**
+   * O tipo da linha atravessa a source, sem cast em lugar nenhum.
+   *
+   * A anotação de `first` é o teste: até o PR5 `drizzleSource` fixava a linha
+   * em `object`, e um consumidor v2 que devolvia `QueryResult<UserDto>` não
+   * reproduzia a assinatura na v3 sem `as` — contra o gate §23, que proíbe
+   * cast no uso público documentado. O tipo entra pelo executor, que é quem de
+   * fato produz as linhas.
+   */
+  it('propaga o tipo da linha declarado pelo executor até o resultado', async () => {
+    interface AccountRow {
+      id: number;
+      name: string;
+    }
+
+    const database: DrizzleDatabase<AccountRow> = {
+      executeData: jest.fn().mockResolvedValue([{ id: 1, name: 'Ada' }]),
+      executeCount: jest.fn().mockResolvedValue(1),
+    };
+    const result = await new QueryBuilderService({}).execute(
+      drizzleSource<AccountRow>({
+        db: database,
+        dialect: 'postgres',
+        table: usersTable,
+        relations: userRelations,
+      }),
+      { fields: 'id,name' },
+      RULES_PRESETS['user.default']
+    );
+    const first: AccountRow = result.data[0];
+
+    expect(first.name).toBe('Ada');
   });
 
   it('não consulta o count quando o plano não pagina', async () => {

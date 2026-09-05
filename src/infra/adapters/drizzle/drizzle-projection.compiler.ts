@@ -23,8 +23,15 @@ export function compileProjection(
   plan: TypedQueryPlan,
   planner: DrizzleJoinPlanner
 ): CompiledProjection {
+  // O plano fala em campos lógicos; a seleção carrega os dois nomes, porque um
+  // vai ao SQL e o outro é a chave da linha hidratada.
   const select: DrizzleSelection[] = plan.internalProjection.root.map(
-    (column) => ({ alias: planner.rootAlias, column, path: '' })
+    (field) => ({
+      alias: planner.rootAlias,
+      field,
+      column: planner.column([], field),
+      path: '',
+    })
   );
   const many: DrizzleManyProjection[] = [];
 
@@ -33,8 +40,13 @@ export function compileProjection(
 
     if (!planner.crossesMany(relationPath)) {
       const alias = planner.join(relationPath, 'presentation');
-      for (const column of columns) {
-        select.push({ alias, column, path });
+      for (const field of columns) {
+        select.push({
+          alias,
+          field,
+          column: planner.column(relationPath, field),
+          path,
+        });
       }
       continue;
     }
@@ -48,12 +60,13 @@ export function compileProjection(
     const present = select.some(
       (selection) =>
         selection.alias === planner.rootAlias &&
-        selection.column === projection.sourceColumn
+        selection.field === projection.sourceField
     );
     if (!present) {
       select.push({
         alias: planner.rootAlias,
-        column: projection.sourceColumn,
+        field: projection.sourceField,
+        column: planner.column([], projection.sourceField),
         path: '',
       });
     }
@@ -90,12 +103,22 @@ function manyProjection(
     );
   }
 
+  // A coluna de correlação entra na projeção mesmo sem o cliente a pedir: é
+  // por ela que o filho encontra o seu root.
+  const fields = [...new Set([...columns, relation.targetColumn])];
+
   return {
     path,
     table: relation.target.name,
-    sourceColumn: relation.sourceColumn,
-    targetColumn: relation.targetColumn,
-    columns: [...new Set([...columns, relation.targetColumn])],
-    orderBy: target.primaryKey,
+    sourceField: relation.sourceColumn,
+    targetColumn: planner.column(relationPath, relation.targetColumn),
+    targetField: relation.targetColumn,
+    columns: fields.map((field) => ({
+      field,
+      column: planner.column(relationPath, field),
+    })),
+    orderBy: target.primaryKey.map((field) =>
+      planner.column(relationPath, field)
+    ),
   };
 }

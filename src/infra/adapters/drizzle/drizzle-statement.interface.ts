@@ -2,7 +2,16 @@ import type { SqlDialect } from '@contracts/v3';
 import type { QuerySchema, ScalarKind } from '@core/schema';
 
 export interface DrizzleColumn {
-  /** Nome físico da coluna na tabela. */
+  /**
+   * Nome **físico** da coluna, o identificador que vai ao SQL.
+   *
+   * A chave do mapa `columns` é outra coisa: é o campo **lógico** — o nome que
+   * a API expõe, que as regras autorizam e que volta no JSON. Os dois só
+   * coincidem quando o banco e a API usam a mesma convenção;
+   * `{ companyId: { name: 'company_id' } }` é a forma normal de um banco
+   * snake_case atrás de uma API camelCase, e é traduzida aqui, não pelo
+   * consumidor.
+   */
   readonly name: string;
   readonly kind: ScalarKind;
   readonly nullable: boolean;
@@ -23,8 +32,14 @@ export interface DrizzleRelation {
   readonly target: DrizzleTable;
   readonly cardinality: 'one' | 'many';
   readonly nullable: boolean;
-  /** Coluna do lado de origem que participa da condição de junção. */
+  /**
+   * Campo **lógico** do lado de origem que participa da condição de junção —
+   * chave do mapa `columns` da tabela de origem, não o nome físico. O
+   * identificador emitido sai do `name` daquela coluna, como em qualquer outro
+   * ponto do compilador; uma chave não declarada falha na construção da source.
+   */
   readonly sourceColumn: string;
+  /** Campo lógico do alvo, chave do mapa `columns` de `target`. */
   readonly targetColumn: string;
 }
 
@@ -43,27 +58,44 @@ export interface DrizzleJoin {
   readonly table: string;
   readonly alias: string;
   readonly parentAlias: string;
+  /** Colunas **físicas** dos dois lados: daqui para baixo tudo é SQL. */
   readonly sourceColumn: string;
   readonly targetColumn: string;
   /** `left` preserva roots sem correspondência; usado na apresentação. */
   readonly kind: 'inner' | 'left';
 }
 
-export interface DrizzleSelection {
-  readonly alias: string;
+/**
+ * Coluna projetada, nas duas identidades que ela precisa ter.
+ *
+ * `column` é o que o SQL pede à tabela; `field` é a chave sob a qual o valor
+ * volta ao objeto hidratado, e é o nome que o normalizador e as regras
+ * conhecem. Guardar só um dos dois foi o que fez `DrizzleColumn.name` ser
+ * declarado e ignorado.
+ */
+export interface DrizzleProjectedColumn {
+  /** Campo lógico: chave no objeto hidratado. */
+  readonly field: string;
+  /** Coluna física: identificador no SQL. */
   readonly column: string;
+}
+
+export interface DrizzleSelection extends DrizzleProjectedColumn {
+  readonly alias: string;
   /** Path da relação dona da coluna; string vazia no root. */
   readonly path: string;
 }
 
 export interface DrizzleOrderBy {
   readonly alias: string;
+  /** Coluna física. */
   readonly column: string;
   readonly direction: 'asc' | 'desc';
 }
 
 export interface DrizzleColumnRef {
   readonly alias: string;
+  /** Coluna física: `DrizzleColumnRef` só existe para virar SQL. */
   readonly column: string;
 }
 
@@ -121,12 +153,18 @@ export type DrizzleCondition =
 export interface DrizzleManyProjection {
   readonly path: string;
   readonly table: string;
-  /** Coluna do root que correlaciona com a relação. */
-  readonly sourceColumn: string;
+  /**
+   * Campo **lógico** do root que correlaciona com a relação: a chave é lida da
+   * linha já hidratada, não da linha crua do driver.
+   */
+  readonly sourceField: string;
+  /** Coluna física do alvo, usada no `IN` da segunda consulta. */
   readonly targetColumn: string;
+  /** Campo lógico do alvo, usado para agrupar os filhos hidratados. */
+  readonly targetField: string;
   /** Colunas a projetar no alvo, já sem as internas do plano. */
-  readonly columns: readonly string[];
-  /** Chave primária do alvo, usada para ordenar a coleção. */
+  readonly columns: readonly DrizzleProjectedColumn[];
+  /** Chave primária do alvo em colunas físicas, para ordenar a coleção. */
   readonly orderBy: readonly string[];
 }
 
@@ -142,7 +180,7 @@ export interface DrizzleStatement {
   readonly offset?: number;
   /** `true` no statement de contagem: o executor emite `count(*)`. */
   readonly countOnly: boolean;
-  /** Chave primária do root, para agrupar as coleções hidratadas. */
+  /** Chave primária do root em campos lógicos, como o plano a declara. */
   readonly rootKey: readonly string[];
   readonly manyProjections: readonly DrizzleManyProjection[];
 }
@@ -161,7 +199,7 @@ export interface DrizzleNativeQuery {
  * do consumidor. Enquanto o Drizzle 1.x estiver em RC, esta é a fronteira
  * declarada da fase 5 — e não uma degradação silenciosa.
  */
-export interface DrizzleDatabase {
+export interface DrizzleDatabase<TRow extends object = object> {
   /**
    * Dialeto que este executor materializa, quando ele sabe declará-lo.
    *
@@ -171,27 +209,35 @@ export interface DrizzleDatabase {
    * dialeto e executado por outro devolve resultado errado, não erro.
    */
   readonly dialect?: SqlDialect;
-  executeData(statement: DrizzleStatement): Promise<readonly object[]>;
+  executeData(statement: DrizzleStatement): Promise<readonly TRow[]>;
   executeCount(statement: DrizzleStatement): Promise<number>;
 }
 
-export interface DrizzleSourceInput {
-  readonly db: DrizzleDatabase;
+/**
+ * `TRow` é o tipo da linha que o executor promete devolver.
+ *
+ * Ele entra por aqui, e não por afirmação do adapter, porque é o executor —
+ * `drizzleDatabase()` ou uma implementação do consumidor — o único ponto que
+ * de fato produz as linhas. O adapter apenas propaga o que foi prometido, e é
+ * isso que faz `execute()` inferir o tipo da linha sem cast no uso público.
+ */
+export interface DrizzleSourceInput<TRow extends object = object> {
+  readonly db: DrizzleDatabase<TRow>;
   readonly dialect: SqlDialect;
   readonly table: DrizzleTable;
   readonly relations: DrizzleRelationMap;
   readonly schema: QuerySchema;
 }
 
-export interface DrizzleSourceOptions {
-  readonly db: DrizzleDatabase;
+export interface DrizzleSourceOptions<TRow extends object = object> {
+  readonly db: DrizzleDatabase<TRow>;
   readonly dialect: SqlDialect;
   readonly table: DrizzleTable;
   readonly relations?: DrizzleRelationMap;
 }
 
-export interface CompiledDrizzleQuery {
-  readonly db: DrizzleDatabase;
+export interface CompiledDrizzleQuery<TRow extends object = object> {
+  readonly db: DrizzleDatabase<TRow>;
   readonly data: DrizzleStatement;
   readonly count: DrizzleStatement;
   readonly paginate: boolean;

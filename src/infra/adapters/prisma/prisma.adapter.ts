@@ -64,10 +64,12 @@ const PATTERN_ESCAPE: Readonly<
  * viram `some`/`none`, então o root nunca infla e a paginação em duas fases é
  * desnecessária. Data e count derivam do mesmo `where`.
  */
-export class PrismaAdapter implements RestQueryAdapterV3<
+export class PrismaAdapter<
+  TRow extends object = object,
+> implements RestQueryAdapterV3<
   PrismaSourceInput,
   CompiledPrismaQuery,
-  object,
+  TRow,
   PrismaNativeQuery
 > {
   readonly id = 'prisma' as const;
@@ -135,8 +137,8 @@ export class PrismaAdapter implements RestQueryAdapterV3<
     }
   }
 
-  async execute(compiled: CompiledPrismaQuery): Promise<AdapterResult<object>> {
-    const rows = toRows(await compiled.delegate.findMany(compiled.data));
+  async execute(compiled: CompiledPrismaQuery): Promise<AdapterResult<TRow>> {
+    const rows = toRows<TRow>(await compiled.delegate.findMany(compiled.data));
     const total = compiled.paginate
       ? await compiled.delegate.count(compiled.count)
       : undefined;
@@ -149,15 +151,6 @@ export class PrismaAdapter implements RestQueryAdapterV3<
   }
 }
 
-const sharedAdapter = new PrismaAdapter();
-
-/**
- * Source discriminada do Prisma (spec §8.1).
- *
- * O delegate é resolvido pelo manifesto, nunca por uma string livre vinda do
- * chamador: model fora do manifesto e delegate ausente do client falham antes
- * de qualquer query.
- */
 /**
  * Busca o delegate no client e prova que ele é um delegate.
  *
@@ -194,17 +187,25 @@ function resolveDelegate(
   return candidate;
 }
 
-const isRow = (row: unknown): row is object =>
-  typeof row === 'object' && row !== null;
-
 /**
  * Estreita o retorno do `findMany` (ver `PrismaDelegate`) por checagem.
  *
  * Linha que não é objeto não existe no protocolo do Prisma: se aparecer, é
  * violação de contrato do client, e o adapter diz isso em vez de repassar o
  * dado adiante para estourar no normalizador, longe da causa.
+ *
+ * `TRow` é o que o consumidor declarou em `prismaSource<TRow>()`, e a checagem
+ * prova o quanto dá para provar aqui: que veio um array de objetos. O client
+ * gerado devolve `PrismaPromise<unknown>` para os argumentos dinâmicos que o
+ * plano monta (ver `PrismaDelegate`), então nenhum tipo do Prisma poderia
+ * refinar isso — a forma da linha é a promessa de quem escreveu a rota, do
+ * mesmo jeito que `Repository<T>` é a do TypeORM. O que **não** existe aqui é
+ * afirmação escondida: a promessa está na assinatura pública.
  */
-function toRows(result: unknown): readonly object[] {
+function toRows<TRow extends object>(result: unknown): readonly TRow[] {
+  const isRow = (row: unknown): row is TRow =>
+    typeof row === 'object' && row !== null;
+
   if (!Array.isArray(result) || !result.every(isRow)) {
     throw configurationError(
       'ADAPTER_CONTRACT_VIOLATION',
@@ -216,12 +217,24 @@ function toRows(result: unknown): readonly object[] {
   return result;
 }
 
-export function prismaSource(
+/**
+ * Source discriminada do Prisma (spec §8.1).
+ *
+ * O delegate é resolvido pelo manifesto, nunca por uma string livre vinda do
+ * chamador: model fora do manifesto e delegate ausente do client falham antes
+ * de qualquer query.
+ *
+ * `TRow` é o tipo da linha e atravessa daqui até o retorno de `execute()`:
+ * um consumidor que declarava `Promise<QueryResult<UserDto>>` na v2 escreve
+ * `prismaSource<UserDto>({ ... })` e não precisa de cast em lugar nenhum, que
+ * é o que o gate §23 exige do uso público documentado.
+ */
+export function prismaSource<TRow extends object = object>(
   options: PrismaSourceOptions
 ): QuerySource<
   PrismaSourceInput,
   CompiledPrismaQuery,
-  object,
+  TRow,
   PrismaNativeQuery
 > {
   const model = options.manifest.models[options.model];
@@ -241,7 +254,11 @@ export function prismaSource(
 
   return {
     kind: 'prisma',
-    adapter: sharedAdapter,
+    // Uma instância por source, e não um singleton: o adapter é genérico no
+    // tipo da linha e não guarda estado entre chamadas, então isto custa um
+    // objeto vazio e evita a única alternativa — afirmar que um
+    // `PrismaAdapter<object>` serve como `PrismaAdapter<TRow>`.
+    adapter: new PrismaAdapter<TRow>(),
     input: {
       client: options.client,
       delegate,

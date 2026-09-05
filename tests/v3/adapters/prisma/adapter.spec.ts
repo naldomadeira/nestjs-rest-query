@@ -112,6 +112,37 @@ describe('prismaSource', () => {
     );
   });
 
+  /**
+   * O tipo da linha atravessa a source, sem cast em lugar nenhum.
+   *
+   * A anotação de `first` é o teste: até o PR5 `prismaSource` fixava a linha
+   * em `object`, e um consumidor v2 que devolvia `QueryResult<UserDto>` não
+   * reproduzia a assinatura na v3 sem `as` — contra o gate §23, que proíbe
+   * cast no uso público documentado. A checagem de runtime continua onde
+   * estava, provando o que dá para provar (um array de objetos); o refinamento
+   * para `UserRow` é a promessa de quem escreveu a rota, declarada na
+   * assinatura.
+   */
+  it('propaga o tipo da linha declarado na source até o resultado', async () => {
+    interface UserRow {
+      id: number;
+      name: string;
+    }
+
+    const result = await new QueryBuilderService({}).execute(
+      prismaSource<UserRow>({
+        client: { user: delegate([{ id: 1, name: 'Ada' }]) },
+        model: 'user',
+        manifest: manifest(),
+      }),
+      { fields: 'id,name' },
+      RULES_PRESETS['user.default']
+    );
+    const first: UserRow = result.data[0];
+
+    expect(first.name).toBe('Ada');
+  });
+
   it('recusa model ausente do manifesto antes de consultar o client', () => {
     expect(() =>
       prismaSource({ client: {}, model: 'missing', manifest: manifest() })
