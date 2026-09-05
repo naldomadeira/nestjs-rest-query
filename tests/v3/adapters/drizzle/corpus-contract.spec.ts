@@ -22,7 +22,7 @@ describe.each(CORPUS_CASES.map((testCase) => [testCase.id, testCase] as const))(
     it(testCase.description, async () => {
       const actual = await runCorpusCase(testCase, sourceFor(testCase.rules));
 
-      const expected = expectationFor(testCase, 'drizzle');
+      const expected = expectationFor(testCase, 'drizzle', 'sqlite');
 
       if (expected.kind === 'error') {
         expect(actual).toEqual({

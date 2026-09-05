@@ -1,5 +1,6 @@
 export type {
   AdapterCapabilities,
+  PatternEscapeMode,
   SqlDialect,
 } from './adapter-capabilities.interface';
 export type {

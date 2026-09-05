@@ -50,13 +50,28 @@ describe('corpus canônico', () => {
           case: testCase.id,
           adapter,
           reason: divergence.reason,
+          dialects: divergence.dialects,
         })
       )
     );
 
-    expect(declared.map(({ case: id, adapter }) => `${adapter}:${id}`)).toEqual(
-      ['prisma:like/underscore-is-literal']
-    );
+    // O recorte por dialeto entra no inventário junto do caso: uma divergência
+    // que se alargue de `['sqlite','mssql']` para todos os dialetos é uma
+    // decisão nova, e tem de aparecer na revisão do mesmo jeito.
+    expect(
+      declared.map(
+        ({ case: id, adapter, dialects }) =>
+          `${adapter}:${id}@${dialects?.join(',') ?? '*'}`
+      )
+    ).toEqual([
+      'prisma:like/percent-is-literal@sqlite,mssql',
+      'prisma:like/underscore-is-literal@sqlite,mssql',
+      'prisma:like/backslash-is-literal@sqlite,mssql',
+      'prisma:like/is-case-sensitive@sqlite,mssql',
+      'prisma:ilike/case-fold@sqlite,mssql',
+      'prisma:ilike/nfd-input-matches-nfc-storage@sqlite,mssql',
+      'prisma:search/or-across-configured-fields@sqlite,mssql',
+    ]);
 
     for (const entry of declared) {
       expect(entry.reason.length).toBeGreaterThan(40);

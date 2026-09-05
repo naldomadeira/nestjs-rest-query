@@ -28,8 +28,13 @@ function statementFor(
   preset = 'user.deep',
   sqlDialect: 'sqlite' | 'mssql' | 'postgres' = 'sqlite'
 ): { data: DrizzleStatement; count: DrizzleStatement } {
+  // O executor tem de materializar o mesmo dialeto que a source declara:
+  // `drizzleSource` falha fechado na divergência. `all()` só existe na família
+  // SQLite; os outros dialetos expõem `execute()`.
+  const client: DrizzleClientLike =
+    sqlDialect === 'sqlite' ? { all: () => [] } : { execute: () => [] };
   const source = drizzleSource({
-    db: drizzleDatabase({ client: { all: () => [] } }),
+    db: drizzleDatabase({ client, dialect: sqlDialect }),
     dialect: sqlDialect,
     table: usersTable,
     relations: userRelations,
@@ -252,7 +257,10 @@ describe('drizzleDatabase', () => {
     });
 
     const { client } = clientReturning([raw]);
-    const rows = await drizzleDatabase({ client }).executeData(data);
+    const rows = await drizzleDatabase({
+      client,
+      dialect: 'sqlite',
+    }).executeData(data);
 
     expect(rows[0]).toMatchObject({
       id: 7,
@@ -274,7 +282,10 @@ describe('drizzleDatabase', () => {
     });
 
     const { client } = clientReturning([raw]);
-    const rows = await drizzleDatabase({ client }).executeData(data);
+    const rows = await drizzleDatabase({
+      client,
+      dialect: 'sqlite',
+    }).executeData(data);
 
     expect(rows[0]).toEqual({ id: 7, company: null });
   });
@@ -292,7 +303,10 @@ describe('drizzleDatabase', () => {
     });
 
     const { client } = clientReturning([raw]);
-    const rows = await drizzleDatabase({ client }).executeData(data);
+    const rows = await drizzleDatabase({
+      client,
+      dialect: 'sqlite',
+    }).executeData(data);
 
     // `company.id` entra pela projeção interna, para hidratar e deduplicar.
     expect(rows[0]).toEqual({
@@ -322,7 +336,10 @@ describe('drizzleDatabase', () => {
       [{ [`c${rootIndex}`]: 1 }, { [`c${rootIndex}`]: 2 }],
       [child('p1', 'A', 1), child('p2', 'B', 1)]
     );
-    const rows = (await drizzleDatabase({ client }).executeData(data)) as {
+    const rows = (await drizzleDatabase({
+      client,
+      dialect: 'sqlite',
+    }).executeData(data)) as {
       posts: unknown[];
     }[];
 
@@ -337,7 +354,7 @@ describe('drizzleDatabase', () => {
     });
     const { client, all } = clientReturning([]);
 
-    await drizzleDatabase({ client }).executeData(data);
+    await drizzleDatabase({ client, dialect: 'sqlite' }).executeData(data);
 
     expect(all).toHaveBeenCalledTimes(1);
   });
@@ -346,29 +363,102 @@ describe('drizzleDatabase', () => {
     const { count } = statementFor({}, 'user.default');
     const { client } = clientReturning([]);
 
-    await expect(drizzleDatabase({ client }).executeCount(count)).resolves.toBe(
-      0
-    );
+    await expect(
+      drizzleDatabase({ client, dialect: 'sqlite' }).executeCount(count)
+    ).resolves.toBe(0);
   });
 
   it('lê o total da linha de contagem', async () => {
     const { count } = statementFor({}, 'user.default');
     const { client } = clientReturning([{ total: 11 }]);
 
-    await expect(drizzleDatabase({ client }).executeCount(count)).resolves.toBe(
-      11
-    );
+    await expect(
+      drizzleDatabase({ client, dialect: 'sqlite' }).executeCount(count)
+    ).resolves.toBe(11);
+  });
+});
+
+/**
+ * Uma forma de retorno por dialeto (ADR-001, fato 2).
+ *
+ * `all()` só existe na família SQLite do `drizzle-orm` 1.x; os outros três
+ * dialetos expõem `execute()` e devolvem formas diferentes. Estes casos são o
+ * que substitui o `as unknown as DrizzleClientLike` que antes deixava um
+ * corpus verde em SQLite parecer cobertura dos quatro.
+ */
+describe('drizzleDatabase por dialeto', () => {
+  const countRows = [{ total: 3 }];
+
+  it.each([
+    ['sqlite' as const, 'all' as const, countRows],
+    ['postgres' as const, 'execute' as const, { rows: countRows }],
+    // `postgres-js` devolve um RowList, que já é o array de linhas.
+    ['postgres' as const, 'execute' as const, countRows],
+    ['mysql' as const, 'execute' as const, [countRows, []]],
+    ['mssql' as const, 'execute' as const, { recordset: countRows }],
+  ])('lê as linhas de %s via %s()', async (dialect, method, result) => {
+    const call = jest.fn().mockResolvedValue(result);
+    const { count } = statementFor({});
+
+    await expect(
+      drizzleDatabase({ client: { [method]: call }, dialect }).executeCount(
+        count
+      )
+    ).resolves.toBe(3);
+    expect(call).toHaveBeenCalledTimes(1);
+  });
+
+  it('exige o método do dialeto, não qualquer método', () => {
+    // Um `db` de Postgres é um database válido do Drizzle que não tem `all()`.
+    expect(() =>
+      drizzleDatabase({ client: { execute: () => [] }, dialect: 'sqlite' })
+    ).toThrow('does not expose all()');
+
+    expect(() =>
+      drizzleDatabase({ client: { all: () => [] }, dialect: 'postgres' })
+    ).toThrow('does not expose execute()');
+  });
+
+  it('acusa contrato quebrado quando o driver não devolve linhas', async () => {
+    const { count } = statementFor({});
+
+    await expect(
+      drizzleDatabase({
+        client: { execute: () => ({ nada: true }) },
+        dialect: 'mssql',
+      }).executeCount(count)
+    ).rejects.toThrow('did not return a row array');
   });
 });
 
 describe('assertDrizzleClient', () => {
-  it('aceita um client com all()', () => {
-    expect(() => assertDrizzleClient({ all: () => [] })).not.toThrow();
+  it('aceita um client com o método do dialeto', () => {
+    expect(() =>
+      assertDrizzleClient({ all: () => [] }, 'sqlite')
+    ).not.toThrow();
+    expect(() =>
+      assertDrizzleClient({ execute: () => [] }, 'mysql')
+    ).not.toThrow();
   });
 
-  it('recusa um objeto que não é um database do Drizzle', () => {
-    expect(() => assertDrizzleClient({})).toThrow(
-      'Drizzle client does not expose all()'
+  it('nomeia o método esperado, para não mandar procurar no lugar errado', () => {
+    expect(() => assertDrizzleClient({}, 'sqlite')).toThrow(
+      'Drizzle client for sqlite does not expose all()'
     );
+    expect(() => assertDrizzleClient({}, 'mssql')).toThrow(
+      'Drizzle client for mssql does not expose execute()'
+    );
+  });
+
+  /**
+   * O único ponto de validação do client precisa cobrir também o dialeto sem
+   * leitor: `SqlDialect` é fechado no tipo, mas o valor chega de configuração e
+   * pode vir de um `as`. Sem este caso, `drizzleDatabase` leria `undefined` e
+   * quebraria em `client[reader.method]` com um TypeError cru.
+   */
+  it('recusa dialeto para o qual não existe leitor de linhas', () => {
+    expect(() =>
+      assertDrizzleClient({ all: () => [] }, 'oracle' as never)
+    ).toThrow('Drizzle adapter does not support dialect oracle');
   });
 });
