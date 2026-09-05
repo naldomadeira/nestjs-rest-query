@@ -182,7 +182,7 @@ demais para a `3.0.0` e reabre a emenda 2.
 de migração foi exercido num projeto v2 de verdade; branches do TypeORM acima
 de 95%.
 
-## Emenda 1 (2026-09-04): cadeia existencial de mais de um salto no TypeORM
+## Emenda 1 (2026-09-04): cadeia existencial de mais de um salto no TypeORM — **implementada em 2026-09-04**
 
 Achado na execução do PR5, ao migrar o exemplo 02: a whitelist v2 dele
 declarava `search: ['items.company.name', 'items.company.cnpj']`, e os dois
@@ -214,6 +214,57 @@ limite declarado em `docs/v3/status.md` e em `docs/v3/versions.md` enquanto não
 for fechado. O que a implementação exige: joins encadeados dentro da subquery
 `EXISTS` (a forma que o Drizzle já usa), travessia da tabela de junção para
 m2m, caso de corpus cobrindo as duas formas, e nova rodada das nove células.
+
+### Fechamento (2026-09-04): implementada
+
+A decisão foi executada no mesmo dia em que foi tomada. `existsThroughMany`
+não recusa mais profundidade nenhuma, e a linha do TypeORM na tabela acima
+passa a ser a mesma das outras duas: **um único `EXISTS`, correlacionado com o
+root uma só vez, com cada salto seguinte como `INNER JOIN` dentro da
+subconsulta**. Correlacionar por fora foi rejeitado pela mesma aritmética de
+sempre — traria a coleção para o `FROM` externo, inflaria os roots e a §14
+perderia o `total`.
+
+O que ficou provado, e onde:
+
+| forma                                           | SQL que passa a sair                                                                                                                                                                                                            | prova                                                  |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| many → one (`posts.author.name`)                | `EXISTS (SELECT 1 FROM posts dqb_ex_posts INNER JOIN users dqb_ex_posts_author ON dqb_ex_posts_author.id = dqb_ex_posts.user_id WHERE dqb_ex_posts.user_id = root.id AND dqb_ex_posts_author.name = :dqb_0)`                    | `contract-guards.spec.ts`, corpus                      |
+| many → many, duas coleções (`posts.tags.label`) | `EXISTS (SELECT 1 FROM posts dqb_ex_posts INNER JOIN tags dqb_ex_posts_tags ON dqb_ex_posts_tags.post_id = dqb_ex_posts.id WHERE dqb_ex_posts.user_id = root.id AND dqb_ex_posts_tags.label = :dqb_0)`                          | `contract-guards.spec.ts`, corpus                      |
+| many-to-many com junção (`labels.name`)         | `EXISTS (SELECT 1 FROM "articles_labels_labels" dqb_ex_labels_j INNER JOIN labels dqb_ex_labels ON dqb_ex_labels.id = dqb_ex_labels_j."labelsId" WHERE dqb_ex_labels_j."articlesId" = root.id AND dqb_ex_labels.name = :dqb_0)` | `existential-compiler.spec.ts`, SQL **e** linhas reais |
+| FK composta em cadeia (`entries.ledger.title`)  | correlação e `ON` com **duas** colunas cada                                                                                                                                                                                     | `existential-compiler.spec.ts`                         |
+
+A many-to-many é a parte que exigia mais que "aceitar profundidade": o `FROM`
+da subconsulta é a **tabela de junção**, e o alvo só é alcançado por join a
+partir dela. O guard antigo existia porque o código anterior a essa recusa
+emitia `EXISTS` contra a tabela da entidade que _declara_ a relação — SQL
+válido, tabela errada, resultado errado em silêncio. Os testes travam as duas
+direções (lado dono e lado inverso, que não guarda a junção e a alcança pelo
+dono) e não só a forma do SQL: o fixture local tem um artigo com dois rótulos
+e um artigo sem rótulo nenhum, e a consulta real devolve um root por artigo
+ligado — nunca o artigo sem junção, nunca o artigo duplicado.
+
+Os identificadores da junção passaram a ser citados pelo `escape` do driver.
+São os únicos nomes do SQL que **não** vêm do consumidor: a estratégia de
+nomes do TypeORM os gera em camelCase (`articlesId`), e sem aspas o PostgreSQL
+os dobraria para minúsculas. O resto do compilador continua emitindo
+identificadores crus — uniformizar a citação é decisão maior que esta emenda, e
+fica declarada aqui como dívida, não como resolvida.
+
+**Status HTTP:** as duas recusas com `CAPABILITY_UNAVAILABLE` (500, disparadas
+por path de cliente) deixaram de existir — o defeito da §17 foi resolvido por
+remoção, não por reclassificação. Sobram no `typeorm-filter.compiler.ts` dois
+`ADAPTER_CONTRACT_VIOLATION`, que continuam 500 porque só disparam se plano e
+plano de joins divergirem: invariante interna do adapter, nunca condição do
+cliente. O adapter TypeORM não tem mais nenhum `CAPABILITY_UNAVAILABLE`.
+
+**Corpus:** 71 → **74 casos** (`relation-many/chain-through-one-is-existential`,
+`chain-through-two-collections` e `chain-through-two-collections-deduplicates`),
+os três verdes nos **três** adapters no dialeto de referência, sem divergência
+declarada. O preset `user.deep` ganhou `posts.author.name` e `posts.tags.label`
+na whitelist. **Custo a pagar: as nove células da matriz precisam de nova
+rodada** — e `docs/v3/status.md`, `docs/v3/versions.md`, `docs/v3/migration-from-v2.md`
+e `MIGRATION.md` ainda anunciam o limite como aberto e a contagem de 71.
 
 ## Releases
 
