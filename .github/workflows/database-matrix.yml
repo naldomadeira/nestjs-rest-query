@@ -1,0 +1,71 @@
+name: database-matrix
+
+# Matriz ORM x banco (spec §19). Uma célula vermelha bloqueia o merge, e skips
+# são proibidos: o gate `assert-no-skips` falha se algum caso do corpus não
+# tiver rodado.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main, 'feat/v3-**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: database-matrix-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typeorm:
+    name: typeorm / ${{ matrix.dialect }}
+    # SQL Server exige runner Linux x64 (spec §19).
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dialect: [postgres, mysql, mssql]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: start the certified profile
+        run: |
+          docker compose -f test/profiles/docker-compose.yml up -d --wait ${{ matrix.dialect }}
+
+      - name: apply the SQL Server profile
+        if: matrix.dialect == 'mssql'
+        # A imagem do SQL Server não roda scripts de init sozinha.
+        run: |
+          docker compose -f test/profiles/docker-compose.yml exec -T mssql \
+            /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Dqb_Str0ng!' -C \
+            -i /profile/profile.sql
+
+      - name: run the parity corpus
+        run: pnpm test:integration
+        env:
+          DQB_DIALECT: ${{ matrix.dialect }}
+          DQB_PG_URL: postgres://dqb:dqb@localhost:55432/dqb
+          DQB_MYSQL_URL: mysql://dqb:dqb@localhost:53306/dqb
+          DQB_MSSQL_URL: mssql://sa:Dqb_Str0ng!@localhost:51433/dqb
+          JEST_JUNIT_OUTPUT_NAME: integration.xml
+
+      - name: fail on skipped cases
+        run: node scripts/assert-no-skips.mjs integration.xml
+
+      - name: dump database logs on failure
+        if: failure()
+        run: docker compose -f test/profiles/docker-compose.yml logs ${{ matrix.dialect }}
+
+      - name: stop the profile
+        if: always()
+        run: docker compose -f test/profiles/docker-compose.yml down -v

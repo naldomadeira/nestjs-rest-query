@@ -1,3 +1,5 @@
+import { resolveDocsAssetPath } from '../apps/docs/lib/asset-path';
+
 describe('resolveDocsAssetPath', () => {
   const originalBasePath = process.env.NEXT_PUBLIC_BASE_PATH;
 
@@ -13,9 +15,6 @@ describe('resolveDocsAssetPath', () => {
   test('prefixes local public assets with the docs base path', async () => {
     process.env.NEXT_PUBLIC_BASE_PATH = '/nestjs-rest-query';
 
-    const { resolveDocsAssetPath } =
-      await import('../apps/docs/lib/asset-path');
-
     expect(resolveDocsAssetPath('/patterns.png')).toBe(
       '/nestjs-rest-query/patterns.png'
     );
@@ -26,9 +25,6 @@ describe('resolveDocsAssetPath', () => {
 
   test('keeps external and already-prefixed URLs unchanged', async () => {
     process.env.NEXT_PUBLIC_BASE_PATH = '/nestjs-rest-query';
-
-    const { resolveDocsAssetPath } =
-      await import('../apps/docs/lib/asset-path');
 
     expect(resolveDocsAssetPath('https://img.logo.dev/example')).toBe(
       'https://img.logo.dev/example'

@@ -1,46 +1,44 @@
 import { applyDecorators } from '@nestjs/common';
-import { RulesConfig } from '@contracts/rules-config.interface';
+import type { CompiledQueryRules } from '@core/authorization';
 import { ALL_OPERATORS } from '@domain/operators/operator.types';
-import { DynamicQueryBuilderModule } from '@core/dynamic-query-builder.module';
+import type { QueryOperator } from '@domain/operators/operator.types';
 import { DynamicQuery } from './dynamic-query.decorator';
 import { buildDQBSwaggerDecorators } from '../swagger/dqb-swagger.builder';
+import { toSwaggerRulesView } from '../swagger/swagger-rules-view';
 
-export function resolveAllowedOperators<T = any>(
-  rules: RulesConfig<T>
-): typeof ALL_OPERATORS {
-  const hasEndpointOperators = Object.prototype.hasOwnProperty.call(
-    rules,
-    'operators'
-  );
-
-  if (hasEndpointOperators) {
-    return rules.operators?.allowed ?? ALL_OPERATORS;
-  }
-
-  return DynamicQueryBuilderModule.config?.operators?.allowed ?? ALL_OPERATORS;
+/**
+ * Operadores a documentar: a união do que os campos do endpoint autorizam.
+ *
+ * A v3 não tem lista global de operadores — cada campo declara os seus, então
+ * a documentação reflete exatamente o que o endpoint aceita. Quando nenhum
+ * filtro é declarado, cai na lista completa apenas para não gerar tabela vazia.
+ */
+export function resolveAllowedOperators(
+  rules: CompiledQueryRules
+): readonly QueryOperator[] {
+  const view = toSwaggerRulesView(rules);
+  return view.operators.length > 0 ? view.operators : ALL_OPERATORS;
 }
 
 /**
- * Registra as regras de query dinamica para o endpoint e gera documentacao Swagger.
+ * Registra as regras compiladas do endpoint e gera a documentação Swagger.
  *
  * @example
  * ```ts
+ * const rules = defineQueryRules(schema, 'product', {
+ *   filters: [{ path: 'name', operators: ['eq', 'ilike'] }],
+ *   sorts: ['id', 'name'],
+ *   fields: { root: { allowed: ['id', 'name'], default: ['id', 'name'] } },
+ * });
+ *
  * @Get()
- * @ApiDynamicQuery({
- *   filters: ['id', 'name', 'price'],
- *   sorts:   ['id', 'name', 'createdAt'],
- *   fields:  ['id', 'name', 'price', 'category'],
- *   includes: ['category'],
- *   search:  ['name', 'document', 'category.name'],
- * })
- * async findAll(@Query() query: DynamicQueryDto, @QueryRules() rules: RulesConfig) {
+ * @ApiDynamicQuery(rules)
+ * async findAll(@Query() query: DynamicQueryDto, @QueryRules() rules: CompiledQueryRules) {
  *   return this.service.findAll(query, rules);
  * }
  * ```
  */
-export function ApiDynamicQuery<T = any>(
-  rules: RulesConfig<T>
-): MethodDecorator {
+export function ApiDynamicQuery(rules: CompiledQueryRules): MethodDecorator {
   return (
     target: object,
     propertyKey: string | symbol,
@@ -48,13 +46,12 @@ export function ApiDynamicQuery<T = any>(
   ) => {
     DynamicQuery(rules)(target, propertyKey, descriptor);
 
-    const operators = resolveAllowedOperators(rules);
-
-    applyDecorators(...buildDQBSwaggerDecorators(rules, operators))(
-      target,
-      propertyKey,
-      descriptor
-    );
+    applyDecorators(
+      ...buildDQBSwaggerDecorators(
+        toSwaggerRulesView(rules),
+        resolveAllowedOperators(rules)
+      )
+    )(target, propertyKey, descriptor);
 
     return descriptor;
   };

@@ -4,20 +4,18 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, 'feat/v3-**']
 
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [20, 22]
+        node: [22, 24]
     steps:
       - uses: actions/checkout@v6
 
       - uses: pnpm/action-setup@v6
-        with:
-          version: 9
 
       - uses: actions/setup-node@v6
         with:
@@ -32,7 +30,7 @@ jobs:
       - run: pnpm test:cov
       - run: pnpm build
 
-      - if: matrix.node == '22'
+      - if: matrix.node == '24'
         uses: codecov/codecov-action@v6
         with:
           files: coverage/cobertura-coverage.xml
@@ -43,11 +41,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
-        with:
-          version: 9
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
@@ -60,3 +56,6 @@ jobs:
 
       - name: Validate type exports (attw)
         run: pnpm dlx @arethetypeswrong/cli@latest --pack .
+
+      - name: Isolated consumer fixtures (CJS and ESM, no ORM peers)
+        run: sh scripts/verify-package.sh

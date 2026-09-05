@@ -3,6 +3,16 @@ title: Introduction
 description: What nestjs-rest-query is and why to use it.
 ---
 
+<Callout type="warn" title="These docs describe v2">
+
+The examples below still use the v2 API — `RulesConfig`, adapter classes from
+the root entrypoint, and coercion driven by how a value looks. **v3 replaces
+all three.** Rewriting this site is phase 7 of the v3 plan; until then, the
+authoritative description of the current API is
+[the v2 → v3 migration guide](https://github.com/naldomadeira/nestjs-rest-query/blob/main/docs/migration/v2-to-v3.md).
+
+</Callout>
+
 **`nestjs-rest-query`** is a NestJS library that builds TypeORM `SelectQueryBuilder` instances dynamically from HTTP query parameters — filters, sorts, pagination, field selection, and relation loading — all controlled by a per-endpoint security whitelist.
 
 ## Main flow
