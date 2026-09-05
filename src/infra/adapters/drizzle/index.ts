@@ -8,6 +8,7 @@ export type {
   DrizzleManyProjection,
   DrizzleNativeQuery,
   DrizzleOrderBy,
+  DrizzleProjectedColumn,
   DrizzleRelation,
   DrizzleRelationMap,
   DrizzleSelection,

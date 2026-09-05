@@ -31,19 +31,21 @@ const ESCAPE_CHARACTER = '!';
  * esse statement no dialeto. A fronteira é declarada, não implícita: enquanto o
  * Drizzle 1.x estiver em RC, a v3 não promete a célula real (fase 5).
  */
-export class DrizzleAdapter implements RestQueryAdapterV3<
-  DrizzleSourceInput,
-  CompiledDrizzleQuery,
-  object,
+export class DrizzleAdapter<
+  TRow extends object = object,
+> implements RestQueryAdapterV3<
+  DrizzleSourceInput<TRow>,
+  CompiledDrizzleQuery<TRow>,
+  TRow,
   DrizzleNativeQuery
 > {
   readonly id = 'drizzle' as const;
 
-  async describe(source: DrizzleSourceInput): Promise<QuerySchema> {
+  async describe(source: DrizzleSourceInput<TRow>): Promise<QuerySchema> {
     return source.schema;
   }
 
-  capabilities(source: DrizzleSourceInput): AdapterCapabilities {
+  capabilities(source: DrizzleSourceInput<TRow>): AdapterCapabilities {
     return {
       dialect: source.dialect,
       transactionalConsistency: false,
@@ -55,8 +57,8 @@ export class DrizzleAdapter implements RestQueryAdapterV3<
 
   compile(
     plan: TypedQueryPlan,
-    source: DrizzleSourceInput
-  ): CompiledDrizzleQuery {
+    source: DrizzleSourceInput<TRow>
+  ): CompiledDrizzleQuery<TRow> {
     const planner = new DrizzleJoinPlanner(source.table, source.relations);
 
     // A ordem importa: where e order registram junções de predicado, o select
@@ -111,7 +113,7 @@ export class DrizzleAdapter implements RestQueryAdapterV3<
   }
 
   customize(
-    compiled: CompiledDrizzleQuery,
+    compiled: CompiledDrizzleQuery<TRow>,
     callback: (native: DrizzleNativeQuery) => void,
     scope: CustomizeScope = 'both'
   ): void {
@@ -124,8 +126,8 @@ export class DrizzleAdapter implements RestQueryAdapterV3<
   }
 
   async execute(
-    compiled: CompiledDrizzleQuery
-  ): Promise<AdapterResult<object>> {
+    compiled: CompiledDrizzleQuery<TRow>
+  ): Promise<AdapterResult<TRow>> {
     const rows = await compiled.db.executeData(compiled.data);
     const total = compiled.paginate
       ? await compiled.db.executeCount(compiled.count)
@@ -139,15 +141,26 @@ export class DrizzleAdapter implements RestQueryAdapterV3<
   }
 }
 
-const sharedAdapter = new DrizzleAdapter();
-
-/** Source discriminada do Drizzle (spec §8.1). */
-export function drizzleSource(
-  options: DrizzleSourceOptions
+/**
+ * Source discriminada do Drizzle (spec §8.1).
+ *
+ * `TRow` vem do executor (`DrizzleSourceOptions.db`), que é quem produz as
+ * linhas de fato, e atravessa daqui até o retorno de `execute()` sem nenhuma
+ * afirmação no meio. Um consumidor que declare
+ * `Promise<NormalizedQueryResult<UserDto>>` escreve `drizzleSource<UserDto>` e
+ * o restante fecha por inferência — sem cast, que é o gate §23.
+ *
+ * O adapter deixou de ser um singleton por causa disso: ele é genérico no tipo
+ * da linha e não guarda estado nenhum entre chamadas, então uma instância por
+ * source custa um objeto vazio e evita a única alternativa, que seria afirmar
+ * a compatibilidade de `DrizzleAdapter<object>` com `DrizzleAdapter<TRow>`.
+ */
+export function drizzleSource<TRow extends object = object>(
+  options: DrizzleSourceOptions<TRow>
 ): QuerySource<
-  DrizzleSourceInput,
-  CompiledDrizzleQuery,
-  object,
+  DrizzleSourceInput<TRow>,
+  CompiledDrizzleQuery<TRow>,
+  TRow,
   DrizzleNativeQuery
 > {
   const relations = options.relations ?? {};
@@ -168,7 +181,7 @@ export function drizzleSource(
 
   return {
     kind: 'drizzle',
-    adapter: sharedAdapter,
+    adapter: new DrizzleAdapter<TRow>(),
     input: {
       db: options.db,
       dialect: options.dialect,

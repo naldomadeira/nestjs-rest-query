@@ -92,10 +92,20 @@ const ROW_READERS: Readonly<Record<SqlDialect, RowReader>> = {
  * Emite o SQL pelo template do Drizzle — identificadores citados pelo dialeto
  * do driver, valores sempre em bind — e hidrata a resposta plana na forma
  * aninhada que o normalizador do núcleo espera.
+ *
+ * `TRow` é uma **promessa do chamador**, não uma verificação: o driver devolve
+ * linhas dinâmicas e nenhuma checagem em runtime distinguiria `UserRow` de
+ * qualquer outro objeto. A sobrecarga declara essa promessa na assinatura, à
+ * vista de quem lê, em vez de escondê-la num `as unknown as` no meio do corpo
+ * — e a implementação continua tipada pelo que ela realmente sabe (`object`),
+ * de modo que nada aqui dentro passa a mentir.
  */
+export function drizzleDatabase<TRow extends object = object>(
+  options: DrizzleDatabaseOptions
+): DrizzleDatabase<TRow>;
 export function drizzleDatabase(
   options: DrizzleDatabaseOptions
-): DrizzleDatabase {
+): DrizzleDatabase<object> {
   const { client, dialect } = options;
 
   // Um ponto só de validação: `assertDrizzleClient` recusa dialeto sem leitor
@@ -146,12 +156,12 @@ function hydrate(statement: DrizzleStatement, raw: Row): Row {
     const value = raw[`c${index}`];
 
     if (selection.path === '') {
-      root[selection.column] = value;
+      root[selection.field] = value;
       return;
     }
 
     const target = ensurePath(root, selection.path);
-    target[selection.column] = value;
+    target[selection.field] = value;
     allNull.set(
       selection.path,
       (allNull.get(selection.path) ?? true) && value === null
@@ -207,7 +217,7 @@ async function attachCollection(
   if (rows.length === 0) return;
 
   const keys = [
-    ...new Set(rows.map((row) => row[projection.sourceColumn])),
+    ...new Set(rows.map((row) => row[projection.sourceField])),
   ].filter((key) => key !== null && key !== undefined);
 
   if (keys.length === 0) return;
@@ -217,19 +227,18 @@ async function attachCollection(
   const byKey = new Map<string, Row[]>();
   for (const child of raw) {
     const hydrated: Row = {};
-    projection.columns.forEach((column, index) => {
-      hydrated[column] = child[`c${index}`];
+    projection.columns.forEach((projected, index) => {
+      hydrated[projected.field] = child[`c${index}`];
     });
 
-    const key = String(hydrated[projection.targetColumn]);
+    const key = String(hydrated[projection.targetField]);
     const bucket = byKey.get(key);
     if (bucket) bucket.push(hydrated);
     else byKey.set(key, [hydrated]);
   }
 
   for (const row of rows) {
-    row[projection.path] =
-      byKey.get(String(row[projection.sourceColumn])) ?? [];
+    row[projection.path] = byKey.get(String(row[projection.sourceField])) ?? [];
   }
 }
 
