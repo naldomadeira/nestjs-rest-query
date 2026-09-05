@@ -97,6 +97,15 @@ const userDeep = defineQueryRules(CORPUS_SCHEMAS, 'user', {
     { path: 'company.name', operators: ['eq'] },
     { path: 'posts', operators: ['isNull'] },
     { path: 'posts.title', operators: ['eq', 'ilike'] },
+    // Cadeias de mais de um salto, pelas mesmas duas razões que trouxeram
+    // `notIn` e `posts.title` para cá: são os únicos caminhos do modelo
+    // canônico que cruzam `many` e continuam — `posts.author` volta a `user`
+    // (many → one) e `posts.tags` abre uma segunda coleção (many → many). Sem
+    // eles nenhum caso mediria a promessa de que a semântica existencial vale
+    // para a cadeia inteira, e o limite do TypeORM ficou dois PRs invisível
+    // porque nada no corpus o alcançava.
+    { path: 'posts.author.name', operators: ['eq'] },
+    { path: 'posts.tags.label', operators: ['eq', 'in'] },
   ],
   sorts: ['id', 'name', 'code'],
   fields: {
