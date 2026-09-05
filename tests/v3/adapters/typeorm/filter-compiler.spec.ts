@@ -141,6 +141,33 @@ describe('compilação de filtros TypeORM', () => {
     expect(sql).toMatch(/:dqb_0/);
   });
 
+  it('isNull=false vira IS NOT NULL, e não a negação da condição inteira', () => {
+    // `NOT (col IS NULL)` e `col IS NOT NULL` coincidem aqui, mas a primeira
+    // forma se propaga mal ao ser combinada com OR na busca; a segunda é a que
+    // as três células da matriz emitem igual.
+    const { sql } = compileToQueryBuilder({
+      filter: { nickname: { isNull: 'false' } },
+    });
+    expect(sql).toMatch(/nickname"? IS NOT NULL/);
+  });
+
+  it('notLike emite NOT LIKE com a mesma cláusula ESCAPE do LIKE', () => {
+    // O escape não pode depender da polaridade: sem a cláusula no ramo negado,
+    // `%` e `_` do valor voltariam a ser curinga só nesse caminho.
+    const { sql, parameters } = compileToQueryBuilder({
+      filter: { name: { notLike: '10%' } },
+    });
+    expect(sql).toMatch(/NOT LIKE :dqb_0 ESCAPE '!'/);
+    expect(parameters.dqb_0).toBe('%10!%%');
+  });
+
+  it('notIlike nega o LIKE sobre a coluna dobrada', () => {
+    const { sql } = compileToQueryBuilder({
+      filter: { name: { notIlike: 'AÇÃO' } },
+    });
+    expect(sql).toMatch(/name_folded"? NOT LIKE/);
+  });
+
   it('a query de count não carrega joins de apresentação', () => {
     const { countSql } = compileToQueryBuilder(
       { includes: 'company,posts', filter: { 'company.name': { eq: 'Acme' } } },

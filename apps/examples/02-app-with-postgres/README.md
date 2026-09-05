@@ -77,4 +77,21 @@ yarn seed:full --users 20 --companies 10 --requests 3
 yarn dev
 ```
 
-Acesse a documentação em: [http://localhost:3000](http://localhost:3000)
+Acesse a documentação em: [http://localhost:3002](http://localhost:3002)
+
+## Smoke E2E
+
+```bash
+docker compose up -d
+pnpm test:e2e
+```
+
+O smoke cria e destrói o próprio banco (`multi_acessos_e2e`) e aplica as
+migrations nele. O `multi_acessos` de desenvolvimento nunca é tocado, e por
+isso a suíte não depende do estado em que o volume do Docker ficou.
+
+Ele é o gate que prova a API v3 pelo lado de fora: envelope canônico, projeção
+exata, relação `one` e coleção `many` aninhadas com projeção própria, recusa de
+campo fora da whitelist com código no corpo, padrão literal em `like` e busca
+pela coluna dobrada — no PostgreSQL, sem `ILIKE` e sem depender da collation do
+servidor.

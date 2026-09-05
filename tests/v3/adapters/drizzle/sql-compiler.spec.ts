@@ -4,16 +4,26 @@ import { buildQueryPlan } from '@core/query-plan';
 import {
   DrizzleAdapter,
   assertDrizzleClient,
+  buildSourceSchema,
+  createDrizzleTable,
   drizzleDatabase,
   drizzleSource,
   toCountSql,
   toDataSql,
   toManySql,
   type DrizzleClientLike,
+  type DrizzleRelationMap,
   type DrizzleStatement,
 } from '@infra/adapters/drizzle';
+import { defineQueryRules } from '@core/authorization';
+import type { SchemaRegistry } from '@core/schema';
 import { RULES_PRESETS } from '../../fixtures/rules';
-import { userRelations, usersTable } from '../../fixtures/drizzle-tables';
+import { CORPUS_SCHEMAS } from '../../fixtures/schemas';
+import {
+  postRelations,
+  userRelations,
+  usersTable,
+} from '../../fixtures/drizzle-tables';
 
 const dialect = new SQLiteDialect();
 
@@ -149,6 +159,85 @@ describe('toDataSql', () => {
     expect(sql).toContain('"users"."id" in (?, ?)');
     expect(sql).toContain('"users"."id" between ? and ?');
     expect(sql).toContain('"users"."nickname" is null');
+  });
+
+  it('emite is not null quando isNull vem false', () => {
+    const { data } = statementFor(
+      { filter: { nickname: { isNull: 'false' } } },
+      'user.default'
+    );
+
+    const { sql } = render(toDataSql(data));
+
+    // `isNull=false` é "tem valor". Cair no ramo positivo devolveria o
+    // conjunto complementar — resultado errado, não erro — e nenhum outro
+    // caso distingue os dois lados desta condição.
+    expect(sql).toContain('"users"."nickname" is not null');
+    expect(sql).not.toContain('not (');
+  });
+
+  it('rende grupo booleano vazio como tautologia, não como parêntese vazio', () => {
+    const { data } = statementFor({}, 'user.default');
+
+    // `where` é o único campo mutável do statement: é por ele que `customize`
+    // entra. Um consumidor que monte o AND a partir de uma lista que acabou
+    // vazia produziria `where ()`, erro de sintaxe no banco; a redução mantém
+    // o statement válido e sem efeito sobre o conjunto.
+    data.where = { op: 'and', terms: [] };
+
+    expect(render(toDataSql(data)).sql).toContain('where 1 = 1');
+  });
+
+  it('encadeia o join dentro do EXISTS quando o filtro cruza duas coleções', () => {
+    const twoCollections = defineQueryRules(CORPUS_SCHEMAS, 'user', {
+      filters: [{ path: 'posts.tags.label', operators: ['eq'] }],
+      sorts: ['id'],
+      fields: { root: { allowed: ['id'], default: ['id'] } },
+    });
+    const source = drizzleSource({
+      db: drizzleDatabase({ client: { all: () => [] }, dialect: 'sqlite' }),
+      dialect: 'sqlite',
+      table: usersTable,
+      // A cadeia `posts.tags` precisa estar declarada na source; o mapa do
+      // corpus para o root `user` só vai até `posts`.
+      relations: { ...userRelations, 'posts.tags': postRelations.tags },
+    }).input;
+    const { data } = new DrizzleAdapter().compile(
+      buildQueryPlan(
+        { filter: { 'posts.tags.label': { eq: 'urgent' } } },
+        twoCollections
+      ),
+      source
+    );
+
+    const { sql } = render(toDataSql(data));
+
+    // Um único EXISTS, correlacionado com o root uma só vez, e o segundo salto
+    // como join *dentro* da subconsulta. Correlacionar o segundo salto por
+    // fora inflaria os roots e estragaria o `total` — que é justamente o que
+    // o EXISTS existe para evitar.
+    expect(sql).toContain(
+      'exists (select 1 from "posts" as "users__posts__x" inner join "tags" as "users__posts__tags__x" on "users__posts__x"."id" = "users__posts__tags__x"."post_id" where "users"."id" = "users__posts__x"."user_id" and "users__posts__tags__x"."label" = ?'
+    );
+    expect(sql).not.toContain('join "tags" as "users__posts__tags"');
+  });
+
+  it('pagina do começo quando o statement traz limit sem offset', () => {
+    const { data } = statementFor(
+      { page: '2', perPage: '5' },
+      'user.default',
+      'postgres'
+    );
+    // `limit` e `offset` são opcionais e independentes no tipo do statement:
+    // um statement montado à mão pode trazer só o limite. Sem o default, o
+    // `offset` iria para o bind como `undefined` e o driver erraria tarde.
+    const { offset, ...withoutOffset } = data;
+
+    const { sql, params } = render(toDataSql(withoutOffset));
+
+    expect(offset).toBe(5);
+    expect(sql).toContain('limit ? offset ?');
+    expect(params.slice(-2)).toEqual([5, 0]);
   });
 
   it('pagina com limit e offset fora do SQL Server', () => {
@@ -326,8 +415,8 @@ describe('drizzleDatabase', () => {
     const projection = data.manyProjections[0];
     const child = (id: string, title: string, userId: number) => {
       const row: Record<string, unknown> = {};
-      projection.columns.forEach((column, index) => {
-        row[`c${index}`] = { id, title, user_id: userId }[column];
+      projection.columns.forEach((projected, index) => {
+        row[`c${index}`] = { id, title, user_id: userId }[projected.field];
       });
       return row;
     };
@@ -357,6 +446,43 @@ describe('drizzleDatabase', () => {
     await drizzleDatabase({ client, dialect: 'sqlite' }).executeData(data);
 
     expect(all).toHaveBeenCalledTimes(1);
+  });
+
+  it('não consulta a coleção quando nenhum root tem a chave de correlação', async () => {
+    const { data } = statementFor({
+      includes: 'posts',
+      fields: 'id,nickname,posts.title',
+    });
+    // Uma coleção pode ser declarada sobre coluna anulável (`sourceColumn` é
+    // qualquer coluna do root). Aqui `nickname` faz esse papel: nenhum root da
+    // página tem valor, então não existe chave para o `IN`.
+    const overNullable: DrizzleStatement = {
+      ...data,
+      manyProjections: [
+        { ...data.manyProjections[0], sourceField: 'nickname' },
+      ],
+    };
+    const raw = (id: number): Record<string, unknown> => {
+      const row: Record<string, unknown> = {};
+      data.select.forEach((selection, index) => {
+        row[`c${index}`] = selection.column === 'nickname' ? null : id;
+      });
+      return row;
+    };
+    const { client, all } = clientReturning([raw(1), raw(2)]);
+
+    const rows = await drizzleDatabase({
+      client,
+      dialect: 'sqlite',
+    }).executeData(overNullable);
+
+    // A coleção vazia é a resposta certa, e `toManySql` recusa lista de chaves
+    // vazia: sem esta saída o root sem chave viraria erro de contrato.
+    expect(all).toHaveBeenCalledTimes(1);
+    expect(rows).toEqual([
+      { id: 1, nickname: null, posts: [] },
+      { id: 2, nickname: null, posts: [] },
+    ]);
   });
 
   it('devolve zero quando a contagem não traz linha', async () => {
@@ -460,5 +586,310 @@ describe('assertDrizzleClient', () => {
     expect(() =>
       assertDrizzleClient({ all: () => [] }, 'oracle' as never)
     ).toThrow('Drizzle adapter does not support dialect oracle');
+  });
+});
+
+/**
+ * Chave lógica e nome físico divergentes.
+ *
+ * Até o PR5 o compilador emitia a **chave** do mapa `columns` como
+ * identificador e nunca lia `DrizzleColumn.name`: um descritor
+ * `{ companyId: { name: 'company_id' } }` compilava, passava em
+ * `assertSourceMatchesRules`, a aplicação subia, e a primeira consulta morria
+ * no banco com `column "companyId" does not exist`. As duas identidades vivem
+ * agora em campos separados — `field` para o JSON e para as regras, `column`
+ * para o SQL —, e este bloco é o que trava a diferença: nenhuma das tabelas
+ * abaixo tem uma única coluna cujo nome físico coincida com a chave lógica, de
+ * modo que qualquer volta atrás aparece como identificador errado no SQL.
+ */
+describe('nome físico distinto da chave lógica', () => {
+  const orgsTable = createDrizzleTable({
+    name: 'orgs',
+    model: 'org',
+    columns: {
+      id: {
+        name: 'org_id',
+        kind: 'integer',
+        nullable: false,
+        primaryKey: true,
+      },
+      tradeName: {
+        name: 'trade_name',
+        kind: 'string',
+        nullable: false,
+        primaryKey: false,
+      },
+    },
+  });
+
+  const notesTable = createDrizzleTable({
+    name: 'notes',
+    model: 'note',
+    columns: {
+      id: {
+        name: 'note_id',
+        kind: 'integer',
+        nullable: false,
+        primaryKey: true,
+      },
+      body: {
+        name: 'note_body',
+        kind: 'string',
+        nullable: false,
+        primaryKey: false,
+      },
+      accountId: {
+        name: 'account_id',
+        kind: 'integer',
+        nullable: false,
+        primaryKey: false,
+      },
+    },
+  });
+
+  const accountsTable = createDrizzleTable({
+    name: 'accounts',
+    model: 'account',
+    columns: {
+      id: {
+        name: 'account_id',
+        kind: 'integer',
+        nullable: false,
+        primaryKey: true,
+      },
+      fullName: {
+        name: 'full_name',
+        kind: 'string',
+        nullable: false,
+        primaryKey: false,
+        foldedField: 'fullNameFolded',
+      },
+      fullNameFolded: {
+        name: 'full_name_folded',
+        kind: 'string',
+        nullable: false,
+        primaryKey: false,
+        internal: true,
+      },
+      companyId: {
+        name: 'company_id',
+        kind: 'integer',
+        nullable: true,
+        primaryKey: false,
+      },
+    },
+  });
+
+  const relations: DrizzleRelationMap = {
+    // As colunas de junção também são chaves lógicas: escrevê-las com o nome
+    // físico é erro de configuração, não configuração alternativa.
+    company: {
+      target: orgsTable,
+      cardinality: 'one',
+      nullable: true,
+      sourceColumn: 'companyId',
+      targetColumn: 'id',
+    },
+    notes: {
+      target: notesTable,
+      cardinality: 'many',
+      nullable: true,
+      sourceColumn: 'id',
+      targetColumn: 'accountId',
+    },
+  };
+
+  const schemas: SchemaRegistry = new Map([
+    ['account', buildSourceSchema(accountsTable, relations)],
+    ['org', buildSourceSchema(orgsTable, {})],
+    ['note', buildSourceSchema(notesTable, {})],
+  ]);
+
+  const rules = defineQueryRules(schemas, 'account', {
+    filters: [
+      { path: 'companyId', operators: ['eq'] },
+      { path: 'company.tradeName', operators: ['eq'] },
+      { path: 'notes.body', operators: ['eq'] },
+    ],
+    sorts: ['fullName'],
+    fields: {
+      root: {
+        allowed: ['id', 'fullName', 'companyId'],
+        default: ['id', 'fullName'],
+      },
+      relations: {
+        company: { allowed: ['tradeName'], default: ['tradeName'] },
+        notes: { allowed: ['body'], default: ['body'] },
+      },
+    },
+    includes: ['company', 'notes'],
+    search: ['fullName'],
+  });
+
+  function compileAccounts(query: Parameters<typeof buildQueryPlan>[0]) {
+    const source = drizzleSource({
+      db: drizzleDatabase({ client: { all: () => [] }, dialect: 'sqlite' }),
+      dialect: 'sqlite',
+      table: accountsTable,
+      relations,
+    }).input;
+    return new DrizzleAdapter().compile(buildQueryPlan(query, rules), source);
+  }
+
+  it('emite o nome físico em select, join, where e order by', () => {
+    const { data } = compileAccounts({
+      filter: { 'company.tradeName': { eq: 'ACME' } },
+      includes: 'company',
+      fields: 'id,fullName,company.tradeName',
+      sort: 'fullName',
+    });
+
+    const { sql } = render(toDataSql(data));
+
+    expect(sql).toContain('"accounts"."account_id" as "c0"');
+    expect(sql).toContain('"accounts"."full_name" as "c1"');
+    expect(sql).toContain(
+      'inner join "orgs" as "accounts__company" on "accounts"."company_id" = "accounts__company"."org_id"'
+    );
+    expect(sql).toContain('"accounts__company"."trade_name" = ?');
+    expect(sql).toContain(
+      'order by "accounts"."full_name" asc, "accounts"."account_id" asc'
+    );
+    // Nenhuma chave lógica pode vazar para o SQL: é exatamente esse vazamento
+    // que subia a aplicação e quebrava no banco.
+    expect(sql).not.toContain('"fullName"');
+    expect(sql).not.toContain('"companyId"');
+    expect(sql).not.toContain('"tradeName"');
+  });
+
+  it('traduz a coluna dobrada da busca e a correlação do EXISTS', () => {
+    const { data } = compileAccounts({
+      search: 'ana',
+      filter: { 'notes.body': { eq: 'urgente' } },
+    });
+
+    const { sql } = render(toDataSql(data));
+
+    expect(sql).toContain('"accounts"."full_name_folded" like ? escape ?');
+    expect(sql).toContain(
+      'exists (select 1 from "notes" as "accounts__notes__x" where "accounts"."account_id" = "accounts__notes__x"."account_id" and "accounts__notes__x"."note_body" = ?'
+    );
+  });
+
+  it('traduz a segunda consulta da coleção, inclusive a ordenação', () => {
+    const { data } = compileAccounts({
+      includes: 'notes',
+      fields: 'id,notes.body',
+    });
+
+    const { sql } = render(toManySql(data.manyProjections[0], [1]));
+
+    // `note_id` entra pela projeção interna do plano, e a ordenação da coleção
+    // sai da PK do alvo: as três colunas passam pela mesma tradução.
+    expect(sql).toContain(
+      'select "notes"."note_id" as "c0", "notes"."note_body" as "c1", "notes"."account_id" as "c2" from "notes" where "notes"."account_id" in (?)'
+    );
+    expect(sql).toContain('order by "notes"."note_id" asc');
+  });
+
+  it('hidrata a linha pelas chaves lógicas, não pelos nomes do banco', async () => {
+    const { data } = compileAccounts({
+      includes: 'company,notes',
+      fields: 'id,fullName,company.tradeName,notes.body',
+    });
+    const root: Record<string, unknown> = {};
+    data.select.forEach((selection, index) => {
+      root[`c${index}`] = selection.path === '' ? 7 : 'ACME';
+    });
+    const child: Record<string, unknown> = { c0: 3, c1: 'nota', c2: 7 };
+
+    const all = jest
+      .fn()
+      .mockResolvedValueOnce([root])
+      .mockResolvedValueOnce([child]);
+    const rows = await drizzleDatabase({
+      client: { all },
+      dialect: 'sqlite',
+    }).executeData(data);
+
+    // O JSON é a fronteira pública: quem pediu `fullName` recebe `fullName`,
+    // não `full_name`, mesmo com a coluna renomeada no banco.
+    expect(rows[0]).toEqual({
+      id: 7,
+      fullName: 7,
+      company: { id: 'ACME', tradeName: 'ACME' },
+      notes: [{ id: 3, body: 'nota', accountId: 7 }],
+    });
+  });
+
+  it('recusa relação cuja coluna de junção não é um campo declarado', () => {
+    expect(() =>
+      buildSourceSchema(accountsTable, {
+        // `company_id` é o nome físico; a relação fala em campo lógico. Antes
+        // do conserto isto compilava SQL válido contra a coluna certa por
+        // acidente, e o mesmo descritor com `name` divergente compilava SQL
+        // contra uma coluna inexistente.
+        company: {
+          target: orgsTable,
+          cardinality: 'one',
+          nullable: true,
+          sourceColumn: 'company_id',
+          targetColumn: 'id',
+        },
+      })
+    ).toThrow(
+      'Drizzle table accounts has no column declared for field company_id'
+    );
+  });
+
+  it('recusa campo que o registry conhece e a tabela do alvo não declara', () => {
+    const ghostRules = defineQueryRules(
+      new Map([
+        ...schemas,
+        [
+          'org',
+          buildSourceSchema(
+            createDrizzleTable({
+              ...orgsTable,
+              columns: {
+                ...orgsTable.columns,
+                slogan: {
+                  name: 'slogan',
+                  kind: 'string',
+                  nullable: true,
+                  primaryKey: false,
+                },
+              },
+            }),
+            {}
+          ),
+        ],
+      ]),
+      'account',
+      {
+        filters: [{ path: 'company.slogan', operators: ['eq'] }],
+        sorts: ['fullName'],
+        fields: { root: { allowed: ['id'], default: ['id'] } },
+      }
+    );
+    const source = drizzleSource({
+      db: drizzleDatabase({ client: { all: () => [] }, dialect: 'sqlite' }),
+      dialect: 'sqlite',
+      table: accountsTable,
+      relations,
+    }).input;
+
+    // O registry das regras e a tabela do adapter são declarações separadas:
+    // um campo que só existe na primeira precisa falhar como configuração, e
+    // não virar identificador inexistente no SQL.
+    expect(() =>
+      new DrizzleAdapter().compile(
+        buildQueryPlan(
+          { filter: { 'company.slogan': { eq: 'x' } } },
+          ghostRules
+        ),
+        source
+      )
+    ).toThrow('Drizzle table orgs has no column declared for field slogan');
   });
 });

@@ -85,6 +85,10 @@ export function planJoins(plan: TypedQueryPlan): JoinPlan {
   }
 
   for (const target of plan.search?.targets ?? []) {
+    // Mesma regra do filtro, e pela mesma razão: alvo de busca por relação
+    // `many` vira EXISTS no compilador. Juntá-lo aqui duplicaria o root uma
+    // vez por item casado e o LIMIT da página cairia sobre as duplicatas.
+    if (target.existential) continue;
     if (target.relationPath.length === 0) continue;
     ensure(target.relationPath.join('.'), 'predicate');
   }
@@ -128,32 +132,165 @@ function relationAt(plan: TypedQueryPlan, path: string): 'one' | 'many' {
   );
 }
 
-/**
- * Colunas que correlacionam uma relação `many` com o root, para a subquery
- * existencial. TypeORM guarda as join columns no lado dono da relação.
- */
-export function correlationColumns(relation: RelationMetadata): {
-  readonly owner: EntityMetadata;
-  readonly pairs: readonly {
-    readonly ownerColumn: string;
-    readonly referencedColumn: string;
-  }[];
-} {
-  const owning = relation.isOwning ? relation : relation.inverseRelation;
+/** Prefixo dos aliases da subquery existencial, para não colidir com joins. */
+const SUBQUERY_PREFIX = 'dqb_ex_';
 
-  if (!owning || owning.joinColumns.length === 0) {
-    throw configurationError(
-      'SOURCE_CONFIGURATION_INVALID',
-      `Relation ${relation.propertyPath} has no join columns; many-to-many existential filters are not supported yet`,
-      { path: relation.propertyPath }
+/** Sufixo do alias da tabela de junção de uma many-to-many. */
+const JUNCTION_SUFFIX = '_j';
+
+/** Uma tabela da subquery existencial, ligada à anterior por `on`. */
+export interface ExistentialStep {
+  readonly table: string;
+  readonly alias: string;
+  /**
+   * Pares que ligam este alias ao anterior — o root, no primeiro passo.
+   *
+   * O passo não sabe o alias do pai de propósito: quem emite o SQL é que
+   * conhece a ordem, e é sempre o alias imediatamente anterior da cadeia.
+   */
+  readonly on: readonly {
+    readonly column: string;
+    readonly parentColumn: string;
+  }[];
+}
+
+/**
+ * Cadeia de tabelas de um caminho existencial, do root até a folha.
+ *
+ * O primeiro passo vai no `FROM` da subquery e é o único correlacionado com o
+ * root; os demais são `INNER JOIN` **dentro** dela. É a forma que o Drizzle já
+ * usa, e a razão é aritmética: correlacionar o segundo salto por fora
+ * multiplicaria os roots e estragaria o `total`, que é justamente o que o
+ * `EXISTS` existe para evitar.
+ *
+ * A cadeia é montada percorrendo a metadata do TypeORM salto a salto, e não o
+ * registry lógico: só a metadata sabe de que lado a FK mora e que tabela de
+ * junção existe.
+ */
+export function existentialChain(
+  root: EntityMetadata,
+  relationPath: readonly string[]
+): readonly ExistentialStep[] {
+  const steps: ExistentialStep[] = [];
+  const traversed: string[] = [];
+  let metadata = root;
+
+  for (const property of relationPath) {
+    const relation = metadata.findRelationWithPropertyPath(property)!;
+    // O alias acumula o caminho inteiro: `posts.tags` não colide com `tags`, e
+    // uma relação que volta para a própria entidade não colide consigo mesma.
+    traversed.push(property);
+    steps.push(
+      ...relationSteps(relation, `${SUBQUERY_PREFIX}${traversed.join('_')}`)
     );
+    metadata = relation.inverseEntityMetadata;
   }
 
-  return {
-    owner: owning.entityMetadata,
-    pairs: owning.joinColumns.map((column: ColumnMetadata) => ({
-      ownerColumn: column.databaseName,
-      referencedColumn: column.referencedColumn!.databaseName,
-    })),
-  };
+  return steps;
+}
+
+/** Passos de um único salto: um para relação direta, dois para many-to-many. */
+function relationSteps(
+  relation: RelationMetadata,
+  alias: string
+): ExistentialStep[] {
+  if (relation.isManyToMany) return manyToManySteps(relation, alias);
+
+  const table = relation.inverseEntityMetadata.tableName;
+
+  // FK deste lado (many-to-one, ou one-to-one dona): a coluna dona está no
+  // pai e a referenciada no alvo, então o par sai invertido em relação ao
+  // caso abaixo.
+  if (relation.isWithJoinColumn) {
+    return [
+      {
+        table,
+        alias,
+        on: relation.joinColumns.map((column: ColumnMetadata) => ({
+          column: column.referencedColumn!.databaseName,
+          parentColumn: column.databaseName,
+        })),
+      },
+    ];
+  }
+
+  // Sobram one-to-many e one-to-one inversa: a FK vive no alvo, e é a relação
+  // dona (o lado inverso) que a descreve. TypeORM exige `inverseSide` nos dois
+  // casos, então o inverso sempre existe e sempre tem join columns.
+  const owning = relation.inverseRelation!;
+
+  return [
+    {
+      table,
+      alias,
+      on: owning.joinColumns.map((column: ColumnMetadata) => ({
+        column: column.databaseName,
+        parentColumn: column.referencedColumn!.databaseName,
+      })),
+    },
+  ];
+}
+
+/**
+ * Many-to-many atravessa a **tabela de junção**, e é isso que o guard antigo
+ * recusava por não saber fazer.
+ *
+ * O defeito que ele substituiu era silencioso: numa m2m o lado dono *tem*
+ * `joinColumns` — só que são colunas da junção —, enquanto `entityMetadata`
+ * continua sendo a entidade que declara a relação. Correlacionar com esse par
+ * produzia `EXISTS (SELECT 1 FROM articles ... WHERE articles.articlesId =
+ * root.id)`: SQL válido, tabela errada, resultado errado. Aqui a junção entra
+ * como tabela própria, e o alvo é alcançado a partir dela.
+ *
+ * Só o lado dono guarda `junctionEntityMetadata` e as duas listas de colunas;
+ * do lado inverso elas vêm do dono, com os papéis trocados — o que aponta para
+ * o alvo, de lá, é o que aponta para o pai, daqui.
+ *
+ * A junção é a única tabela do SQL cujo nome e cujas colunas **não** vêm do
+ * consumidor: a estratégia de nomes do TypeORM os gera em camelCase
+ * (`articlesId`). O resto deste compilador emite identificadores crus, e sem
+ * aspas o PostgreSQL dobra `articlesId` para minúsculas e não acha a coluna —
+ * então só estes três passam pelo `escape` do driver. Uniformizar a citação
+ * do compilador inteiro é decisão maior que esta emenda.
+ *
+ * O driver vem por `entityMetadata.connection`, e não pelo `dataSource` que a
+ * 1.x prefere, porque o peer declarado é `^0.3.26 || ^1.0.0` e `dataSource` só
+ * existe na 1.x. Ler o nome novo custou os sete testes desta suíte no job
+ * `Test Peers` sob 0.3.26 e 0.3.27 — `Cannot destructure property 'driver' of
+ * undefined`, ou seja a m2m inteira morta no mínimo do próprio peer. `connection`
+ * está nas duas (na 1.x como getter deprecado), é o que `typeorm.adapter.ts` já
+ * usa, e é uma expressão só: um `dataSource ?? connection` cobriria a 2.0 ao
+ * preço de um branch que nenhuma versão do range executa nos dois lados.
+ */
+function manyToManySteps(
+  relation: RelationMetadata,
+  alias: string
+): ExistentialStep[] {
+  const owning = relation.isOwning ? relation : relation.inverseRelation!;
+  const toParent = relation.isOwning
+    ? owning.joinColumns
+    : owning.inverseJoinColumns;
+  const toTarget = relation.isOwning
+    ? owning.inverseJoinColumns
+    : owning.joinColumns;
+  const { driver } = relation.entityMetadata.connection;
+
+  return [
+    {
+      table: driver.escape(owning.junctionEntityMetadata!.tableName),
+      alias: `${alias}${JUNCTION_SUFFIX}`,
+      on: toParent.map((column: ColumnMetadata) => ({
+        column: driver.escape(column.databaseName),
+        parentColumn: column.referencedColumn!.databaseName,
+      })),
+    },
+    {
+      table: relation.inverseEntityMetadata.tableName,
+      alias,
+      on: toTarget.map((column: ColumnMetadata) => ({
+        column: column.referencedColumn!.databaseName,
+        parentColumn: driver.escape(column.databaseName),
+      })),
+    },
+  ];
 }

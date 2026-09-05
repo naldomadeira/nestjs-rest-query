@@ -4,12 +4,15 @@ import type { PlanFilter } from '@core/semantic-validator';
 import {
   DrizzleAdapter,
   DrizzleJoinPlanner,
+  createDrizzleTable,
   drizzleSource,
   scalarCondition,
   type DrizzleDatabase,
   type DrizzleColumnRef,
+  type DrizzleRelationMap,
   type DrizzleSourceInput,
   type DrizzleStatement,
+  type DrizzleTable,
 } from '@infra/adapters/drizzle';
 import { defineQueryRules } from '@core/authorization';
 import { RULES_PRESETS } from '../../fixtures/rules';
@@ -49,6 +52,39 @@ function compile(
   const compiled = new DrizzleAdapter().compile(plan, source);
   return { data: compiled.data, count: compiled.count };
 }
+
+/**
+ * `posts` de um schema legado: a coleção aponta para o `code` do usuário.
+ *
+ * `sourceColumn` é qualquer coluna do root, não necessariamente a PK — uma
+ * coleção sobre chave natural é configuração válida. Fixture local porque é o
+ * único arranjo em que a correlação precisa de uma coluna que a projeção
+ * interna do plano não trouxe de graça: a PK ela sempre traz.
+ */
+const postsByCodeTable: DrizzleTable = createDrizzleTable({
+  name: 'posts',
+  model: 'post',
+  columns: {
+    ...postsTable.columns,
+    user_code: {
+      name: 'user_code',
+      kind: 'string',
+      nullable: false,
+      primaryKey: false,
+    },
+  },
+});
+
+const postsByCodeRelations: DrizzleRelationMap = {
+  ...userRelations,
+  posts: {
+    target: postsByCodeTable,
+    cardinality: 'many',
+    nullable: true,
+    sourceColumn: 'code',
+    targetColumn: 'user_code',
+  },
+};
 
 describe('drizzleSource', () => {
   it('deriva o schema lógico das colunas declaradas', async () => {
@@ -166,8 +202,8 @@ describe('DrizzleAdapter compile', () => {
     expect(data.table).toBe('users');
     expect(data.alias).toBe('users');
     expect(data.select).toEqual([
-      { alias: 'users', column: 'id', path: '' },
-      { alias: 'users', column: 'name', path: '' },
+      { alias: 'users', field: 'id', column: 'id', path: '' },
+      { alias: 'users', field: 'name', column: 'name', path: '' },
     ]);
     expect(data.joins).toEqual([]);
   });
@@ -195,6 +231,7 @@ describe('DrizzleAdapter compile', () => {
     ]);
     expect(data.select).toContainEqual({
       alias: 'users__company',
+      field: 'name',
       column: 'name',
       path: 'company',
     });
@@ -218,6 +255,7 @@ describe('DrizzleAdapter compile', () => {
     ]);
     expect(data.select).toContainEqual({
       alias: 'users__company__owner',
+      field: 'name',
       column: 'name',
       path: 'company.owner',
     });
@@ -376,6 +414,10 @@ describe('DrizzleAdapter compile', () => {
   it('espalha o search em OR sobre as colunas dobradas', () => {
     const { data } = compile({ search: 'Ada' }, 'user.deep');
 
+    // O terceiro termo é o alvo `posts.title`, que atravessa uma relação
+    // `many`: ele entra como `EXISTS` correlacionado, dentro do **mesmo** OR
+    // dos alvos escalares. Existencial e escalar misturados são uma pergunta
+    // só; em grupos separados a busca viraria um AND de duas buscas.
     expect(data.where).toEqual({
       op: 'and',
       terms: [
@@ -390,6 +432,29 @@ describe('DrizzleAdapter compile', () => {
               ref: { alias: 'users', column: 'email_folded' },
               value: '%ada%',
             }),
+            {
+              op: 'exists',
+              relationPath: ['posts'],
+              negated: false,
+              joins: [
+                {
+                  path: 'posts',
+                  table: 'posts',
+                  alias: 'users__posts__x',
+                  parentAlias: 'users',
+                  sourceColumn: 'id',
+                  targetColumn: 'user_id',
+                  kind: 'inner',
+                },
+              ],
+              where: {
+                op: 'like',
+                ref: { alias: 'users__posts__x', column: 'title_folded' },
+                value: '%ada%',
+                escape: '!',
+                negated: false,
+              },
+            },
           ],
         },
       ],
@@ -512,31 +577,108 @@ describe('DrizzleAdapter compile', () => {
     );
 
     expect(data.joins).toEqual([]);
-    expect(data.select).toEqual([{ alias: 'users', column: 'id', path: '' }]);
+    expect(data.select).toEqual([
+      { alias: 'users', field: 'id', column: 'id', path: '' },
+    ]);
     expect(data.manyProjections).toEqual([
       {
         path: 'posts',
         table: 'posts',
-        sourceColumn: 'id',
+        sourceField: 'id',
         targetColumn: 'user_id',
-        columns: ['id', 'title', 'user_id'],
+        targetField: 'user_id',
+        columns: [
+          { field: 'id', column: 'id' },
+          { field: 'title', column: 'title' },
+          { field: 'user_id', column: 'user_id' },
+        ],
         orderBy: ['id'],
       },
     ]);
   });
 
-  it('seleciona a coluna de correlação mesmo quando o cliente não a pediu', () => {
+  it('seleciona a PK do root mesmo quando o cliente não a pediu', () => {
     const { data } = compile(
       { includes: 'posts', fields: 'name,posts.title' },
       'user.deep'
     );
 
-    // `posts` correlaciona por `users.id`, que não está em `fields`.
+    // `posts` correlaciona por `users.id`, que não está em `fields`. Aqui a
+    // coluna chega pela projeção interna do plano, que sempre acrescenta a PK
+    // — não pelo reparo do compiler de projeção. Quem exercita o reparo é o
+    // caso da coleção sobre chave natural, logo abaixo.
     expect(data.select).toContainEqual({
       alias: 'users',
+      field: 'id',
       column: 'id',
       path: '',
     });
+  });
+
+  it('acrescenta a coluna de correlação quando a coleção não usa a PK', () => {
+    const { data } = compile(
+      { includes: 'posts', fields: 'name,posts.title' },
+      'user.deep',
+      input({ relations: postsByCodeRelations })
+    );
+
+    // A projeção interna do plano traz `id`, nunca `code`: sem este reparo a
+    // segunda consulta receberia `undefined` como chave de correlação e a
+    // coleção voltaria vazia em todo root — sem erro nenhum.
+    expect(data.select).toContainEqual({
+      alias: 'users',
+      field: 'code',
+      column: 'code',
+      path: '',
+    });
+    expect(data.manyProjections[0]).toMatchObject({
+      sourceField: 'code',
+      targetColumn: 'user_code',
+      targetField: 'user_code',
+      columns: [
+        { field: 'id', column: 'id' },
+        { field: 'title', column: 'title' },
+        { field: 'user_code', column: 'user_code' },
+      ],
+    });
+  });
+
+  it('falha fechado quando a coleção aponta para um model fora do registry', () => {
+    const ghostTable: DrizzleTable = createDrizzleTable({
+      name: 'ghosts',
+      model: 'ghost',
+      columns: {
+        id: { name: 'id', kind: 'integer', nullable: false, primaryKey: true },
+        user_id: {
+          name: 'user_id',
+          kind: 'integer',
+          nullable: false,
+          primaryKey: false,
+        },
+      },
+    });
+
+    // A ordem da coleção sai da PK do alvo, que vive no registry do plano. Sem
+    // o alvo lá, hidratar devolveria a coleção em ordem indefinida — e a
+    // paginação da §14 depende de ordem total, então isto é erro, não default.
+    expect(() =>
+      compile(
+        { includes: 'posts', fields: 'id,posts.title' },
+        'user.deep',
+        input({
+          relations: {
+            ...userRelations,
+            posts: {
+              target: ghostTable,
+              cardinality: 'many',
+              nullable: true,
+              sourceColumn: 'id',
+              targetColumn: 'user_id',
+            },
+          },
+        })
+      )
+    ).toThrow('Drizzle relation posts targets the unknown model ghost');
   });
 
   it('falha fechado ao projetar uma coleção aninhada em outra relação', () => {
@@ -672,6 +814,16 @@ describe('scalarCondition', () => {
 });
 
 describe('DrizzleJoinPlanner', () => {
+  it('usa o nome da tabela como alias do root, não um prefixo vazio', () => {
+    const planner = new DrizzleJoinPlanner(usersTable, userRelations);
+
+    // `aliasFor` é público na classe exportada: um consumidor que qualifique
+    // uma coluna do root por ela receberia `users__` sem este atalho, e o SQL
+    // sairia citando um alias que não existe no FROM.
+    expect(planner.aliasFor([])).toBe(planner.rootAlias);
+    expect(planner.aliasFor(['company'])).toBe('users__company');
+  });
+
   it('recusa juntar através de uma relação many', () => {
     const planner = new DrizzleJoinPlanner(usersTable, userRelations);
 
@@ -720,6 +872,20 @@ describe('DrizzleAdapter execute', () => {
     expect(result.total).toBe(1);
   });
 
+  it('customize sem escopo alcança data e count', () => {
+    const adapter = new DrizzleAdapter();
+    const plan = buildQueryPlan({}, RULES_PRESETS['user.default']);
+    const compiled = adapter.compile(plan, input());
+    const seen: string[] = [];
+
+    // O default é `both`: quem chama `customize(compiled, cb)` sem escopo
+    // espera que o filtro extra entre também na contagem, senão `total` conta
+    // linhas que a página nunca devolve.
+    adapter.customize(compiled, (native) => seen.push(native.kind));
+
+    expect(seen).toEqual(['data', 'count']);
+  });
+
   it('customize com escopo único atinge apenas aquela query', () => {
     const adapter = new DrizzleAdapter();
     const plan = buildQueryPlan({}, RULES_PRESETS['user.default']);
@@ -730,6 +896,40 @@ describe('DrizzleAdapter execute', () => {
     adapter.customize(compiled, (native) => seen.push(native.kind), 'count');
 
     expect(seen).toEqual(['data', 'count']);
+  });
+
+  /**
+   * O tipo da linha atravessa a source, sem cast em lugar nenhum.
+   *
+   * A anotação de `first` é o teste: até o PR5 `drizzleSource` fixava a linha
+   * em `object`, e um consumidor v2 que devolvia `QueryResult<UserDto>` não
+   * reproduzia a assinatura na v3 sem `as` — contra o gate §23, que proíbe
+   * cast no uso público documentado. O tipo entra pelo executor, que é quem de
+   * fato produz as linhas.
+   */
+  it('propaga o tipo da linha declarado pelo executor até o resultado', async () => {
+    interface AccountRow {
+      id: number;
+      name: string;
+    }
+
+    const database: DrizzleDatabase<AccountRow> = {
+      executeData: jest.fn().mockResolvedValue([{ id: 1, name: 'Ada' }]),
+      executeCount: jest.fn().mockResolvedValue(1),
+    };
+    const result = await new QueryBuilderService({}).execute(
+      drizzleSource<AccountRow>({
+        db: database,
+        dialect: 'postgres',
+        table: usersTable,
+        relations: userRelations,
+      }),
+      { fields: 'id,name' },
+      RULES_PRESETS['user.default']
+    );
+    const first: AccountRow = result.data[0];
+
+    expect(first.name).toBe('Ada');
   });
 
   it('não consulta o count quando o plano não pagina', async () => {

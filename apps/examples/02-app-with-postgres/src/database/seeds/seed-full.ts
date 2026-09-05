@@ -54,7 +54,11 @@ async function stepModules(ds: DataSource): Promise<Module[]> {
   const repo: Repository<Module> = ds.getRepository(Module);
 
   logger.title('Passo 1/4 — Módulos');
-  await repo.upsert(MODULES_SEED_DATA, {
+  // `repo.create(...)` antes do upsert não é cerimônia: as factories devolvem
+  // objetos literais, e o listener `@BeforeInsert` que preenche as colunas
+  // dobradas só é disparado para instâncias da entidade. Sem isto o seed
+  // gravaria `*_folded` vazio e `?search=` não encontraria nada.
+  await repo.upsert(repo.create(MODULES_SEED_DATA), {
     conflictPaths: ['slug'],
     skipUpdateIfNoValuesChanged: true,
   });
@@ -69,7 +73,7 @@ async function stepCompanies(ds: DataSource): Promise<Company[]> {
 
   logger.title('Passo 2/4 — Empresas');
   const data = COMPANIES_SEED_DATA.slice(0, COMPANY_COUNT);
-  await repo.upsert(data, {
+  await repo.upsert(repo.create(data), {
     conflictPaths: ['cnpj'],
     skipUpdateIfNoValuesChanged: true,
   });
@@ -88,7 +92,7 @@ async function stepUsers(ds: DataSource): Promise<User[]> {
   );
 
   // Admin fixo
-  await repo.upsert([makeAdminUser()], {
+  await repo.upsert([repo.create(makeAdminUser())], {
     conflictPaths: ['ssoUserId'],
     skipUpdateIfNoValuesChanged: true,
   });
@@ -106,7 +110,7 @@ async function stepUsers(ds: DataSource): Promise<User[]> {
   let success = 0;
   for (const user of [...managers, ...externals]) {
     try {
-      await repo.upsert([user], {
+      await repo.upsert([repo.create(user)], {
         conflictPaths: ['ssoUserId'],
         skipUpdateIfNoValuesChanged: true,
       });

@@ -2,12 +2,12 @@
 
 > **Status:** Aceito em 2026-09-04.
 > **Owner:** Opus.
-> **Emenda:** §6.2, §25.8 e a divergência declarada do Prisma no
+> **Emenda:** §6.2, §8.2, §25.8 e a divergência declarada do Prisma no
 > [design de 2026-09-03](./2026-09-03-v3-paridade-orm-bancos-design.md).
 > **Bloqueia:** nada. Habilita a fase 6.
 
 O design de 2026-09-03 continua sendo o registro da decisão original e **não
-foi editado**. Este ADR registra três emendas a ele, o fato que motivou cada
+foi editado**. Este ADR registra quatro emendas a ele, o fato que motivou cada
 uma e o mecanismo que a torna segura.
 
 ---
@@ -151,6 +151,46 @@ transforma imports e deixa o usuário achando que terminou, quando as decisões
 de schema — que o próprio design (§linha 728) diz que codemod não cobre —
 continuam pendentes. O `MIGRATION.md` passa a ser validado contra um projeto v2
 real, que é o que o gate pede.
+
+## Emenda 4 — `defaultPerPage` volta a `10`
+
+**Desfaz** a troca do default de paginação de `10` para `20`, restaurando o
+comportamento da `2.x`. `maxPerPage` continua `100` e não estava em questão.
+
+O que motivou esta emenda foi procurar a decisão e não achar. O `20` aparece em
+exatamente um lugar do design: o bloco de exemplo da §8.2, sem uma linha de
+justificativa. `build-query-plan.ts` e `dynamic-query-builder.module.ts`
+copiaram o exemplo, `tests/v3/core/module.spec.ts` fixou o número como "os
+defaults do spec §8.2", e daí ele se espalhou para o `MIGRATION.md`, o
+`docs/v3/migration-from-v2.md`, o `README.md` e as páginas publicadas — que
+passaram a **instruir o consumidor a fixar `defaultPerPage`** por causa de uma
+mudança que ninguém tomou. O commit que a introduziu (`906fc1f`) descreve em
+detalhe o que mudou em `forRoot`, em `RulesConfig` e nos decorators, e não
+menciona paginação.
+
+**O critério que ela não passa é o da §5.6.** Toda outra mudança breaking da v3
+troca um comportamento errado por um certo, e o consumidor percebe: a coerção
+por tipo recusa `10abc` com `400`, o path exato recusa `company.name` não
+declarado, o parâmetro desconhecido vira `QUERY_SYNTAX_UNKNOWN_PARAM`. São
+recusas nomeadas — exatamente o que a §5.6 exige em vez de aproximação
+silenciosa.
+
+Esta é a única que não recusa nada. Uma aplicação `2.x` que nunca configurou
+paginação sobe na `3.0.0`, responde `200`, e devolve 20 itens onde devolvia 10:
+mesma URL, mesmo código, payload dobrado, nenhum sinal. Quem pagina por
+contagem de páginas vê o total de páginas mudar sozinho. É a forma de quebra
+que a v3 inteira foi desenhada para não produzir, e o benefício em troca é
+nenhum — nem foi articulado.
+
+**Custo de desfazer:** zero para quem ainda não migrou, porque a `3.0.0` não
+foi publicada. Um consumidor que tenha lido uma versão anterior do
+`MIGRATION.md` e fixado `defaultPerPage: 10` explicitamente continua correto —
+a configuração explícita sempre venceu o default.
+
+**Mecanismo:** `DEFAULTS.pagination.defaultPerPage` e o default do
+`build-query-plan` voltam a `10`; o teste que fixava o número deixa de citar a
+§8.2 e passa a citar esta emenda, com o motivo no corpo. O bloco de exemplo da
+§8.2 do design **não foi editado**, pela mesma regra das outras três emendas.
 
 ---
 

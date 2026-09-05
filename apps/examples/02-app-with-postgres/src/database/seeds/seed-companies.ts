@@ -25,7 +25,11 @@ async function seedCompanies(ds: typeof seedDataSource): Promise<void> {
   logger.info(`Empresas a gerar: ${count}`);
   logger.divider();
 
-  await repo.upsert(data, {
+  // `repo.create(...)` antes do upsert não é cerimônia: as factories devolvem
+  // objetos literais, e o listener `@BeforeInsert` que preenche as colunas
+  // dobradas só é disparado para instâncias da entidade. Sem isto o seed
+  // gravaria `*_folded` vazio e `?search=` não encontraria nada.
+  await repo.upsert(repo.create(data), {
     conflictPaths: ['cnpj'],
     skipUpdateIfNoValuesChanged: true,
   });

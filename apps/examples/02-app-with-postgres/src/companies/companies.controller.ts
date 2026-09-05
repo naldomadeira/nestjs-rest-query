@@ -3,13 +3,14 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiDynamicQuery,
   ApiPaginatedResponse,
-  QueryResult,
+  DynamicQueryDto,
   QueryRules,
-  RulesConfig,
+  type CompiledQueryRules,
+  type NormalizedQueryResult,
 } from 'nestjs-rest-query';
 import { CompaniesBusiness } from './companies.business';
 import { Company } from './entities/company.entity';
-import { CompanyQueryDto } from './dtos/company-query.dto';
+import { companyRules } from './companies.query';
 
 @ApiTags('companies')
 @Controller('companies')
@@ -17,20 +18,19 @@ export class CompaniesController {
   constructor(private readonly companiesBusiness: CompaniesBusiness) {}
 
   @Get()
-  @ApiOperation({ summary: 'Busca empresas com filtros dinâmicos' })
-  @ApiDynamicQuery<Company>({
-    filters: ['name', 'cnpj', 'createdAt', 'updatedAt'],
-    sorts: ['name', 'cnpj', 'createdAt'],
-    fields: ['id', 'uuid', 'cnpj', 'name', 'createdAt', 'updatedAt'],
+  @ApiOperation({
+    summary: 'Busca empresas com filtros dinâmicos',
+    description:
+      'A busca por razão social usa a coluna dobrada; parcial de CNPJ usa filter[cnpj][like], onde % e _ são literais',
   })
-  @ApiPaginatedResponse<Company>(Company, {
-    status: 200,
-    description: 'Lista de empresas',
-  })
+  // A DTO estendida da v2 (`CompanyQueryDto`, com um `search` próprio) foi
+  // removida: `search` é parâmetro da gramática e já vem em `DynamicQueryDto`.
+  @ApiDynamicQuery(companyRules)
+  @ApiPaginatedResponse(Company, { description: 'Lista de empresas' })
   async findAll(
-    @Query() query: CompanyQueryDto,
-    @QueryRules() rules: RulesConfig,
-  ): Promise<QueryResult<Company>> {
+    @Query() query: DynamicQueryDto,
+    @QueryRules() rules: CompiledQueryRules,
+  ): Promise<NormalizedQueryResult<Company>> {
     return this.companiesBusiness.findAll(query, rules);
   }
 }

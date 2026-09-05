@@ -38,11 +38,18 @@ NestJS has controllers. TypeORM has a query builder. The boilerplate between the
 
 ## Compatibility
 
-| nestjs-rest-query | NestJS | TypeORM | Drizzle  | Prisma              | Node   |
-| ----------------- | ------ | ------- | -------- | ------------------- | ------ |
-| `2.1.x`           | `11.x` | `0.3.x` | `0.45.x` | `5.x \| 6.x \| 7.x` | `>=20` |
-| `2.0.x`           | `11.x` | `0.3.x` | `0.45.x` | —                   | `>=20` |
-| `1.x`             | `11.x` | `0.3.x` | —        | —                   | `>=20` |
+| nestjs-rest-query  | NestJS | TypeORM               | Drizzle               | Prisma                | Node   |
+| ------------------ | ------ | --------------------- | --------------------- | --------------------- | ------ |
+| `3.x` (prerelease) | `11.x` | `^0.3.26 \|\| ^1.0.0` | `>=1.0.0-rc.4 <1.0.0` | `^6.19.0 \|\| ^7.0.0` | `>=20` |
+| `2.1.x`            | `11.x` | `0.3.x`               | `0.45.x`              | `5.x \| 6.x \| 7.x`   | `>=20` |
+| `2.0.x`            | `11.x` | `0.3.x`               | `0.45.x`              | —                     | `>=20` |
+| `1.x`              | `11.x` | `0.3.x`               | —                     | —                     | `>=20` |
+
+The `3.x` row is what the prerelease requires, not a suggestion: Drizzle
+`0.45.x` is **not** accepted by v3. This README documents the released `2.1.x`
+API; v3 changed the public API surface — see
+[MIGRATION.md, "2.x → 3.x"](./MIGRATION.md#2x--3x). The full v3 matrix lives in
+[`docs/v3/versions.md`](./docs/v3/versions.md).
 
 ## Adapters
 
@@ -52,10 +59,13 @@ NestJS has controllers. TypeORM has a query builder. The boilerplate between the
 | Drizzle | ✅ Stable | `nestjs-rest-query/drizzle` |
 | Prisma  | ✅ Stable | `nestjs-rest-query/prisma`  |
 
-> Development note: the v3 branch is a prerelease effort. Prisma and Drizzle
-> subpaths are functional there, but stable `3.0.0` remains blocked on the full
-> ORM × database matrix, Drizzle 1.x GA/MSSQL support, generated Prisma
-> manifests, and package-consumer smoke tests.
+> Development note: v3 is a prerelease effort with a different public API — the
+> three adapters share one semantic core, and the adapter is chosen by the
+> source rather than by `forRoot`. Stable `3.0.0` remains blocked on the full
+> ORM × database matrix, Drizzle 1.x GA/MSSQL support, a generated Prisma
+> manifest, and package-consumer smoke tests. State per cell:
+> [`docs/v3/status.md`](./docs/v3/status.md). Upgrade path:
+> [MIGRATION.md](./MIGRATION.md#2x--3x).
 
 Want a different ORM? [Open a discussion](https://github.com/naldomadeira/nestjs-rest-query/discussions).
 
@@ -71,6 +81,8 @@ Peer dependencies: `@nestjs/common`, `@nestjs/core`, `reflect-metadata`. Optiona
 
 ### Choose your ORM
 
+In `2.x`, the adapter is a `forRoot` option:
+
 ```typescript
 // TypeORM (default)
 import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
@@ -78,7 +90,6 @@ import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
 DynamicQueryBuilderModule.forRoot({});
 
 // Drizzle
-import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
 import { DrizzleAdapter } from 'nestjs-rest-query/drizzle';
 
 DynamicQueryBuilderModule.forRoot({
@@ -86,7 +97,6 @@ DynamicQueryBuilderModule.forRoot({
 });
 
 // Prisma
-import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
 import { PrismaAdapter } from 'nestjs-rest-query/prisma';
 
 DynamicQueryBuilderModule.forRoot({
@@ -94,9 +104,33 @@ DynamicQueryBuilderModule.forRoot({
 });
 ```
 
+In `3.x` this call is **rejected at startup**: `forRoot` no longer accepts
+`adapter`, and the root package exports no adapter classes. The adapter is
+decided per call, by the source you hand to `execute()`:
+
+```typescript
+// 3.x — forRoot only configures common policy
+DynamicQueryBuilderModule.forRoot({
+  pagination: { defaultPerPage: 10, maxPerPage: 100 },
+  textProfile: 'portable-strict',
+});
+
+// ...and the adapter comes from the source
+import { typeormSource } from 'nestjs-rest-query/typeorm';
+// or: drizzleSource from 'nestjs-rest-query/drizzle'
+// or: prismaSource  from 'nestjs-rest-query/prisma'
+
+await this.qb.execute(typeormSource(this.users), query, rules);
+```
+
 See [Adapters](/docs/adapters) for more.
 
 ## Quick start
+
+> This walkthrough is the `2.x` API. On `3.x`, rules are built with
+> `defineQuerySchema` + `defineQueryRules` and `execute()` takes a source —
+> see [MIGRATION.md](./MIGRATION.md#2x--3x) and the migrated apps under
+> [`apps/examples/`](./apps/examples/).
 
 ### 1. Register the module
 
@@ -108,7 +142,7 @@ import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
 @Module({
   imports: [
     DynamicQueryBuilderModule.forRoot({
-      pagination: { defaultPerPage: 20, maxPerPage: 100 },
+      pagination: { defaultPerPage: 10, maxPerPage: 100 },
     }),
   ],
 })
@@ -253,7 +287,7 @@ The interceptor lets users type filters in the Swagger UI form and forwards them
 ```typescript
 DynamicQueryBuilderModule.forRoot({
   pagination: {
-    defaultPerPage: 20,
+    defaultPerPage: 10,
     maxPerPage: 100,
   },
   operators: {

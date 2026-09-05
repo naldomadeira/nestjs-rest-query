@@ -38,6 +38,18 @@ export interface PlanSearchTarget {
   readonly path: string;
   readonly column: string;
   readonly relationPath: readonly string[];
+  /**
+   * `true` quando o caminho cruza uma relação many: semântica existencial,
+   * exatamente como em `PlanFilter.existential`.
+   *
+   * Sem esta marca o plano mentia para quem confia nele: o adapter do TypeORM
+   * juntava a relação `many` como join de predicado, o `LIMIT` caía sobre as
+   * linhas duplicadas pelo join e a página vinha curta em silêncio — com o
+   * `total` certo, porque `getCount()` conta roots distintos. Prisma e Drizzle
+   * escapavam por derivar a cardinalidade por conta própria; a §5 exige que a
+   * verdade esteja no plano, não na esperteza de cada adapter.
+   */
+  readonly existential: boolean;
 }
 
 export interface PlanSearch {

@@ -4,12 +4,13 @@ import {
   ApiDynamicQuery,
   ApiPaginatedResponse,
   DynamicQueryDto,
-  QueryResult,
   QueryRules,
-  RulesConfig,
+  type CompiledQueryRules,
+  type NormalizedQueryResult,
 } from 'nestjs-rest-query';
-import { Module, Module as ModuleEntity } from './entities/module.entity';
+import { Module as ModuleEntity } from './entities/module.entity';
 import { ModulesBusiness } from './modules.business';
+import { moduleRules } from './modules.query';
 
 @ApiTags('modules')
 @Controller('modules')
@@ -20,21 +21,14 @@ export class ModulesController {
   @ApiOperation({
     summary: 'Busca módulos com filtros dinâmicos',
     description:
-      'Busca módulos com suporte a filtros, ordenação, paginação e seleção de campos',
+      'O status é enum: valor fora do conjunto declarado é recusado antes de chegar ao banco',
   })
-  @ApiDynamicQuery<Module>({
-    filters: ['name', 'slug', 'status', 'createdAt', 'updatedAt'],
-    sorts: ['name', 'slug', 'status', 'createdAt'],
-    fields: ['id', 'name', 'slug', 'status', 'icon', 'createdAt', 'updatedAt'],
-  })
-  @ApiPaginatedResponse<Module>(ModuleEntity, {
-    status: 200,
-    description: 'Lista de módulos',
-  })
+  @ApiDynamicQuery(moduleRules)
+  @ApiPaginatedResponse(ModuleEntity, { description: 'Lista de módulos' })
   async findAll(
     @Query() query: DynamicQueryDto,
-    @QueryRules() rules: RulesConfig,
-  ): Promise<QueryResult<ModuleEntity>> {
+    @QueryRules() rules: CompiledQueryRules,
+  ): Promise<NormalizedQueryResult<ModuleEntity>> {
     return this.modulesBusiness.findAll(query, rules);
   }
 }

@@ -10,8 +10,9 @@ import type { PlanFilter } from '@core/semantic-validator';
 import type { TypedQueryPlan } from '@core/query-plan';
 import { containsPattern } from '../shared/escape-pattern';
 import {
-  correlationColumns,
+  existentialChain,
   ROOT_ALIAS,
+  type ExistentialStep,
   type JoinPlan,
 } from './typeorm-join-planner';
 
@@ -54,14 +55,25 @@ export function compileFilters<T extends ObjectLiteral>(
   const search = context.plan.search;
   if (search && search.targets.length > 0) {
     // Search combina seus campos com OR e entra como mais um termo do AND.
+    //
+    // Existencial e não existencial convivem no mesmo OR: a busca é uma só
+    // pergunta ("algum destes lugares contém o termo"), e separá-la em dois
+    // grupos a transformaria num AND de duas buscas.
     qb.andWhere(
       new Brackets((where) => {
         for (const target of search.targets) {
           const key = bag.add(
             containsPattern(search.foldedTerm, context.escapeCharacter)
           );
+          const like = (column: string): string =>
+            `${column} LIKE :${key} ESCAPE '${context.escapeCharacter}'`;
+
           where.orWhere(
-            `${columnRef(target.column, context)} LIKE :${key} ESCAPE '${context.escapeCharacter}'`
+            target.existential
+              ? existsThroughMany(qb, target.relationPath, (alias) =>
+                  like(`${alias}.${leafColumn(target.column)}`)
+                )
+              : like(columnRef(target.column, context))
           );
         }
       })
@@ -178,43 +190,80 @@ function existentialCondition<T extends ObjectLiteral>(
   context: FilterCompilerContext,
   bag: ParameterBag
 ): string {
-  const relationPath = filter.relationPath;
-  if (relationPath.length !== 1) {
-    throw configurationError(
-      'CAPABILITY_UNAVAILABLE',
-      `Existential filters through nested many relations are not supported yet: ${filter.path}`,
-      { path: filter.path }
-    );
-  }
-
-  const relation =
-    qb.expressionMap.mainAlias!.metadata.findRelationWithPropertyPath(
-      relationPath[0]
-    )!;
-  const { owner, pairs } = correlationColumns(relation);
-  const subAlias = `dqb_ex_${relationPath[0]}`;
-
-  const correlation = pairs
-    .map(
-      (pair) =>
-        `${subAlias}.${pair.ownerColumn} = ${ROOT_ALIAS}.${pair.referencedColumn}`
-    )
-    .join(' AND ');
-
-  const conditions = [correlation];
-
-  if (filter.target !== 'relation') {
-    const leaf = filter.column.split('.').pop()!;
-    const column = `${subAlias}.${leaf}`;
-    conditions.push(existentialLeafCondition(column, filter, context, bag));
-  }
-
-  const exists = `EXISTS (SELECT 1 FROM ${owner.tableName} ${subAlias} WHERE ${conditions.join(' AND ')})`;
+  const exists = existsThroughMany(
+    qb,
+    filter.relationPath,
+    // Alvo é a própria relação: a condição é só a correlação, sem folha.
+    filter.target === 'relation'
+      ? null
+      : (alias) =>
+          existentialLeafCondition(
+            `${alias}.${leafColumn(filter.column)}`,
+            filter,
+            context,
+            bag
+          )
+  );
 
   // `isNull=true` numa relação many significa coleção vazia.
   return filter.target === 'relation' && filter.value === true
     ? `NOT ${exists}`
     : exists;
+}
+
+/**
+ * `EXISTS` correlacionado por um caminho que cruza `many`, de qualquer
+ * profundidade.
+ *
+ * É a mesma maquinaria para filtro e para busca — inclusive a correlação por
+ * FK composta —, porque a semântica é a mesma: "algum item corresponde". O
+ * chamador só fornece a condição da folha, já qualificada pelo alias da
+ * subquery, ou `null` quando a pergunta é sobre a própria coleção.
+ *
+ * A correlação com o root acontece **uma só vez**, no primeiro salto; os
+ * saltos seguintes são `INNER JOIN` dentro da subquery. Correlacionar cada
+ * salto por fora traria a coleção para o `FROM` externo, inflaria os roots e
+ * estragaria o `total` — o problema que o `EXISTS` resolve.
+ */
+function existsThroughMany<T extends ObjectLiteral>(
+  qb: SelectQueryBuilder<T>,
+  relationPath: readonly string[],
+  leaf: ((subAlias: string) => string) | null
+): string {
+  const [head, ...tail] = existentialChain(
+    qb.expressionMap.mainAlias!.metadata,
+    relationPath
+  );
+
+  const correlation = linkCondition(head, ROOT_ALIAS);
+
+  // Cada passo se liga ao alias imediatamente anterior — inclusive a tabela de
+  // junção de uma many-to-many, que é um passo como os outros.
+  const joins: string[] = [];
+  let parentAlias = head.alias;
+  for (const step of tail) {
+    joins.push(
+      ` INNER JOIN ${step.table} ${step.alias} ON ${linkCondition(step, parentAlias)}`
+    );
+    parentAlias = step.alias;
+  }
+
+  const conditions = [correlation];
+  // A folha é sempre qualificada pelo último alias da cadeia: é lá que a
+  // coluna do filtro (ou da busca) mora.
+  if (leaf) conditions.push(leaf(parentAlias));
+
+  return `EXISTS (SELECT 1 FROM ${head.table} ${head.alias}${joins.join('')} WHERE ${conditions.join(' AND ')})`;
+}
+
+/** Igualdade entre as colunas de um passo e as do alias anterior. */
+function linkCondition(step: ExistentialStep, parentAlias: string): string {
+  return step.on
+    .map(
+      (pair) =>
+        `${step.alias}.${pair.column} = ${parentAlias}.${pair.parentColumn}`
+    )
+    .join(' AND ');
 }
 
 function existentialLeafCondition(
@@ -257,6 +306,11 @@ function existentialLeafCondition(
       return `${column} ${SQL_COMPARISON[filter.operator]} :${key}`;
     }
   }
+}
+
+/** Última parte de um path pontuado: a coluna física da folha. */
+function leafColumn(column: string): string {
+  return column.slice(column.lastIndexOf('.') + 1);
 }
 
 /** Referência SQL de uma coluna lógica, resolvendo o alias do join. */

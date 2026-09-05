@@ -53,8 +53,11 @@ const userFilters = [
   { path: 'active', operators: ['eq'] },
   { path: 'born_on', operators: ['eq', 'gt', 'lt', 'between'] },
   { path: 'created_at', operators: ['eq', 'gt', 'lt'] },
-  { path: 'nickname', operators: ['eq', 'isNull'] },
-  { path: 'company.name', operators: ['eq', 'ilike'] },
+  // `notIn` entra aqui por causa do corpus: `nickname` é a única coluna
+  // anulável filtrável e `company.name` a única folha por relação, e é nelas
+  // que o caminho de `NOT IN` com valores encontra NULL — de coluna e de join.
+  { path: 'nickname', operators: ['eq', 'isNull', 'notIn'] },
+  { path: 'company.name', operators: ['eq', 'ilike', 'notIn'] },
 ] as const;
 
 const userDefault = defineQueryRules(CORPUS_SCHEMAS, 'user', {
@@ -94,6 +97,15 @@ const userDeep = defineQueryRules(CORPUS_SCHEMAS, 'user', {
     { path: 'company.name', operators: ['eq'] },
     { path: 'posts', operators: ['isNull'] },
     { path: 'posts.title', operators: ['eq', 'ilike'] },
+    // Cadeias de mais de um salto, pelas mesmas duas razões que trouxeram
+    // `notIn` e `posts.title` para cá: são os únicos caminhos do modelo
+    // canônico que cruzam `many` e continuam — `posts.author` volta a `user`
+    // (many → one) e `posts.tags` abre uma segunda coleção (many → many). Sem
+    // eles nenhum caso mediria a promessa de que a semântica existencial vale
+    // para a cadeia inteira, e o limite do TypeORM ficou dois PRs invisível
+    // porque nada no corpus o alcançava.
+    { path: 'posts.author.name', operators: ['eq'] },
+    { path: 'posts.tags.label', operators: ['eq', 'in'] },
   ],
   sorts: ['id', 'name', 'code'],
   fields: {
@@ -105,7 +117,12 @@ const userDeep = defineQueryRules(CORPUS_SCHEMAS, 'user', {
     },
   },
   includes: ['company', 'company.owner', 'posts'],
-  search: ['name', 'email'],
+  // `posts.title` entra na busca por causa do corpus, como `notIn` entrou nos
+  // filtros: é o único caminho de `search` que atravessa uma relação `many` no
+  // modelo canônico, e sem ele nenhum caso mediria a promessa de que buscar
+  // por uma folha `many` é existencial — a página vinha curta no TypeORM e
+  // ninguém percebia, porque o `total` continuava certo.
+  search: ['name', 'email', 'posts.title'],
 });
 
 const userNoSearch = defineQueryRules(CORPUS_SCHEMAS, 'user', {

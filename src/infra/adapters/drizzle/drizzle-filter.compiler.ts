@@ -87,7 +87,12 @@ function scoped(
     joins,
     where: make({
       alias: joins[joins.length - 1].alias,
-      column: segments[segments.length - 1],
+      // Dentro da subconsulta o alias é outro, mas a coluna é a mesma da
+      // tabela do path — e por isso é traduzida pela mesma regra.
+      column: context.planner.column(
+        relationPath,
+        segments[segments.length - 1]
+      ),
     }),
     negated: false,
   };

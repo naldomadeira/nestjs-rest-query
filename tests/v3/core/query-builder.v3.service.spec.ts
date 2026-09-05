@@ -33,7 +33,7 @@ describe('QueryBuilderService (v3)', () => {
     expect(result).toEqual({
       data: [{ id: 1, name: 'Ada' }],
       page: 1,
-      perPage: 20,
+      perPage: 10,
       total: 1,
       lastPage: 1,
     });

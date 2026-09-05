@@ -3,7 +3,7 @@ title: Instalação
 description: Como instalar e configurar o nestjs-rest-query no seu projeto.
 ---
 
-## Instalar o pacote
+## Instale o pacote
 
 ```bash tab="pnpm"
 pnpm add nestjs-rest-query
@@ -17,9 +17,33 @@ npm install nestjs-rest-query
 yarn add nestjs-rest-query
 ```
 
-## Configurar o bootstrap
+<Callout type="warn">
+  A API `3.x` descrita nestas páginas ainda não está no npm — `2.1.0` é a última
+  versão publicada. Até a `3.0.0` sair, o código daqui corresponde ao fonte da
+  linha `main` do repositório e às quatro aplicações de exemplo, não ao tarball
+  que o comando acima baixa.
+</Callout>
 
-Três ajustes são necessários no `main.ts` para que a biblioteca funcione corretamente.
+Depois instale o ORM que você usa. Todos os peers de ORM são opcionais e o
+entrypoint raiz não carrega nenhum, então você instala exatamente um:
+
+```bash tab="TypeORM"
+pnpm add typeorm @nestjs/typeorm
+```
+
+```bash tab="Prisma"
+pnpm add @prisma/client
+pnpm add -D prisma
+```
+
+```bash tab="Drizzle"
+pnpm add drizzle-orm postgres
+```
+
+## Configure o bootstrap
+
+Três ajustes são necessários no `main.ts` para a biblioteca funcionar
+corretamente.
 
 ### 1. Query parser estendido
 
@@ -27,7 +51,11 @@ Três ajustes são necessários no `main.ts` para que a biblioteca funcione corr
 app.set('query parser', 'extended');
 ```
 
-O Express 5 alterou o parser de query padrão de `qs` (extended) para `simple`. A biblioteca espera que parâmetros como `?filter[name][eq]=foo` sejam expandidos em objetos aninhados pelo framework antes de chegar ao controller — isso só acontece com o parser `extended`.
+O Express 5 trocou o parser de query padrão de `qs` (estendido) para `simple`. A
+biblioteca espera que parâmetros como `?filter[name][eq]=foo` sejam expandidos
+em objetos aninhados pelo framework antes de chegarem ao controller — e isso só
+acontece com o parser `extended`. Sem ele, um filtro é aceito em silêncio e
+nunca aplicado.
 
 ### 2. ValidationPipe com conversão implícita
 
@@ -42,7 +70,10 @@ app.useGlobalPipes(
 );
 ```
 
-O DTO usa `string` para campos como `page` e `perPage`. O `enableImplicitConversion: true` instrui o `class-transformer` a converter esses valores para os tipos esperados automaticamente, sem a necessidade de decorators adicionais no DTO.
+A `DynamicQueryDto` tipa `page`, `perPage` e `paginate` como `string`, porque é
+isso que chega no fio. A biblioteca faz o parse e a validação por conta própria —
+`?page=abc` é `400 PAGINATION_INVALID`, nunca uma queda silenciosa para a
+página 1.
 
 ### 3. Interceptor do Swagger (opcional)
 
@@ -56,13 +87,17 @@ SwaggerModule.setup('/', app, document, {
 });
 ```
 
-O Swagger UI serializa filtros como múltiplos query params (`filter[name][eq]=foo`). Sem o interceptor, o browser envia esses parâmetros de forma que o Express pode não preservar a notação de colchetes corretamente. O `dqbSwaggerRequestInterceptor` reescreve a URL antes de disparar a requisição, garantindo que os filtros cheguem ao controller no formato esperado.
+A Swagger UI serializa filtros como vários query params
+(`filter[name][eq]=foo`). Sem o interceptor, o navegador envia esses parâmetros
+de uma forma em que o Express pode não preservar corretamente a notação de
+colchetes. O `dqbSwaggerRequestInterceptor` reescreve a URL antes do envio,
+garantindo que os filtros cheguem ao controller no formato esperado.
 
 <Callout type="info">
-  Este interceptor só é necessário para testar filtros pela interface do Swagger
-  UI. Clientes externos (Postman, aplicações frontend, etc.) constroem a URL
-  diretamente e não precisam dele. A seção [Swagger](/docs/swagger) explica o
-  cenário completo.
+  Este interceptor só é necessário para testar filtros pela Swagger UI. Clientes
+  externos (Postman, aplicações de frontend, etc.) montam a URL diretamente e
+  não precisam dele. A seção [Swagger](/pt-BR/docs/swagger) explica o cenário
+  completo.
 </Callout>
 
 ### Exemplo completo
@@ -78,7 +113,7 @@ import { dqbSwaggerRequestInterceptor } from 'nestjs-rest-query';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Required to expand filter[field][op]=value into nested objects
+  // Necessário para expandir filter[campo][op]=valor em objetos aninhados
   app.set('query parser', 'extended');
 
   app.useGlobalPipes(
@@ -106,9 +141,10 @@ async function bootstrap() {
 bootstrap();
 ```
 
-## Registrar o módulo
+## Registre o módulo
 
-Importe `DynamicQueryBuilderModule` no `AppModule` raiz com `forRoot`. Todas as opções são **opcionais** — sem configuração, a biblioteca usa os valores padrão:
+Importe o `DynamicQueryBuilderModule` no `AppModule` raiz com `forRoot`. Toda
+opção é **opcional** — `forRoot({})` já entrega os defaults:
 
 ```typescript title="app.module.ts"
 import { Module } from '@nestjs/common';
@@ -117,79 +153,108 @@ import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
 @Module({
   imports: [
     DynamicQueryBuilderModule.forRoot({
-      // all options are optional
+      pagination: { defaultPerPage: 10, maxPerPage: 100 },
     }),
   ],
 })
 export class AppModule {}
 ```
 
-O módulo é `@Global`, portanto não é necessário importá-lo em módulos de funcionalidade — o `QueryBuilderService` fica disponível em toda a aplicação automaticamente.
+O módulo é `@Global`, então você não precisa importá-lo nos módulos de feature —
+o `QueryBuilderService` fica disponível na aplicação inteira automaticamente.
+
+<Callout type="warn" title="Nenhum adapter aqui">
+
+O `forRoot` configura apenas política comum. Não existe opção `adapter` nem
+adapter default implícito: quem decide o adapter é a **source** que você passa
+ao `execute()`. Passar `adapter` ou `operators` é recusado na inicialização com
+`SOURCE_CONFIGURATION_INVALID` e a mensagem
+`forRoot no longer accepts "adapter"; see the "2.x → 3.x" section of MIGRATION.md`.
+
+</Callout>
 
 ## Opções de configuração
 
-`forRoot` aceita um objeto `QueryBuilderConfig`. Todas as propriedades são opcionais.
+O `forRoot` aceita um objeto `QueryBuilderConfigV3`.
 
 ### `pagination`
 
-Controla o comportamento padrão de paginação.
+| Opção            | Tipo     | Default | Descrição                                                  |
+| ---------------- | -------- | ------- | ---------------------------------------------------------- |
+| `defaultPerPage` | `number` | `10`    | Itens por página quando a requisição não traz `perPage`.   |
+| `maxPerPage`     | `number` | `100`   | Teto. Um `perPage` maior é `400`, não um corte silencioso. |
 
-| Opção            | Tipo     | Padrão | Descrição                                                                           |
-| ---------------- | -------- | ------ | ----------------------------------------------------------------------------------- |
-| `defaultPerPage` | `number` | `10`   | Quantidade de itens por página quando `perPage` não é informado na requisição.      |
-| `maxPerPage`     | `number` | `100`  | Limite máximo de itens por página, ignorando valores maiores enviados pelo cliente. |
-
-### `operators`
-
-Restringe os operadores de filtro permitidos globalmente na aplicação.
-
-| Opção     | Tipo              | Padrão           | Descrição                                                                                         |
-| --------- | ----------------- | ---------------- | ------------------------------------------------------------------------------------------------- |
-| `allowed` | `QueryOperator[]` | todos permitidos | Lista de operadores aceitos. `undefined` = todos. `[]` (lista vazia) = nenhum operador permitido. |
-
-```typescript
-DynamicQueryBuilderModule.forRoot({
-  operators: {
-    allowed: ['eq', 'like', 'in', 'between'],
-  },
-});
-```
-
-Você também pode sobrescrever isso por endpoint com `RulesConfig.operators`; quando presente, o valor do endpoint vence a configuração global do `forRoot` apenas naquela rota.
-
-```typescript
-@ApiDynamicQuery({
-  filters: ['name', 'status'],
-  operators: { allowed: ['eq', 'ilike'] },
-})
-list(@Query() query: DynamicQueryDto, @QueryRules() rules: RulesConfig) {
-  return this.service.list(query, rules);
-}
-```
-
-Se o endpoint definir explicitamente `operators: {}`, aquela rota volta a permitir todos os operadores.
+As duas são validadas na inicialização: `defaultPerPage` abaixo de `1`, ou um
+`maxPerPage` menor que o `defaultPerPage`, estoura
+`SOURCE_CONFIGURATION_INVALID` enquanto o módulo carrega.
 
 ### `logging`
 
-Habilita e configura os logs internos de construção de queries.
-
-| Opção     | Tipo                                     | Padrão        | Descrição                                                                                      |
-| --------- | ---------------------------------------- | ------------- | ---------------------------------------------------------------------------------------------- |
-| `enabled` | `boolean`                                | `false`       | Habilita logs internos.                                                                        |
-| `level`   | `'error' \| 'warn' \| 'info' \| 'debug'` | `'info'`      | Nível mínimo de log emitido.                                                                   |
-| `logger`  | `LoggerLike`                             | NestJS Logger | Logger customizado. Qualquer objeto com `error/warn/log/debug` funciona (winston, pino, etc.). |
+| Opção          | Tipo                                     | Default       | Descrição                                                              |
+| -------------- | ---------------------------------------- | ------------- | ---------------------------------------------------------------------- |
+| `enabled`      | `boolean`                                | `false`       | Habilita os logs internos.                                             |
+| `level`        | `'error' \| 'warn' \| 'info' \| 'debug'` | `'info'`      | Nível mínimo emitido.                                                  |
+| `redactValues` | `boolean`                                | `true`        | Redige valores de filtro e de busca antes de logar.                    |
+| `logger`       | `LoggerLike`                             | Logger NestJS | Qualquer objeto com `error`/`warn`/`log`/`debug` (winston, pino, ...). |
 
 ```typescript
 DynamicQueryBuilderModule.forRoot({
-  logging: {
-    enabled: true,
-    level: 'debug',
-  },
+  logging: { enabled: true, level: 'debug' },
 });
 ```
 
+O log do plano em `debug` carrega apenas metadados — paths, operadores,
+contagens, paginação — nunca os valores que o cliente enviou.
+
+### `portability`
+
+| Opção     | Tipo      | Default | Descrição                                                                  |
+| --------- | --------- | ------- | -------------------------------------------------------------------------- |
+| `enforce` | `boolean` | `false` | Exige que a source carregue os fatos do perfil certificado, e os verifica. |
+
+Com `enforce: true`, uma source construída sem `portabilityProfile` é recusada
+com `PORTABILITY_PROFILE_MISMATCH`, e o mesmo vale para um perfil cujo dialeto
+não bata com o do adapter ou que falhe em `checkPortabilityProfile()`. Colete os
+fatos uma vez, na subida, com `collectProfileFacts()`, e entregue-os à fábrica
+da source — o caminho de requisição nunca consulta catálogos.
+
+### `consistency`
+
+| Opção         | Tipo                            | Default      |
+| ------------- | ------------------------------- | ------------ |
+| `consistency` | `'eventual' \| 'transactional'` | `'eventual'` |
+
+<Callout type="warn">
+  **Nenhum adapter entregue suporta `'transactional'` hoje**, então o `forRoot`
+  recusa o valor: TypeORM, Prisma e Drizzle reportam `transactionalConsistency:
+  false`, e uma configuração que reprovaria toda requisição morre na
+  inicialização com `SOURCE_CONFIGURATION_INVALID`. O `'eventual'` é o único
+  valor que sobe.
+</Callout>
+
+### `textProfile`
+
+| Opção         | Tipo                                     | Default             |
+| ------------- | ---------------------------------------- | ------------------- |
+| `textProfile` | `'portable-strict' \| 'database-native'` | `'portable-strict'` |
+
+Sob `portable-strict`, `ilike`, `notIlike` e `search` comparam uma coluna
+dobrada declarada com um termo dobrado, então nenhum `ILIKE` e nenhum
+`mode: 'insensitive'` é emitido.
+
+<Callout type="info">
+  O `'database-native'` é reservado, e o `forRoot` o recusa com
+  `SOURCE_CONFIGURATION_INVALID`. Nenhum adapter lê o valor — a dobra é aplicada
+  pelo núcleo de qualquer forma —, então aceitá-lo significaria perder a
+  verificação de `portability.enforce` em silêncio e ainda assim compilar
+  `portable-strict`. O `'portable-strict'` é o único valor que sobe.
+</Callout>
+
 ## Próximos passos
 
-Com o módulo registrado, injete o `QueryBuilderService` em qualquer provider e comece a construir queries dinâmicas a partir dos parâmetros de requisição HTTP.
+Com o módulo registrado, injete o `QueryBuilderService` em qualquer provider,
+declare um schema e as regras do endpoint, e passe uma source ao `execute()`.
 
-Se quiser sair do zero com um endpoint real, siga para [Primeiro endpoint](/docs/getting-started/first-endpoint). Para entender a integração com OpenAPI, veja [Swagger](/docs/swagger).
+Continue em [Primeiro endpoint](/pt-BR/docs/getting-started/first-endpoint) para
+uma rota funcionando de ponta a ponta, ou em
+[Adapters](/pt-BR/docs/adapters) para ver o que cada ORM exige.

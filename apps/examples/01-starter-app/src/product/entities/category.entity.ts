@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  OneToMany,
+  type Relation,
+} from 'typeorm';
 import { Product } from './product.entity';
 
 @Entity()
@@ -9,6 +15,11 @@ export class Category {
   @Column()
   name: string;
 
+  /** Valor dobrado de `name` — ver `Product.name_folded`. */
+  @Column({ select: false })
+  name_folded: string;
+
+  /** Ver `Product.category` para o porquê do `Relation<T>`. */
   @OneToMany(() => Product, (product) => product.category)
-  products: Product[];
+  products: Relation<Product>[];
 }

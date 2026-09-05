@@ -167,31 +167,6 @@ export const postsTable: DrizzleTable = createDrizzleTable({
   },
 });
 
-/** Cadeia completa a partir de `user`, incluindo o salto profundo. */
-export const userRelations: DrizzleRelationMap = {
-  company: {
-    target: companiesTable,
-    cardinality: 'one',
-    nullable: true,
-    sourceColumn: 'company_id',
-    targetColumn: 'id',
-  },
-  'company.owner': {
-    target: usersTable,
-    cardinality: 'one',
-    nullable: true,
-    sourceColumn: 'owner_id',
-    targetColumn: 'id',
-  },
-  posts: {
-    target: postsTable,
-    cardinality: 'many',
-    nullable: true,
-    sourceColumn: 'id',
-    targetColumn: 'user_id',
-  },
-};
-
 export const tagsTable: DrizzleTable = createDrizzleTable({
   name: 'tags',
   model: 'tag',
@@ -218,6 +193,49 @@ export const tagsTable: DrizzleTable = createDrizzleTable({
     },
   },
 });
+
+/** Cadeia completa a partir de `user`, incluindo o salto profundo. */
+export const userRelations: DrizzleRelationMap = {
+  company: {
+    target: companiesTable,
+    cardinality: 'one',
+    nullable: true,
+    sourceColumn: 'company_id',
+    targetColumn: 'id',
+  },
+  'company.owner': {
+    target: usersTable,
+    cardinality: 'one',
+    nullable: true,
+    sourceColumn: 'owner_id',
+    targetColumn: 'id',
+  },
+  posts: {
+    target: postsTable,
+    cardinality: 'many',
+    nullable: true,
+    sourceColumn: 'id',
+    targetColumn: 'user_id',
+  },
+  // Saltos depois da coleção: o mapa é indexado por path, então a cadeia
+  // `posts.author` (many → one) e `posts.tags` (many → many) precisa estar
+  // declarada a partir do root. São elas que o `existsChain` junta *dentro* do
+  // EXISTS, sem correlacionar o root uma segunda vez.
+  'posts.author': {
+    target: usersTable,
+    cardinality: 'one',
+    nullable: false,
+    sourceColumn: 'user_id',
+    targetColumn: 'id',
+  },
+  'posts.tags': {
+    target: tagsTable,
+    cardinality: 'many',
+    nullable: true,
+    sourceColumn: 'id',
+    targetColumn: 'post_id',
+  },
+};
 
 /** Cadeia a partir de `post`. */
 export const postRelations: DrizzleRelationMap = {

@@ -1,53 +1,89 @@
-// Prisma schema for the 04-app-with-prisma sample.
+// Schema Prisma do exemplo 04 (companies / users / posts).
 //
-// Mirrors the Drizzle sample schema (companies / users / posts) so the
-// REST API surface and `.http` fixtures map 1:1 across the two examples.
+// Formato do Prisma 7: o generator é `prisma-client` (não mais
+// `prisma-client-js`), e `output` + `moduleFormat` são **obrigatórios** —
+// o client deixou de ser escrito dentro de `node_modules/.prisma`. Como este
+// exemplo compila para CommonJS (`tsconfig.json`), `moduleFormat = "cjs"`.
+// O padrão é o mesmo de `tests/v3/adapters/prisma/schema/postgres.prisma`.
+//
+// O client do Prisma 7 se carrega por `import()` dinâmico, então qualquer
+// runner Jest que o toque precisa de `NODE_OPTIONS=--experimental-vm-modules`
+// (é o que o `test:e2e` faz).
+//
+// Duas coisas aqui existem por causa da v3, não do Prisma:
+//
+// 1. **Colunas dobradas** (`name_folded`, `email_folded`, `title_folded`). Sob
+//    o perfil `portable-strict` a busca portátil e `ilike` comparam valor
+//    dobrado contra coluna dobrada, em vez de pedir `mode: 'insensitive'` ao
+//    Prisma — que dependeria da collation do servidor e daria resultado
+//    diferente por banco. Preencher essas colunas na escrita é
+//    responsabilidade da aplicação (`prisma/database.ts` usa `foldText`).
+//
+// 2. **`posts.id_order`**. A PK de `Post` é UUID, e UUID não tem ordem total
+//    idêntica nas três famílias de banco. O desempate de paginação é feito
+//    sempre sobre a PK, então sem uma coluna de ordem portável a v3 recusa o
+//    endpoint na subida com `CAPABILITY_UNAVAILABLE`. `companies.id` e
+//    `users.id` são inteiros e não precisam de nada.
+//
+// As propriedades são camelCase com `@map` para a coluna snake_case: o schema
+// lógico da v3 nomeia campos pela **propriedade do client** (é ela que vai no
+// `where`/`select` do Prisma), então a API HTTP sai camelCase e o banco segue
+// o perfil certificado de `test/profiles/postgres/profile.sql`.
 
 generator client {
-  provider = "prisma-client-js"
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
 }
 
+// O Prisma 7 **removeu** `url` do datasource: a conexão passa a vir do driver
+// adapter entregue ao construtor do client (`@prisma/adapter-pg` aqui), e as
+// URLs de CLI/Migrate vivem em `prisma.config.ts`. Deixar `url = env(...)`
+// aqui falha a geração com `P1012`.
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model Company {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String
-  createdAt DateTime @default(now()) @map("created_at")
+  id         Int      @id @default(autoincrement())
+  name       String
+  nameFolded String   @map("name_folded")
+  createdAt  DateTime @map("created_at") @db.Timestamptz(6)
 
-  users     User[]
+  users User[] @relation("UserCompany")
 
-  @@index([name])
   @@map("companies")
 }
 
 model User {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String
-  email     String   @unique
-  companyId String?  @map("company_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at")
+  id          Int      @id @default(autoincrement())
+  name        String
+  nameFolded  String   @map("name_folded")
+  email       String
+  emailFolded String   @map("email_folded")
+  companyId   Int?     @map("company_id")
+  createdAt   DateTime @map("created_at") @db.Timestamptz(6)
 
-  company   Company? @relation(fields: [companyId], references: [id])
-  posts     Post[]
+  // `onDelete`/`onUpdate: NoAction` explícitos porque é o que a DDL de
+  // `prisma/profile.sql` realmente diz: nenhuma FK declara ação referencial, e
+  // ausência em SQL significa NO ACTION. O implícito do Prisma descreveria um
+  // cascade que o banco não tem.
+  company Company? @relation("UserCompany", fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  posts   Post[]   @relation("UserPosts")
 
-  @@index([email])
-  @@index([companyId])
   @@map("users")
 }
 
 model Post {
-  id        String   @id @default(uuid()) @db.Uuid
-  title     String
-  content   String?
-  userId    String   @map("user_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at")
+  id          String   @id @db.Uuid
+  idOrder     String   @map("id_order")
+  title       String
+  titleFolded String   @map("title_folded")
+  content     String?
+  userId      Int      @map("user_id")
+  createdAt   DateTime @map("created_at") @db.Timestamptz(6)
 
-  user      User     @relation(fields: [userId], references: [id])
+  user User @relation("UserPosts", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  @@index([userId])
-  @@index([title])
   @@map("posts")
 }

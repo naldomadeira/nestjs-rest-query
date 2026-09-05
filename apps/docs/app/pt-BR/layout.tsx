@@ -1,5 +1,4 @@
 import '../global.css';
-import { Analytics as VercelAnalytics } from '@vercel/analytics/react';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { I18nRoot } from '@/components/i18n-root';

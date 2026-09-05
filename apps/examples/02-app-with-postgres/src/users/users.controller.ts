@@ -1,15 +1,16 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiDynamicQuery,
   ApiPaginatedResponse,
   DynamicQueryDto,
-  QueryResult,
   QueryRules,
-  RulesConfig,
+  type CompiledQueryRules,
+  type NormalizedQueryResult,
 } from 'nestjs-rest-query';
 import { User } from './entities/user.entity';
 import { UsersBusiness } from './users.business';
+import { userRules } from './users.query';
 
 @ApiTags('users')
 @Controller('users')
@@ -20,30 +21,18 @@ export class UsersController {
   @ApiOperation({
     summary: 'Busca usuários com filtros dinâmicos',
     description:
-      'Busca usuários com suporte a filtros, ordenação, paginação e relacionamentos',
+      'Filtros, ordenação, paginação e busca dobrada, com whitelist exata por campo e operador',
   })
-  @ApiDynamicQuery<User>({
-    filters: [
-      'username',
-      'email',
-      'firstName',
-      'lastName',
-      'createdAt',
-      'document',
-      'ssoUserId',
-      'id',
-    ],
-    sorts: ['username', 'email', 'createdAt'],
-    fields: ['id', 'username', 'email', 'firstName', 'lastName', 'createdAt'],
-  })
-  @ApiPaginatedResponse<User>(User, {
-    status: 200,
-    description: 'Lista de usuários',
-  })
+  // As regras compiladas são a fonte única: o decorator as registra no handler
+  // (é delas que `@QueryRules()` vem) e monta a documentação a partir do mesmo
+  // objeto. Swagger e autorização não podem divergir porque não são duas
+  // declarações.
+  @ApiDynamicQuery(userRules)
+  @ApiPaginatedResponse(User, { description: 'Lista de usuários' })
   async findAll(
     @Query() query: DynamicQueryDto,
-    @QueryRules() rules: RulesConfig,
-  ): Promise<QueryResult<User>> {
+    @QueryRules() rules: CompiledQueryRules,
+  ): Promise<NormalizedQueryResult<User>> {
     return this.usersBusiness.findAll(query, rules);
   }
 }

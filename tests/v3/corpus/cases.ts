@@ -158,6 +158,26 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     expect: { kind: 'error', status: 400, code: 'FILTER_VALUE_INVALID' },
   },
 
+  {
+    /**
+     * Coluna nula não sai por `notIn`: vale a lógica de três valores do SQL.
+     *
+     * `nickname NOT IN ('Zed')` é `UNKNOWN` nas dez linhas de `nickname` nulo,
+     * então elas ficam de fora mesmo sem casar nenhum item da lista; sobra a
+     * única linha com valor, que não está listada. É a outra metade de "null
+     * só é consultado por isNull" (§10.1) — quem quer as nulas pede `isNull`,
+     * não `notIn`. As três famílias de banco concordam nisso, e o caso trava a
+     * semântica nos três adapters: nenhum pode "consertar" o NULL por conta
+     * própria acrescentando um `OR nickname IS NULL`, porque isso mudaria o
+     * conjunto de linhas conforme o ORM.
+     */
+    id: 'null/not-in-keeps-only-non-null-unlisted',
+    description: 'notIn não devolve linha de coluna nula',
+    tags: ['null', 'csv-escape'],
+    rules: 'user.default',
+    query: { filter: { nickname: { notIn: 'Zed' } } },
+    expect: { kind: 'rows', ids: [2], total: 1, lastPage: 1 },
+  },
   // --- Padrões literais (spec §11) ---
   {
     id: 'like/percent-is-literal',
@@ -223,6 +243,32 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     divergences: { prisma: PRISMA_PATTERN_REFUSAL },
   },
   {
+    /**
+     * Busca por uma folha através de `many` é existencial (spec §11.1 e §12).
+     *
+     * A promessa medida aqui é a da §5: os três adapters devolvem a mesma
+     * página **e** o mesmo total. O termo `co` casa `cobol` e `the compiler`
+     * (dois posts do usuário 2), `on computable numbers` (um post do 3), e as
+     * colunas de root de `comma@nimbus.test` (6) e `under_score` (10) — ou
+     * seja, um alvo existencial e dois alvos escalares no mesmo OR, com um
+     * root casando por dois itens.
+     *
+     * `perPage=3` é o que torna a divergência observável: compilado como join
+     * de predicado, o `LIMIT 3` cai sobre as 5 linhas duplicadas pelo join e
+     * consome duas delas no mesmo root, devolvendo 2 linhas numa página de 3 —
+     * com `total` 4, porque a contagem sempre contou roots distintos. Página
+     * curta com total certo é o sintoma exato que este caso proíbe.
+     */
+    id: 'search/through-many-is-existential',
+    description:
+      'search por folha através de many não duplica nem encurta a página',
+    tags: ['relation-many', 'case-fold', 'pagination'],
+    rules: 'user.deep',
+    query: { search: 'co', page: '1', perPage: '3' },
+    expect: { kind: 'rows', ids: [2, 3, 6], total: 4, lastPage: 2 },
+    divergences: { prisma: PRISMA_PATTERN_REFUSAL },
+  },
+  {
     id: 'search/not-configured',
     description: 'search em endpoint sem campos de busca é rejeitado',
     tags: ['case-fold'],
@@ -257,17 +303,65 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     expect: { kind: 'rows', ids: [], total: 0, lastPage: 1 },
   },
   {
+    /**
+     * `perPage` fixo porque o que este caso prova é o **conjunto inteiro**, e
+     * o seed tem 11 linhas. Sem isso ele dependia calado de
+     * `defaultPerPage`, que a Emenda 4 da ADR-001 devolveu de `20` para `10` —
+     * e a expectativa passaria a mostrar 10 de 11 linhas afirmando "todas".
+     * Um default de configuração não deve poder reescrever o que um caso do
+     * corpus prova.
+     */
     id: 'list/not-in-empty-is-always-true',
     description: 'notIn=[] compila para condição sempre verdadeira',
     tags: ['csv-escape'],
     rules: 'user.default',
-    query: { filter: { id: { notIn: [] } } },
+    query: { filter: { id: { notIn: [] } }, perPage: '20' },
     expect: {
       kind: 'rows',
       ids: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
       total: 11,
       lastPage: 1,
     },
+  },
+  {
+    /**
+     * O caminho de `NOT IN` com valores — que `notIn=[]` não exercita.
+     *
+     * `notIn=[]` é sempre-verdadeiro e é elidido do `AND`: por causa dele
+     * nenhum adapter chega a emitir `NOT IN`. Este caso é o que obriga os três
+     * a compilar a lista de verdade e a concordar sobre a §11 (`notIn` é
+     * "pertinência após coerção item a item", negada): as três linhas `Ada` e
+     * a `Grace` saem do conjunto e todo o resto continua, sem depender de
+     * ordem de itens nem de quantos itens a lista tem.
+     */
+    id: 'list/not-in-with-values-excludes-listed',
+    description: 'notIn com valores remove exatamente os itens listados',
+    tags: ['csv-escape'],
+    rules: 'user.default',
+    query: { filter: { name: { notIn: 'Ada,Grace' } } },
+    expect: {
+      kind: 'rows',
+      ids: [3, 6, 7, 8, 9, 10, 11],
+      total: 7,
+      lastPage: 1,
+    },
+  },
+  {
+    /**
+     * `null` dentro da lista é recusado antes do compiler (spec §10.1).
+     *
+     * A promessa aqui é de portabilidade, não de conveniência: `x NOT IN (a,
+     * NULL)` é `UNKNOWN` para toda linha nas três famílias de banco, isto é,
+     * um `notIn` com `NULL` no conjunto devolveria sempre vazio. Recusar o
+     * item mantém "null só é consultado por isNull" e impede que o cliente
+     * escreva, sem perceber, um filtro que nunca casa nada.
+     */
+    id: 'list/not-in-rejects-null-item',
+    description: 'null dentro da lista de notIn é inválido',
+    tags: ['csv-escape', 'null'],
+    rules: 'user.default',
+    query: { filter: { name: { notIn: ['Ada', null] } } },
+    expect: { kind: 'error', status: 400, code: 'FILTER_VALUE_INVALID' },
   },
   {
     id: 'list/between-requires-two-values',
@@ -294,6 +388,26 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     rules: 'user.default',
     query: { filter: { 'company.name': { eq: 'Acme' } } },
     expect: { kind: 'rows', ids: [1, 2], total: 2, lastPage: 1 },
+  },
+  {
+    /**
+     * Relação ausente também não sai por `notIn` — o mesmo NULL, outra origem.
+     *
+     * Nas linhas 8 a 11 não existe `company`, então a folha `company.name` não
+     * tem valor nenhum para comparar: o filtro por relação `one` é
+     * "a folha é comparada na relação associada" (§11.1), e sem relação
+     * associada não há associação a negar. O caso importa porque o NULL aqui
+     * não vem da coluna, e sim do join, e é exatamente onde os adapters
+     * poderiam divergir — quem resolve a relação com `LEFT JOIN` cai na lógica
+     * de três valores, quem resolve com `INNER JOIN` ou subconsulta descarta a
+     * linha antes; as duas rotas têm de devolver o mesmo conjunto.
+     */
+    id: 'relation-one/not-in-through-absent-relation',
+    description: 'notIn por relação one exige a relação presente',
+    tags: ['relation-one', 'null', 'csv-escape'],
+    rules: 'user.default',
+    query: { filter: { 'company.name': { notIn: 'Acme' } } },
+    expect: { kind: 'rows', ids: [3, 4, 5, 6, 7], total: 5, lastPage: 1 },
   },
   {
     id: 'relation-one/is-null-true-means-absent',
@@ -358,6 +472,58 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     rules: 'user.deep',
     query: { filter: { posts: { isNull: 'false' } } },
     expect: { kind: 'rows', ids: [1, 2, 3], total: 3, lastPage: 1 },
+  },
+  {
+    /**
+     * Cadeia `many` → `one` (spec §11.1).
+     *
+     * `posts.author` volta ao próprio autor do post, então "algum post cujo
+     * autor se chama Ada" é o usuário 1 — e **só** ele: os usuários 4 e 5
+     * também se chamam Ada, mas não têm post nenhum. Um segundo salto
+     * correlacionado com o root em vez de com o post daria os três.
+     *
+     * O usuário 1 tem três posts, todos de autoria dele: `total` 1 é a prova
+     * de que a cadeia mora dentro de um `EXISTS` e não num join, que
+     * devolveria a mesma linha três vezes e contaria 3.
+     */
+    id: 'relation-many/chain-through-one-is-existential',
+    description: 'cadeia many → one continua existencial e não duplica roots',
+    tags: ['relation-many', 'relation-deep'],
+    rules: 'user.deep',
+    query: { filter: { 'posts.author.name': { eq: 'Ada' } } },
+    expect: { kind: 'rows', ids: [1], total: 1, lastPage: 1 },
+  },
+  {
+    /**
+     * Cadeia `many` → `many`: duas coleções no mesmo caminho.
+     *
+     * A tag `history` está no post 1 (usuário 1) e no post 4 (usuário 2). O
+     * segundo salto tem de ser resolvido *dentro* da subconsulta: trazido para
+     * o statement externo, ele multiplicaria o root por item da segunda
+     * coleção e o `total` deixaria de contar roots.
+     */
+    id: 'relation-many/chain-through-two-collections',
+    description: 'cadeia que cruza duas relações many é existencial',
+    tags: ['relation-many', 'relation-deep'],
+    rules: 'user.deep',
+    query: { filter: { 'posts.tags.label': { eq: 'history' } } },
+    expect: { kind: 'rows', ids: [1, 2], total: 2, lastPage: 1 },
+  },
+  {
+    /**
+     * O mesmo caminho, com um root casando por **dois** itens da folha.
+     *
+     * O post 1 tem `history` e `math`, os dois na lista: o usuário 1 casa duas
+     * vezes pela cadeia e ainda assim é uma linha e um root no `total`. É a
+     * forma existencial ("algum item corresponde") medida onde ela dói —
+     * compilada como join, esta consulta devolveria três linhas e `total` 3.
+     */
+    id: 'relation-many/chain-through-two-collections-deduplicates',
+    description: 'root que casa por dois itens da cadeia conta uma vez só',
+    tags: ['relation-many', 'relation-deep'],
+    rules: 'user.deep',
+    query: { filter: { 'posts.tags.label': { in: 'history,math' } } },
+    expect: { kind: 'rows', ids: [1, 2], total: 2, lastPage: 1 },
   },
   {
     id: 'relation-many/sort-through-many-is-not-allowed',
@@ -484,11 +650,19 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     expect: { kind: 'rows', ids: [1, 4, 5], total: 3, lastPage: 1 },
   },
   {
+    /**
+     * `perPage` fixo porque o que este caso prova é o **conjunto inteiro**, e
+     * o seed tem 11 linhas. Sem isso ele dependia calado de
+     * `defaultPerPage`, que a Emenda 4 da ADR-001 devolveu de `20` para `10` —
+     * e a expectativa passaria a mostrar 10 de 11 linhas afirmando "todas".
+     * Um default de configuração não deve poder reescrever o que um caso do
+     * corpus prova.
+     */
     id: 'sort/duplicate-same-direction-is-deduped',
     description: 'sort repetido com a mesma direção é deduplicado',
     tags: ['sort-tie'],
     rules: 'user.default',
-    query: { sort: 'code,code' },
+    query: { sort: 'code,code', perPage: '20' },
     expect: {
       kind: 'rows',
       ids: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
@@ -505,11 +679,19 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     expect: { kind: 'error', status: 400, code: 'SORT_CONFLICT' },
   },
   {
+    /**
+     * `perPage` fixo porque o que este caso prova é o **conjunto inteiro**, e
+     * o seed tem 11 linhas. Sem isso ele dependia calado de
+     * `defaultPerPage`, que a Emenda 4 da ADR-001 devolveu de `20` para `10` —
+     * e a expectativa passaria a mostrar 10 de 11 linhas afirmando "todas".
+     * Um default de configuração não deve poder reescrever o que um caso do
+     * corpus prova.
+     */
     id: 'sort/descending-reverses-code-order',
     description: 'sort descendente inverte a ordem de code point',
     tags: ['sort-tie'],
     rules: 'user.default',
-    query: { sort: '-code' },
+    query: { sort: '-code', perPage: '20' },
     expect: {
       kind: 'rows',
       ids: [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1],

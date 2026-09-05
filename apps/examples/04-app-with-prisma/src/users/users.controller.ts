@@ -1,26 +1,50 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import {
   ApiDynamicQuery,
   ApiPaginatedResponse,
   DynamicQueryDto,
-  QueryResult,
   QueryRules,
-  RulesConfig,
+  type CompiledQueryRules,
+  type NormalizedQueryResult,
 } from 'nestjs-rest-query';
 import { UsersBusiness } from './users.business';
+import type { UserRow } from '../query/rows';
+import { usersRules } from './users.query';
 
 /**
- * User entity shape for Swagger documentation. Relation slots reflect
- * Prisma's native nested response shape.
+ * Shape documentado do usuário.
+ *
+ * Só campos visíveis: as colunas dobradas (`nameFolded`, `emailFolded`) são
+ * internas e nunca saem no JSON, mesmo quando o campo que elas apoiam é
+ * projetado.
  */
 class UserDto {
-  id: string;
+  @ApiProperty()
+  id: number;
+
+  @ApiProperty()
   name: string;
+
+  @ApiProperty()
   email: string;
-  companyId?: string;
-  createdAt: Date;
-  company?: { id: string; name: string };
+
+  @ApiProperty({ nullable: true, type: Number })
+  companyId: number | null;
+
+  @ApiProperty()
+  createdAt: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Relação `one`: objeto ou null',
+  })
+  company?: { id: number; name: string } | null;
+
+  @ApiProperty({
+    required: false,
+    description: 'Relação `many`: array, possivelmente vazio',
+  })
   posts?: Array<{ id: string; title: string }>;
 }
 
@@ -31,37 +55,21 @@ export class UsersController {
 
   @Get()
   @ApiOperation({
-    summary: 'Fetch users with dynamic filters',
+    summary: 'Busca usuários com filtros dinâmicos',
     description:
-      'Fetch users with support for filters, sorting, pagination, and relationships',
+      'Filtros, ordenação, paginação e relações, com whitelist exata por campo',
   })
-  @ApiDynamicQuery<UserDto>({
-    filters: [
-      'id',
-      'name',
-      'email',
-      'companyId',
-      'createdAt',
-      'company',
-      'posts',
-    ],
-    // sort on 'posts' is intentionally NOT allowed: Prisma cannot sort
-    // through to-many relations and the adapter throws a 400.
-    sorts: ['name', 'email', 'createdAt', 'company'],
-    fields: ['id', 'name', 'email', 'companyId', 'createdAt'],
-    includes: ['company', 'posts'],
-    search: ['name', 'email', 'company.name'],
-  })
-  @ApiPaginatedResponse<UserDto>(UserDto, {
+  // As regras compiladas são a fonte única: o decorator as registra no handler
+  // e gera a documentação a partir delas.
+  @ApiDynamicQuery(usersRules)
+  @ApiPaginatedResponse(UserDto, {
     status: 200,
-    description: 'List of users',
+    description: 'Lista de usuários',
   })
   async findAll(
     @Query() query: DynamicQueryDto,
-    @QueryRules() rules: RulesConfig
-  ): Promise<QueryResult<UserDto>> {
-    return this.usersBusiness.findAll(query, rules) as Promise<
-      QueryResult<UserDto>
-    >;
+    @QueryRules() rules: CompiledQueryRules
+  ): Promise<NormalizedQueryResult<UserRow>> {
+    return this.usersBusiness.findAll(query, rules);
   }
 }

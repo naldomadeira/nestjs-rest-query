@@ -1,168 +1,335 @@
 ---
 title: Endpoint whitelist rules
-description: Complete reference for supported query parameters — filters, operators, sorts, fields, includes, and pagination.
+description: Complete reference for defineQuerySchema and defineQueryRules — what you declare, what is validated at startup, and the columns the portable profile requires.
 ---
 
-## Filters and operators
+In v3 authorisation comes from two declarations, and `RulesConfig` no longer
+exists.
 
-Format: `filter[field][operator]=value`
+| Declaration         | Scope            | Answers                           |
+| ------------------- | ---------------- | --------------------------------- |
+| `defineQuerySchema` | per **model**    | what the model **is**             |
+| `defineQueryRules`  | per **endpoint** | what that endpoint **authorises** |
 
-The field must be listed in the endpoint `RulesConfig.filters` — unauthorized fields throw `400 Bad Request`.
+The split is the point: the model knowing a column does not authorise a client
+to ask for it, and the same schema can serve endpoints with different
+authorisations. `defineQueryRules` returns `CompiledQueryRules` — validated and
+compiled at construction time, so an impossible configuration fails when the
+application boots instead of on the first request that touches it.
 
-### Available operators
-
-| Operator   | Description                                      |
-| ---------- | ------------------------------------------------ |
-| `eq`       | Equal                                            |
-| `ne`       | Not equal                                        |
-| `gt`       | Greater than                                     |
-| `gte`      | Greater than or equal                            |
-| `lt`       | Less than                                        |
-| `lte`      | Less than or equal                               |
-| `like`     | Contains (case-sensitive, automatic wildcards)   |
-| `ilike`    | Contains (case-insensitive, portable across DBs) |
-| `notLike`  | Does not contain (case-sensitive)                |
-| `notIlike` | Does not contain (case-insensitive)              |
-| `in`       | In a list (CSV)                                  |
-| `notIn`    | Not in a list (CSV)                              |
-| `between`  | Between two values (`val1,val2`)                 |
-| `isNull`   | Null (`true`) or not null (`false`)              |
-
-### Operators with special behavior
-
-**`in` and `notIn`** — the value is a CSV list. Each item is treated as a separate element:
-
-```
-filter[status][in]=active,pending
-filter[status][notIn]=deleted,banned
-```
-
-**`between`** — two comma-separated values, applied as `BETWEEN val1 AND val2`:
-
-```
-filter[createdAt][between]=2024-01-01,2024-12-31
-filter[price][between]=10,99
-```
-
-**`isNull`** — `true` generates `IS NULL`, `false` generates `IS NOT NULL`. There is no separate `isNotNull` operator:
-
-```
-filter[deletedAt][isNull]=true
-filter[photoUrl][isNull]=false
-```
-
-**`ilike`** — uses `LOWER()` to ensure portability across PostgreSQL, MySQL, and SQLite. For PostgreSQL with large volumes, consider creating a functional index on `LOWER(field)` for better performance:
-
-```
-filter[name][ilike]=joao
-```
-
-### Restricting operators globally
-
-By default all operators are allowed. To restrict them, configure `operators.allowed` in `forRoot`:
+## `defineQuerySchema`
 
 ```typescript
-DynamicQueryBuilderModule.forRoot({
-  operators: {
-    allowed: ['eq', 'ne', 'like', 'in'],
-  },
+const userSchema: QuerySchema = defineQuerySchema({
+  model: 'user',
+  primaryKey: ['id'],
+  fields: [
+    { path: 'id', kind: 'integer', nullable: false, primaryKey: true },
+    {
+      path: 'email',
+      kind: 'string',
+      nullable: false,
+      primaryKey: false,
+      foldedField: 'email_folded',
+    },
+    {
+      path: 'email_folded',
+      kind: 'string',
+      nullable: false,
+      primaryKey: false,
+      internal: true,
+    },
+    {
+      path: 'status',
+      kind: 'enum',
+      nullable: false,
+      primaryKey: false,
+      enumValues: ['active', 'suspended'],
+      portableOrderField: 'status_order',
+    },
+    {
+      path: 'status_order',
+      kind: 'integer',
+      nullable: false,
+      primaryKey: false,
+      internal: true,
+    },
+  ],
+  relations: [
+    { path: 'company', target: 'company', cardinality: 'one', nullable: true },
+    { path: 'posts', target: 'post', cardinality: 'many', nullable: true },
+  ],
 });
 ```
 
-Operators outside the list throw `BadRequestException`.
+### `FieldDescriptor`
 
-### Restricting operators per endpoint
+| Property             | Required   | Meaning                                                                                                 |
+| -------------------- | ---------- | ------------------------------------------------------------------------------------------------------- |
+| `path`               | yes        | The field name as the API exposes it.                                                                   |
+| `kind`               | yes        | The logical type. It decides coercion, ordering and which operators apply.                              |
+| `nullable`           | yes        | Must match the source. `isNull` is only valid on a nullable field.                                      |
+| `primaryKey`         | yes        | Part of the primary key.                                                                                |
+| `enumValues`         | for `enum` | The accepted members. A value outside them is `FILTER_VALUE_INVALID`.                                   |
+| `foldedField`        | no         | The internal column holding the folded value. Required for `ilike`, `notIlike` and `search`.            |
+| `portableOrderField` | no         | The internal column giving a portable total order. Required for order comparisons on `uuid` and `enum`. |
+| `internal`           | no         | Never filterable, projectable or sortable, and never present in the JSON.                               |
 
-If a route defines `operators` inside its `RulesConfig`, that endpoint-specific whitelist overrides the global `forRoot` setting for that route.
+The eleven kinds are `string`, `uuid`, `enum`, `integer`, `bigint`, `decimal`,
+`boolean`, `date`, `datetime`, `json`, `binary`. Seven of them —`string`,
+`integer`, `bigint`, `decimal`, `boolean`, `date`, `datetime` — already have a
+total order that is identical across the three database families and need no
+companion. `uuid` and `enum` do not: a UUID's physical representation differs
+(SQL Server orders `UNIQUEIDENTIFIER` by byte groups) and an enum's order
+depends on the provider. `json` and `binary` are opaque and get no inferred
+operator at all.
+
+### `RelationDescriptor`
+
+`path`, `target` (the model name in the registry), `cardinality`
+(`'one' | 'many'`) and `nullable`, all required.
+
+### What `defineQuerySchema` refuses
+
+All of these are `SOURCE_CONFIGURATION_INVALID`, at startup:
+
+- a duplicate `path` in `fields`;
+- an `enum` field with no `enumValues`;
+- a relation whose `path` collides with a field of the same name;
+- an empty `primaryKey`;
+- a `primaryKey` part that is not a declared field, or that is `nullable`;
+- a `foldedField` or `portableOrderField` that does not exist, or that exists
+  but is **not** marked `internal`.
+
+### The registry
 
 ```typescript
-const rules: RulesConfig = {
-  filters: ['name', 'status'],
-  operators: {
-    allowed: ['eq', 'like'],
-  },
-};
+export const USER_SCHEMAS: SchemaRegistry = new Map([
+  ['user', userSchema],
+  ['company', companySchema],
+  ['post', postSchema],
+]);
 ```
 
-Use this when one endpoint needs a tighter whitelist than the rest of the app. An empty endpoint object, `operators: {}`, means "allow all operators" for that route even if the global config is restricted.
+Every model reachable from the root has to be in it, keyed by model name. A
+missing entry is `SOURCE_CONFIGURATION_INVALID`:
+`Schema registry has no entry for model <model>`.
 
----
+One schema per model, not one per endpoint — reuse the same object across
+endpoints and change only the rules.
 
-## Sorts
+## `defineQueryRules`
 
-Format: `sort=field,-other` (`-` prefix for desc, no prefix for asc)
+```typescript
+export const userRules = defineQueryRules(USER_SCHEMAS, 'user', {
+  filters: [
+    { path: 'id', operators: ['eq', 'in'] },
+    { path: 'email', operators: ['eq', 'ilike'] },
+    { path: 'createdAt', operators: ['gt', 'gte', 'lt', 'lte', 'between'] },
+    // Relation as the target accepts only isNull.
+    { path: 'company', operators: ['isNull'] },
+    { path: 'company.name', operators: ['eq', 'ilike'] },
+    { path: 'posts', operators: ['isNull'] },
+    { path: 'posts.title', operators: ['eq', 'ilike'] },
+  ],
+  sorts: ['name', 'email', 'createdAt', 'company.name'],
+  fields: {
+    root: {
+      allowed: ['id', 'name', 'email', 'companyId', 'createdAt'],
+      default: ['id', 'name', 'email', 'createdAt'],
+    },
+    relations: {
+      company: { allowed: ['id', 'name'], default: ['id', 'name'] },
+      posts: {
+        allowed: ['id', 'title', 'createdAt'],
+        default: ['id', 'title'],
+      },
+    },
+  },
+  includes: ['company', 'posts'],
+  search: ['name', 'email', 'company.name'],
+});
+```
 
-The field must be listed in `RulesConfig.sorts`.
+### `filters`
 
-<Callout type="warn">
-  **Warning:** when `fields` is defined in `RulesConfig`, `sort` fields must
-  also be present in `fields`. If a field is in `sorts` but missing from
-  `fields`, TypeORM throws an error because the field was not selected in the
-  query. Keep `sorts` and `fields` in sync, or omit `fields` if you do not need
-  to restrict column selection.
+A list of `{ path, operators }`, not a list of strings — **there is no global
+operator list in v3**. `forRoot({ operators })` is refused at startup, and the
+Swagger documentation shows the union of what the fields actually authorise.
+
+Refused at construction:
+
+- a duplicate rule for the same `path`;
+- `operators: []`;
+- an operator the field's kind cannot serve (`like` on an integer, `gt` on a
+  `uuid` with no `portableOrderField`, `ilike` with no `foldedField`, `isNull`
+  on a non-nullable field, any operator on `json`/`binary`);
+- an operator other than `isNull` on a path that ends at a relation.
+
+### `sorts`
+
+A list of paths. `-` in the request means descending; the rules do not encode
+direction.
+
+Refused at construction:
+
+- a path that crosses a `many` relation:
+  `Sort <path> crosses a many relation, which has no deterministic order`. In
+  `2.x` TypeORM accepted this and returned an arbitrary join row.
+- a path with no portable total order:
+  `Field <path> has no portable total order`.
+
+<Callout type="warn" title="The sorts check is the most common upgrade break">
+  `sorts` inherits the portable-order check from the operator matrix, so an
+  ordinary `2.x` line like `sorts: ['name', 'slug', 'status', 'createdAt']` —
+  with `status` an enum — stops the application from booting. Either drop the
+  path or give the field a `portableOrderField`.
 </Callout>
 
----
+`fields` no longer restricts `sorts`. In `2.x` a path in `sorts` but missing from
+`fields` was rejected; the two lists are independent now.
 
-## Fields
+### `fields`
 
-Format: `fields=id,name,email`
+**`fields.root` is mandatory**, with `allowed` and a non-empty `default`. In
+`2.x` `fields` was optional.
 
-Restricts the columns returned by the query (`SELECT`). When omitted, all entity columns are returned.
+- `default` is what the response contains when the request carries no `fields`.
+- Every entry of `default` has to be in `allowed`.
+- Every relation in `includes` needs a declared projection with a non-empty
+  `default` — and the reverse: a projection for a relation that is **not** in
+  `includes` is refused too.
+- Relation projections are keyed by the relation path, including deep ones:
+  `'items.company'`.
 
-The field must be listed in `RulesConfig.fields`; the response is constrained to the declared field whitelist.
+A wildcard exists, but only at construction time and only in the explicit form
+`'<relation>.*'`. It must be the **only** entry in that relation's `allowed`, it
+expands to the target model's non-internal fields, and it is never accepted from
+a client — the request parser's path alphabet rejects `*` outright.
+
+```typescript
+relations: {
+  company: { allowed: ['company.*'], default: ['id', 'name'] },
+}
+```
+
+### `includes`
+
+Relation paths a client may load with `?includes=`. There is no implicit eager
+loading: a relation is only joined and hydrated when the request asks for it (or
+when a filter, sort or search needs it internally).
+
+A deep include requires its parent: `includes: ['items.company']` without
+`'items'` is refused with
+`Include items.company requires its parent include items`, and the same rule
+applies to the request — `?includes=items.company` alone is
+`400 FIELD_NOT_ALLOWED`.
+
+### `search`
+
+Paths a single `?search=` term is compared against, combined with `OR`.
+
+Refused at construction:
+
+- a non-textual field: `Search field <path> must be textual` (only `string`,
+  `uuid` and `enum` qualify);
+- a field with no folded column:
+  `Search field <path> declares no folded field`.
+
+A target that crosses **one** `many` relation compiles to a correlated `EXISTS`
+in all three adapters, so the page keeps the size you asked for and `total`
+keeps counting root rows. Under TypeORM a target that crosses a `many` relation
+and then continues through another relation is refused at request time — see
+[Adapters](/docs/adapters).
+
+## The two column families
+
+### Folded columns
+
+Under the `portable-strict` text profile, `search`, `ilike` and `notIlike` never
+emit `ILIKE` or Prisma's `mode: 'insensitive'`. They compare a pre-normalised
+column against a term normalised by the same function, which is what makes the
+same request return the same rows on PostgreSQL, MySQL and SQL Server whatever
+the server collation is.
+
+Your application fills the column on write, with `foldText(value)` exported from
+the root — the exact function the core applies to the incoming term.
+
+```typescript
+import { foldText } from 'nestjs-rest-query';
+
+@BeforeInsert()
+@BeforeUpdate()
+foldSearchableColumns(): void {
+  this.email_folded = foldText(this.email ?? '');
+}
+```
 
 <Callout type="warn">
-  Defining `fields` in `RulesConfig` also affects sorts — see the warning above.
+
+**`foldText` is `NFC` + `toLowerCase`. It does not strip diacritics.**
+`?search=eletrica` does not find "Elétrica". What folding buys you is that the
+case of the term never changes the result set — nothing more. If a `2.x`
+endpoint relied on an accent-insensitive collation, that is an observable
+regression, and the fix is a second, explicitly accent-stripped column of your
+own.
+
 </Callout>
 
----
+Naming: under **TypeORM** the name is a convention, not a choice — the resolver
+recognises the companion as `<field path>_folded` over the **entity property
+name**. Under **Drizzle** and **Prisma** the schema is declared rather than
+derived, so any name works as long as the declaration and the physical column
+agree; the examples use `nameFolded`.
 
-## Includes
+About indexes: `like` and `search` compile to "contains", i.e.
+`LIKE '%term%'`, which a plain b-tree index does not accelerate. What the folded
+column changes is that the comparison becomes a literal `LIKE` instead of
+`ILIKE`, so a plain index now serves **anchored** patterns; substring search
+still wants a trigram or full-text index. Not measured here.
 
-Format: `includes=company,roles`
+### Portable order columns
 
-Loads relations through the configured adapter. Each relation must be listed in `RulesConfig.includes` — unauthorized relations throw `400 Bad Request`.
+`uuid` and `enum` do not order identically across the three database families,
+so v3 refuses to order by them directly and orders by the `portableOrderField`
+you declare. Under TypeORM the companion follows the `_order` suffix over the
+property path and is likewise auto-marked internal.
 
-There is no implicit eager load: includes are only applied when the `includes` parameter is present in the query string.
+The trap is pagination. The tie-break is always appended over the **full primary
+key**, even when the URL carries no `sort` at all, so a `uuid` primary key with
+no portable order column kills a bare `GET /posts`:
 
----
+```
+CAPABILITY_UNAVAILABLE: Primary key part id of post has no portable total order
+```
+
+This hits almost every Prisma consumer, because `@id @default(uuid())` is the
+idiomatic Prisma default, and every Drizzle consumer using `uuid` primary keys.
+The fix is another column plus a backfill — see `posts.id_order` in example 04
+and `idOrder` in example 03.
 
 ## Pagination
 
-| Parameter  | Type             | Default | Description                                         |
-| ---------- | ---------------- | ------- | --------------------------------------------------- |
-| `page`     | number           | `1`     | Current page                                        |
-| `perPage`  | number           | `10`    | Items per page (maximum: `100`)                     |
-| `paginate` | `true` / `false` | `true`  | `false` disables pagination and returns all records |
+| Parameter  | Type             | Default | Notes                                             |
+| ---------- | ---------------- | ------- | ------------------------------------------------- |
+| `page`     | positive integer | `1`     |                                                   |
+| `perPage`  | positive integer | `20`    | Above `maxPerPage` (default `100`) it is a `400`. |
+| `paginate` | boolean literal  | `true`  | `false` returns `{ data }` with no page metadata. |
 
-The defaults and maximum `perPage` are configurable through `forRoot`:
+Both defaults are set in `forRoot` — see
+[Installation](/docs/getting-started/installation). Ordering is always
+deterministic: without a total, unique, non-null key appended at the end, two
+pages could repeat or lose rows, which is why the primary-key tie-break is
+mandatory rather than optional.
 
-```typescript
-DynamicQueryBuilderModule.forRoot({
-  pagination: {
-    defaultPerPage: 20,
-    maxPerPage: 200,
-  },
-});
-```
+## Migrating a `2.x` whitelist
 
-### Response with active pagination
+Re-read every one of them; it may have been exposing more than you meant.
 
-```json
-{
-  "data": [...],
-  "page": 1,
-  "perPage": 10,
-  "total": 42,
-  "lastPage": 5
-}
-```
-
-### Response with `paginate=false`
-
-```json
-{
-  "data": [...]
-}
-```
+| `2.x`                                                   | `3.x`                                                     |
+| ------------------------------------------------------- | --------------------------------------------------------- |
+| `filters: ['company']` also accepted `company.*`        | declare `company.name` explicitly — matching is exact     |
+| `operators: { allowed: [...] }`, global or per endpoint | per-field `operators` in each filter rule                 |
+| `fields` optional, and it restricted `sorts`            | `fields.root` mandatory; `fields` and `sorts` independent |
+| `alias`                                                 | gone                                                      |
+| `RulesConfig`                                           | `CompiledQueryRules`, returned by `defineQueryRules`      |
