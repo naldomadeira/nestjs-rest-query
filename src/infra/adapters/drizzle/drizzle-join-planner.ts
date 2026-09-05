@@ -1,4 +1,5 @@
 import { configurationError } from '@core/errors';
+import { physicalColumn } from './drizzle-schema.resolver';
 import type {
   DrizzleColumnRef,
   DrizzleJoin,
@@ -40,6 +41,22 @@ export class DrizzleJoinPlanner {
   aliasFor(relationPath: readonly string[]): string {
     if (relationPath.length === 0) return this.rootAlias;
     return `${this.rootAlias}__${relationPath.join('__')}`;
+  }
+
+  /**
+   * Tabela dona de um path: o root, ou o alvo do último salto.
+   *
+   * É o que permite traduzir campo lógico em coluna física no nível certo —
+   * `company.name` pergunta a `companies`, não a `users`.
+   */
+  tableFor(relationPath: readonly string[]): DrizzleTable {
+    if (relationPath.length === 0) return this.table;
+    return this.relation(relationPath).target;
+  }
+
+  /** Coluna física de um campo lógico, resolvida na tabela do path. */
+  column(relationPath: readonly string[], field: string): string {
+    return physicalColumn(this.tableFor(relationPath), field);
   }
 
   relation(relationPath: readonly string[]): DrizzleRelation {
@@ -106,8 +123,15 @@ export class DrizzleJoinPlanner {
             table: relation.target.name,
             alias,
             parentAlias,
-            sourceColumn: relation.sourceColumn,
-            targetColumn: relation.targetColumn,
+            // A condição de junção é SQL: os dois lados já entram traduzidos.
+            sourceColumn: this.column(
+              chain.slice(0, -1),
+              relation.sourceColumn
+            ),
+            targetColumn: physicalColumn(
+              relation.target,
+              relation.targetColumn
+            ),
             kind: 'left',
           },
         });
@@ -122,9 +146,12 @@ export class DrizzleJoinPlanner {
   /** Coluna qualificada de um path pontuado (`company.name` -> alias.coluna). */
   ref(columnPath: string, purpose: JoinPurpose): DrizzleColumnRef {
     const segments = columnPath.split('.');
-    const column = segments[segments.length - 1];
-    const alias = this.join(segments.slice(0, -1), purpose);
-    return { alias, column };
+    const relationPath = segments.slice(0, -1);
+    const alias = this.join(relationPath, purpose);
+    return {
+      alias,
+      column: this.column(relationPath, segments[segments.length - 1]),
+    };
   }
 
   /**
@@ -154,8 +181,8 @@ export class DrizzleJoinPlanner {
         table: relation.target.name,
         alias,
         parentAlias,
-        sourceColumn: relation.sourceColumn,
-        targetColumn: relation.targetColumn,
+        sourceColumn: this.column(segment.slice(0, -1), relation.sourceColumn),
+        targetColumn: physicalColumn(relation.target, relation.targetColumn),
         kind: 'inner',
       });
 

@@ -66,8 +66,8 @@ export function toManySql(
 
   const columns = sql.join(
     projection.columns.map(
-      (column, index) =>
-        sql`${sql.identifier(projection.table)}.${sql.identifier(column)} as ${label(index)}`
+      (projected, index) =>
+        sql`${sql.identifier(projection.table)}.${sql.identifier(projected.column)} as ${label(index)}`
     ),
     sql`, `
   );
