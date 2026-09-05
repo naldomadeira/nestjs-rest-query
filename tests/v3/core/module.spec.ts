@@ -2,10 +2,17 @@ import { DynamicQueryBuilderModule } from '@core/dynamic-query-builder.module';
 import { RestQueryError } from '@core/errors';
 
 describe('DynamicQueryBuilderModule.forRoot', () => {
-  it('aplica os defaults do spec §8.2', () => {
+  /**
+   * O bloco de exemplo da §8.2 do design traz `defaultPerPage: 20`, e este
+   * teste já fixou esse número. Ele é `10` — a Emenda 4 da ADR-001 desfez a
+   * troca, que nunca foi decidida: nenhum documento a justifica, e ela era a
+   * única mudança breaking da v3 que não trocava um comportamento errado por
+   * um certo. Dobrava calada o payload de quem nunca configurou paginação.
+   */
+  it('aplica os defaults, com paginação pela Emenda 4 da ADR-001', () => {
     DynamicQueryBuilderModule.forRoot({});
     expect(DynamicQueryBuilderModule.config).toEqual({
-      pagination: { defaultPerPage: 20, maxPerPage: 100 },
+      pagination: { defaultPerPage: 10, maxPerPage: 100 },
       textProfile: 'portable-strict',
       consistency: 'eventual',
       logging: { enabled: false, level: 'info', redactValues: true },
@@ -61,7 +68,7 @@ describe('DynamicQueryBuilderModule.forRoot', () => {
   it('mescla parcialmente a paginação', () => {
     DynamicQueryBuilderModule.forRoot({ pagination: { maxPerPage: 50 } });
     expect(DynamicQueryBuilderModule.config.pagination).toEqual({
-      defaultPerPage: 20,
+      defaultPerPage: 10,
       maxPerPage: 50,
     });
   });

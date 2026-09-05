@@ -111,7 +111,7 @@ decided per call, by the source you hand to `execute()`:
 ```typescript
 // 3.x — forRoot only configures common policy
 DynamicQueryBuilderModule.forRoot({
-  pagination: { defaultPerPage: 20, maxPerPage: 100 },
+  pagination: { defaultPerPage: 10, maxPerPage: 100 },
   textProfile: 'portable-strict',
 });
 
@@ -142,7 +142,7 @@ import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
 @Module({
   imports: [
     DynamicQueryBuilderModule.forRoot({
-      pagination: { defaultPerPage: 20, maxPerPage: 100 },
+      pagination: { defaultPerPage: 10, maxPerPage: 100 },
     }),
   ],
 })
@@ -287,7 +287,7 @@ The interceptor lets users type filters in the Swagger UI form and forwards them
 ```typescript
 DynamicQueryBuilderModule.forRoot({
   pagination: {
-    defaultPerPage: 20,
+    defaultPerPage: 10,
     maxPerPage: 100,
   },
   operators: {
