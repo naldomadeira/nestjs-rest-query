@@ -71,9 +71,10 @@ export class UsersBusiness {
 }
 ```
 
-O `typeormSource` é a única fábrica de source **genérica no tipo da linha**,
-então uma anotação `Promise<NormalizedQueryResult<User>>` funciona aqui e não
-funciona sob Prisma ou Drizzle.
+O `typeormSource` infere o tipo da linha do repositório que você entrega, então
+a anotação `Promise<NormalizedQueryResult<User>>` não precisa de argumento de
+tipo aqui. O `prismaSource<TRow>` e o `drizzleSource<TRow>` também são
+genéricos no tipo da linha; o que muda é por onde o tipo chega.
 
 ### Opções da source
 
@@ -156,28 +157,36 @@ ser `nullable: false`.
 - **Paginação em duas fases** quando a projeção inclui relação `many`, então uma
   página nunca é inflada pelo join.
 - **`EXISTS` correlacionado** — com correlação por chave estrangeira composta —
-  para filtro ou alvo de `search` que atravesse **uma** relação `many`. O
-  `total` continua contando roots e a página continua com o tamanho pedido.
+  para filtro ou alvo de `search` que atravesse uma relação `many`, em qualquer
+  profundidade. O `total` continua contando roots e a página continua com o
+  tamanho pedido.
 
-## Limites
+## Cadeias existenciais, em qualquer profundidade
 
-Duas formas existenciais são recusadas em vez de compiladas, com
-`CAPABILITY_UNAVAILABLE`:
+Uma condição existencial — filtro **ou** alvo de `search` cujo path atravessa
+uma relação `many` — compila com o que vier depois daquele salto: outra relação
+`one` (`posts.author.name`), uma segunda coleção, ou uma **many-to-many**
+(`posts.tags.label`). Nenhuma forma é recusada, e o adapter não emite
+`CAPABILITY_UNAVAILABLE` em lugar nenhum.
 
-| Forma                                                        | Mensagem                                                                             |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| Path que atravessa uma relação `many` e depois outra relação | `Existential conditions through nested many relations are not supported yet: <path>` |
-| Path através de uma relação **many-to-many**                 | `Existential filters through many-to-many relations are not supported yet: <path>`   |
+A forma compilada é sempre **um** `EXISTS` correlacionado ao root uma **só**
+vez, no primeiro salto; cada salto seguinte é um `INNER JOIN` dentro da
+subconsulta, e a condição da folha é qualificada pelo último alias.
+Correlacionar cada salto por fora traria a coleção para o `FROM` externo,
+inflaria os roots e estragaria o `total` — exatamente o problema que o `EXISTS`
+existe para evitar.
 
-Prisma e Drizzle compilam as duas. É lacuna aberta declarada, registrada em
-[`docs/v3/status.md`](https://github.com/naldomadeira/nestjs-rest-query/blob/main/docs/v3/status.md),
-não comportamento pretendido — e recusar é deliberado: até o PR5 o caminho
-many-to-many emitia `EXISTS` sintaticamente válido contra a tabela errada, o que
-devolvia linhas erradas em silêncio.
+Na many-to-many a tabela de junção é um passo como os outros, então é ela que
+fica no `FROM` da subconsulta, e a tabela alvo entra por join a partir dela.
+Esses identificadores de junção são os únicos que este compilador tira da
+estratégia de nomes do TypeORM em vez das suas entidades (`articlesId`), então
+passam pelo `escape` do driver.
 
-Note que isso atinge as **regras** que você pode declarar na prática, não só as
-requisições que os clientes mandam: colocar `search: ['items.company.name']` nas
-regras de um endpoint compila bem na subida e só falha na primeira busca.
+As **regras** que você pode declarar também não ficam limitadas — era ali que o
+limite mordia primeiro, na subida, e ele acabou: `search: ['items.company.name']`
+sobe e roda, que é o que o
+[`02-app-with-postgres`](https://github.com/naldomadeira/nestjs-rest-query/blob/main/apps/examples/02-app-with-postgres/src/access-requests/access-requests.query.ts)
+declara.
 
 ## ESM: `@nestjs/typeorm` 12
 

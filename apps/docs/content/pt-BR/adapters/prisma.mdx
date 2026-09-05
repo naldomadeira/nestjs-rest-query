@@ -147,9 +147,12 @@ Vale dizer porque não era assim até a `3.0.0`: o `client` era tipado
 satisfazia esse tipo — classe não recebe index signature implícita em
 TypeScript, então todo consumidor precisava de uma afirmação.
 
-O `prismaSource` fixa o tipo da linha em `object`; só o `typeormSource` é
-genérico no row, então anote `Promise<NormalizedQueryResult<object>>` em vez de
-usar cast.
+O `prismaSource<TRow>` é genérico no tipo da linha. Nada nas opções carrega esse
+tipo — o delegate vem do manifesto, não de um client tipado —, então esta é a
+única fábrica em que você mesmo nomeia o argumento de tipo:
+`prismaSource<UserDto>({ client, model, manifest })` deixa o método ser anotado
+`Promise<NormalizedQueryResult<UserDto>>` sem cast. Omitindo, você fica com
+`object`, como acima.
 
 ## Operadores recusados, por provider
 

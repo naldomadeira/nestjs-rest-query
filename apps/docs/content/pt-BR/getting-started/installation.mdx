@@ -230,10 +230,11 @@ da source — o caminho de requisição nunca consulta catálogos.
 | `consistency` | `'eventual' \| 'transactional'` | `'eventual'` |
 
 <Callout type="warn">
-  **Nenhum adapter entregue suporta `'transactional'` hoje.** TypeORM, Prisma e
-  Drizzle reportam `transactionalConsistency: false`, então declará-lo faz toda
-  requisição falhar cedo com `CAPABILITY_UNAVAILABLE` em vez de rodar dados e
-  contagem sob snapshots diferentes. Deixe em `'eventual'`.
+  **Nenhum adapter entregue suporta `'transactional'` hoje**, então o `forRoot`
+  recusa o valor: TypeORM, Prisma e Drizzle reportam `transactionalConsistency:
+  false`, e uma configuração que reprovaria toda requisição morre na
+  inicialização com `SOURCE_CONFIGURATION_INVALID`. O `'eventual'` é o único
+  valor que sobe.
 </Callout>
 
 ### `textProfile`
@@ -247,9 +248,11 @@ dobrada declarada com um termo dobrado, então nenhum `ILIKE` e nenhum
 `mode: 'insensitive'` é emitido.
 
 <Callout type="info">
-  Considere `'database-native'` reservado. O valor viaja no plano, mas nenhum
-  adapter o lê: a dobra é aplicada pelo núcleo de qualquer forma. O único efeito
-  observável hoje é que a verificação de `portability.enforce` é ignorada.
+  O `'database-native'` é reservado, e o `forRoot` o recusa com
+  `SOURCE_CONFIGURATION_INVALID`. Nenhum adapter lê o valor — a dobra é aplicada
+  pelo núcleo de qualquer forma —, então aceitá-lo significaria perder a
+  verificação de `portability.enforce` em silêncio e ainda assim compilar
+  `portable-strict`. O `'portable-strict'` é o único valor que sobe.
 </Callout>
 
 ## Próximos passos

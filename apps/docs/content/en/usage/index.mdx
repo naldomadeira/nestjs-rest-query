@@ -142,6 +142,10 @@ See [Adapters](/docs/adapters) for the three source factories and
 
 Notes that are easy to get wrong:
 
+- **A parameter outside this table is a `400`**, not a silent no-op:
+  `QUERY_SYNTAX_UNKNOWN_PARAM`, with the key name in `details.param` and never
+  the value. A `?utm_source=`, a cache-busting `?_=`, a middleware's `?lang=` —
+  all refused. Strip them before the query reaches the DTO.
 - The parameter is `sort`, singular. The **rules** property is `sorts`.
 - `filter[name]=Ada` is the short form of `filter[name][eq]=Ada`.
 - Lists accept a repeated/array parameter (preferred, `qs` expands it) or CSV.
@@ -254,22 +258,22 @@ The core, not the adapter, produces this JSON. Two consequences:
 
 Branch on `code`, never on `message`.
 
-| Code                           | Status     | When                                                                                                                                                                                                   |
-| ------------------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `QUERY_SYNTAX_INVALID`         | 400        | a path or operator outside the safe alphabet, a malformed list                                                                                                                                         |
-| `QUERY_SYNTAX_UNKNOWN_PARAM`   | 400        | declared in the contract, **not emitted today**                                                                                                                                                        |
-| `FIELD_NOT_ALLOWED`            | 400        | the path is not in that scope's whitelist                                                                                                                                                              |
-| `FIELD_NOT_FOUND`              | 400        | the path is whitelisted but does not exist on the schema                                                                                                                                               |
-| `RELATION_NOT_FOUND`           | 400        | a relation hop in the path does not exist                                                                                                                                                              |
-| `OPERATOR_NOT_ALLOWED`         | 400        | the field does not authorise that operator                                                                                                                                                             |
-| `OPERATOR_TYPE_MISMATCH`       | 400        | the operator makes no sense for that kind — `like` on an integer, `sort` through a `many` relation                                                                                                     |
-| `FILTER_VALUE_INVALID`         | 400        | the value does not decode for the declared kind                                                                                                                                                        |
-| `PAGINATION_INVALID`           | 400        | `page`, `perPage` or `paginate` is not a valid literal, or exceeds `maxPerPage`                                                                                                                        |
-| `SORT_CONFLICT`                | 400        | the same path was requested ascending and descending                                                                                                                                                   |
-| `CAPABILITY_UNAVAILABLE`       | 400 or 500 | the operator or shape cannot be served: no folded column, no portable order, Prisma patterns on `sqlite`/`sqlserver` (400); a primary key with no portable order, or a TypeORM existential chain (500) |
-| `PORTABILITY_PROFILE_MISMATCH` | 500        | `portability.enforce` is on and the source's profile facts do not match                                                                                                                                |
-| `SOURCE_CONFIGURATION_INVALID` | 500        | the declared schema does not match the source, or `forRoot` got a removed key                                                                                                                          |
-| `ADAPTER_CONTRACT_VIOLATION`   | 500        | the adapter cannot compile a shape the plan asked for                                                                                                                                                  |
+| Code                           | Status     | When                                                                                                                                                                              |
+| ------------------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `QUERY_SYNTAX_INVALID`         | 400        | a path or operator outside the safe alphabet, a malformed list                                                                                                                    |
+| `QUERY_SYNTAX_UNKNOWN_PARAM`   | 400        | a query parameter outside the eight-name grammar; `details.param` is the key, never the value                                                                                     |
+| `FIELD_NOT_ALLOWED`            | 400        | the path is not in that scope's whitelist                                                                                                                                         |
+| `FIELD_NOT_FOUND`              | 400        | the path is whitelisted but does not exist on the schema                                                                                                                          |
+| `RELATION_NOT_FOUND`           | 400        | a relation hop in the path does not exist                                                                                                                                         |
+| `OPERATOR_NOT_ALLOWED`         | 400        | the field does not authorise that operator                                                                                                                                        |
+| `OPERATOR_TYPE_MISMATCH`       | 400        | the operator makes no sense for that kind — `like` on an integer, `sort` through a `many` relation                                                                                |
+| `FILTER_VALUE_INVALID`         | 400        | the value does not decode for the declared kind                                                                                                                                   |
+| `PAGINATION_INVALID`           | 400        | `page`, `perPage` or `paginate` is not a valid literal, or exceeds `maxPerPage`                                                                                                   |
+| `SORT_CONFLICT`                | 400        | the same path was requested ascending and descending                                                                                                                              |
+| `CAPABILITY_UNAVAILABLE`       | 400 or 500 | the operator or shape cannot be served: no folded column, no portable order, Prisma patterns on `sqlite`/`sqlserver` (400); a primary key with no portable order (500)            |
+| `PORTABILITY_PROFILE_MISMATCH` | 500        | `portability.enforce` is on and the source's profile facts do not match                                                                                                           |
+| `SOURCE_CONFIGURATION_INVALID` | 500        | the declared schema does not match the source, or `forRoot` got a removed key or a value no adapter implements (`textProfile: 'database-native'`, `consistency: 'transactional'`) |
+| `ADAPTER_CONTRACT_VIOLATION`   | 500        | the adapter cannot compile a shape the plan asked for                                                                                                                             |
 
 The split is deliberate: client input is `400`, and a mistake in your
 declaration is `500`, because it is a bug in the application, not in the
