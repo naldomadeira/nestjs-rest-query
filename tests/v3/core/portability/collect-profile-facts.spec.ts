@@ -22,18 +22,33 @@ const REQUIRED_INDEXES = ['users_name_folded_idx'];
 /** Executor de SQL cru falso: responde na ordem em que o coletor pergunta. */
 function runnerReturning(...batches: readonly (readonly unknown[])[]) {
   const seen: string[] = [];
+  const seenParams: (readonly unknown[] | undefined)[] = [];
   let call = 0;
-  const query = async <R>(sql: string): Promise<readonly R[]> => {
+  const query = async <R>(
+    sql: string,
+    params?: readonly unknown[]
+  ): Promise<readonly R[]> => {
     seen.push(sql);
+    seenParams.push(params);
     return (batches[call++] ?? []) as readonly R[];
   };
-  return { query, seen };
+  return { query, seen, seenParams };
 }
 
-const collect = (dialect: ProfileDialect, ...batches: readonly unknown[][]) =>
+/**
+ * Resposta da sonda de fuso do cliente, que é a **primeira** query de todo
+ * coletor. `UTC` faz a sonda passar; qualquer outro texto simula um driver
+ * convertendo para fuso local.
+ */
+const probeAnswer = (echoed = '2000-01-01T12:00:00') => [{ echoed }];
+
+const collect = (
+  dialect: ProfileDialect,
+  ...batches: readonly (readonly unknown[])[]
+) =>
   collectProfileFacts({
     dialect,
-    query: runnerReturning(...batches).query,
+    query: runnerReturning(probeAnswer(), ...batches).query,
     textColumns: TEXT_COLUMNS,
     requiredIndexes: REQUIRED_INDEXES,
   });
@@ -59,6 +74,7 @@ describe('collectProfileFacts', () => {
       serverVersion: '18.0',
       encoding: 'UTF8',
       sessionTimeZone: 'UTC',
+      clientDateTimeIsUtc: true,
       strictMode: true,
       textColumns: [
         { table: 'users', column: 'name', collation: 'C' },
@@ -216,6 +232,7 @@ describe('collectProfileFacts', () => {
    */
   it('restringe as queries do SQL Server ao schema e às tabelas de usuário', async () => {
     const runner = runnerReturning(
+      probeAnswer(),
       [{ collation: 'Latin1_General_100_BIN2_UTF8', version: '16.0.4200' }],
       [],
       []
@@ -228,8 +245,16 @@ describe('collectProfileFacts', () => {
       requiredIndexes: REQUIRED_INDEXES,
     });
 
-    expect(runner.seen[1]).toContain('TABLE_SCHEMA = SCHEMA_NAME()');
-    expect(runner.seen[2]).toContain('t.is_ms_shipped = 0');
+    // Casar por conteúdo, não por índice: a ordem das queries do coletor é
+    // detalhe interno, e ancorar nela fez este teste quebrar quando a sonda de
+    // fuso entrou na frente.
+    const columns = runner.seen.find((sql) =>
+      sql.includes('INFORMATION_SCHEMA')
+    );
+    const indexes = runner.seen.find((sql) => sql.includes('sys.indexes'));
+
+    expect(columns).toContain('TABLE_SCHEMA = SCHEMA_NAME()');
+    expect(indexes).toContain('t.is_ms_shipped = 0');
   });
 
   it('recusa um dialeto sem coletor em vez de devolver fatos vazios', async () => {
@@ -244,9 +269,147 @@ describe('collectProfileFacts', () => {
   });
 });
 
+describe('sonda de fuso do cliente', () => {
+  it('reconhece um driver que entrega o instante em UTC', async () => {
+    const facts = await collect(
+      'postgres',
+      [{ encoding: 'UTF8', timezone: 'UTC', version: '18.0' }],
+      [],
+      []
+    );
+
+    expect(facts.clientDateTimeIsUtc).toBe(true);
+  });
+
+  it('acusa um driver que desloca para o fuso local', async () => {
+    // O que o TypeORM faz no SQL Server com `useUTC: false`: manda a hora de
+    // parede local. UTC-3 transforma 12:00:00Z em 09:00:00.
+    const query = runnerReturning(
+      probeAnswer('2000-01-01T09:00:00'),
+      [{ collation: 'Latin1_General_100_BIN2_UTF8', version: '16.0' }],
+      [],
+      []
+    ).query;
+
+    const facts = await collectProfileFacts({
+      dialect: 'mssql',
+      query,
+      textColumns: TEXT_COLUMNS,
+      requiredIndexes: REQUIRED_INDEXES,
+    });
+
+    expect(facts.clientDateTimeIsUtc).toBe(false);
+  });
+
+  it('aceita o eco com espaço em vez de T, que alguns drivers devolvem', async () => {
+    // `DATE_FORMAT` do MySQL e `CONVERT` do SQL Server podem devolver o
+    // separador como espaço; o instante é o mesmo e não é violação.
+    const query = runnerReturning(
+      probeAnswer('2000-01-01 12:00:00'),
+      [
+        {
+          charset: 'utf8mb4',
+          timezone: '+00:00',
+          version: '8.4.0',
+          sqlMode: 'STRICT_ALL_TABLES',
+        },
+      ],
+      [],
+      []
+    ).query;
+
+    const facts = await collectProfileFacts({
+      dialect: 'mysql',
+      query,
+      textColumns: TEXT_COLUMNS,
+      requiredIndexes: REQUIRED_INDEXES,
+    });
+
+    expect(facts.clientDateTimeIsUtc).toBe(true);
+  });
+
+  it('reconhece UTC no MySQL pelo caminho normal', async () => {
+    const facts = await collect(
+      'mysql',
+      [
+        {
+          charset: 'utf8mb4',
+          timezone: '+00:00',
+          version: '8.4.0',
+          sqlMode: 'STRICT_ALL_TABLES',
+        },
+      ],
+      [],
+      []
+    );
+
+    expect(facts.clientDateTimeIsUtc).toBe(true);
+  });
+
+  it('manda o instante como parâmetro vinculado, não interpolado no SQL', async () => {
+    // Trava o contrato de dois argumentos do `ProfileQueryRunner`. Se o
+    // repasse de parâmetros se perder, a sonda deixa de medir a conversão do
+    // driver — que é a única coisa que ela existe para medir — e passa a
+    // reprovar tudo. Já aconteceu uma vez, num `git checkout` distraído.
+    const runner = runnerReturning(
+      probeAnswer(),
+      [{ encoding: 'UTF8', timezone: 'UTC', version: '18.0' }],
+      [],
+      []
+    );
+
+    await collectProfileFacts({
+      dialect: 'postgres',
+      query: runner.query,
+      textColumns: TEXT_COLUMNS,
+      requiredIndexes: REQUIRED_INDEXES,
+    });
+
+    const [probeParams] = runner.seenParams;
+    expect(probeParams).toHaveLength(1);
+    expect(probeParams?.[0]).toBeInstanceOf(Date);
+    expect((probeParams?.[0] as Date).toISOString()).toBe(
+      '2000-01-01T12:00:00.000Z'
+    );
+
+    // E o instante não aparece no texto da query: interpolar mediria a nossa
+    // formatação em vez da conversão do driver.
+    expect(runner.seen[0]).not.toContain('2000-01-01');
+  });
+
+  it('falha fechado quando o executor ignora parâmetros vinculados', async () => {
+    // "Não sei" não é "está certo" (§5.6): um executor que não vincula
+    // parâmetro nenhum não consegue provar nada sobre o fuso do driver.
+    const query = async <R>(): Promise<readonly R[]> => {
+      throw new Error('bind parameters are not supported');
+    };
+
+    await expect(
+      collectProfileFacts({
+        dialect: 'postgres',
+        query,
+        textColumns: TEXT_COLUMNS,
+        requiredIndexes: REQUIRED_INDEXES,
+      })
+    ).rejects.toMatchObject({ code: 'PORTABILITY_PROFILE_MISMATCH' });
+  });
+
+  it('falha fechado quando a sonda não devolve valor', async () => {
+    await expect(
+      collectProfileFacts({
+        dialect: 'postgres',
+        query: runnerReturning([]).query,
+        textColumns: TEXT_COLUMNS,
+        requiredIndexes: REQUIRED_INDEXES,
+      })
+    ).rejects.toMatchObject({ code: 'PORTABILITY_PROFILE_MISMATCH' });
+  });
+});
+
 describe('assertProfileFacts', () => {
   const postgresBatches = (collation: string, indexes: string[]) =>
     [
+      probeAnswer(),
       [{ encoding: 'UTF8', timezone: 'UTC', version: '18.0' }],
       [
         { table_name: 'users', column_name: 'name', collation_name: collation },

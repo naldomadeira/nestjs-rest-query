@@ -19,7 +19,17 @@ import {
  * `execute` no Drizzle. Assim o núcleo continua sem importar driver nenhum, e
  * não existem três cópias do mesmo SQL para divergirem entre si.
  */
-export type ProfileQueryRunner = <R>(sql: string) => Promise<readonly R[]>;
+export type ProfileQueryRunner = <R>(
+  sql: string,
+  /**
+   * Parâmetros vinculados, no estilo de placeholder do próprio driver.
+   *
+   * Obrigatório para a sonda de fuso do cliente: é justamente o caminho do
+   * parâmetro que se quer medir, e SQL montado por concatenação não passaria
+   * pela conversão do driver — mediria a nossa formatação, não a dele.
+   */
+  params?: readonly unknown[]
+) => Promise<readonly R[]>;
 
 /** Tabela e coluna de um campo textual portável do perfil. */
 export type ProfileColumnRef = readonly [table: string, column: string];
@@ -81,6 +91,75 @@ export async function assertProfileFacts(
 }
 
 /**
+ * Instante de referência da sonda de fuso, e o texto que ele deve produzir.
+ *
+ * Meio-dia de 1º de janeiro fica longe de qualquer borda de horário de verão,
+ * então um eco deslocado é deslocamento de fuso e não ambiguidade de DST.
+ */
+const PROBE_INSTANT = new Date('2000-01-01T12:00:00.000Z');
+const PROBE_EXPECTED = '2000-01-01T12:00:00';
+
+/**
+ * SQL que ecoa um instante vinculado como texto, por dialeto.
+ *
+ * O placeholder é o do driver: `$1` no Postgres, `?` no MySQL, `@0` no SQL
+ * Server. Todos os três formatam sem fuso, então o texto que volta é a hora de
+ * parede que o banco recebeu — que é exatamente o que se quer comparar.
+ */
+const PROBE_SQL: Readonly<Record<ProfileDialect, string>> = {
+  postgres: `SELECT to_char($1::timestamptz AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS') AS echoed`,
+  mysql: `SELECT DATE_FORMAT(?, '%Y-%m-%dT%H:%i:%s') AS echoed`,
+  mssql: `SELECT CONVERT(varchar(19), @0, 126) AS echoed`,
+};
+
+/**
+ * O driver entrega instantes em UTC?
+ *
+ * Mede o sintoma, não a configuração: nenhuma query revela como o driver está
+ * configurado, mas um instante conhecido que volta deslocado revela o efeito —
+ * que é o que importa. Read-only, porque um check de inicialização não deve
+ * escrever.
+ *
+ * Falha fechado se a sonda não puder rodar: um executor que ignora parâmetros
+ * vinculados não consegue provar nada aqui, e "não sei" não é "está certo"
+ * (§5.6).
+ */
+async function probeClientDateTimeIsUtc(
+  dialect: ProfileDialect,
+  query: ProfileQueryRunner
+): Promise<boolean> {
+  let echoed: string | undefined;
+
+  try {
+    const [row] = await query<{ echoed: string | Date | null }>(
+      PROBE_SQL[dialect],
+      [PROBE_INSTANT]
+    );
+    const value = row?.echoed;
+    echoed =
+      value instanceof Date
+        ? value.toISOString().slice(0, 19)
+        : (value ?? undefined)?.toString().slice(0, 19);
+  } catch (cause) {
+    throw configurationError(
+      'PORTABILITY_PROFILE_MISMATCH',
+      `The ${dialect} client timezone probe could not run; the query runner must support bound parameters`,
+      { dialect, cause: cause instanceof Error ? cause.message : String(cause) }
+    );
+  }
+
+  if (echoed === undefined) {
+    throw configurationError(
+      'PORTABILITY_PROFILE_MISMATCH',
+      `The ${dialect} client timezone probe returned no value; the profile could not be verified`,
+      { dialect }
+    );
+  }
+
+  return echoed.replace(' ', 'T') === PROBE_EXPECTED;
+}
+
+/**
  * Primeira linha de uma query de catálogo, ou o erro canônico.
  *
  * Um catálogo que não responde é um perfil que não pôde ser verificado, e a
@@ -120,6 +199,8 @@ async function collectPostgres({
   textColumns,
   requiredIndexes,
 }: CollectProfileFactsOptions): Promise<ProfileFacts> {
+  const clientDateTimeIsUtc = await probeClientDateTimeIsUtc('postgres', query);
+
   const server = firstRow(
     await query<{
       encoding: string;
@@ -150,6 +231,7 @@ async function collectPostgres({
 
   return {
     dialect: 'postgres',
+    clientDateTimeIsUtc,
     serverVersion: server.version,
     encoding: server.encoding,
     sessionTimeZone: server.timezone,
@@ -174,6 +256,8 @@ async function collectMySql({
   textColumns,
   requiredIndexes,
 }: CollectProfileFactsOptions): Promise<ProfileFacts> {
+  const clientDateTimeIsUtc = await probeClientDateTimeIsUtc('mysql', query);
+
   const server = firstRow(
     await query<{
       charset: string;
@@ -207,6 +291,7 @@ async function collectMySql({
 
   return {
     dialect: 'mysql',
+    clientDateTimeIsUtc,
     serverVersion: server.version,
     encoding: server.charset,
     sessionTimeZone: normalizeMySqlTimeZone(server),
@@ -247,6 +332,8 @@ async function collectMsSql({
   textColumns,
   requiredIndexes,
 }: CollectProfileFactsOptions): Promise<ProfileFacts> {
+  const clientDateTimeIsUtc = await probeClientDateTimeIsUtc('mssql', query);
+
   const server = firstRow(
     await query<{ collation: string; version: string }>(
       `SELECT CONVERT(varchar(128), DATABASEPROPERTYEX(DB_NAME(), 'Collation')) AS collation,
@@ -277,6 +364,7 @@ async function collectMsSql({
 
   return {
     dialect: 'mssql',
+    clientDateTimeIsUtc,
     // Garantido pela collation `_UTF8` do perfil certificado.
     encoding: 'UTF8',
     serverVersion: server.version,
