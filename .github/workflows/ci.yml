@@ -31,6 +31,7 @@ jobs:
       # causa do `isolatedModules`: sem este passo, erro de tipo em `tests/**`
       # não é pego por gate nenhum. Também é o único gate que carrega o
       # `tests/v3/integration/**`, que o `pnpm test` ignora por padrão.
+      - run: pnpm prisma:generate
       - run: pnpm typecheck:tests
       - run: pnpm test:cov
       - run: pnpm build
