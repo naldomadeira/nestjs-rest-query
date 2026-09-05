@@ -9,6 +9,7 @@ import {
   type NormalizedQueryResult,
 } from 'nestjs-rest-query';
 import { PostsBusiness } from './posts.business';
+import type { PostRow } from '../query/rows';
 import { postsRules } from './posts.query';
 
 class PostDto {
@@ -46,7 +47,7 @@ export class PostsController {
   async findAll(
     @Query() query: DynamicQueryDto,
     @QueryRules() rules: CompiledQueryRules
-  ): Promise<NormalizedQueryResult<object>> {
+  ): Promise<NormalizedQueryResult<PostRow>> {
     return this.postsBusiness.findAll(query, rules);
   }
 }

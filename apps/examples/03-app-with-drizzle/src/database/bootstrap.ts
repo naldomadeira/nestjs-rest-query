@@ -27,42 +27,42 @@ export const DROP_STATEMENTS: readonly string[] = TABLES.map(
 
 export const CREATE_STATEMENTS: readonly string[] = [
   `create table "companies" (
-     "id"          uuid primary key,
-     "idOrder"     text collate "C" not null,
-     "name"        text collate "C" not null,
-     "nameFolded"  text collate "C" not null,
-     "createdAt"   timestamptz not null
+     "id"           uuid primary key,
+     "id_order"     text collate "C" not null,
+     "name"         text collate "C" not null,
+     "name_folded"  text collate "C" not null,
+     "created_at"   timestamptz not null
    )`,
   `create table "users" (
-     "id"           uuid primary key,
-     "idOrder"      text collate "C" not null,
-     "name"         text collate "C" not null,
-     "nameFolded"   text collate "C" not null,
-     "email"        text collate "C" not null unique,
-     "emailFolded"  text collate "C" not null,
-     "companyId"    uuid references "companies" ("id"),
-     "createdAt"    timestamptz not null
+     "id"            uuid primary key,
+     "id_order"      text collate "C" not null,
+     "name"          text collate "C" not null,
+     "name_folded"   text collate "C" not null,
+     "email"         text collate "C" not null unique,
+     "email_folded"  text collate "C" not null,
+     "company_id"    uuid references "companies" ("id"),
+     "created_at"    timestamptz not null
    )`,
   `create table "posts" (
-     "id"           uuid primary key,
-     "idOrder"      text collate "C" not null,
-     "title"        text collate "C" not null,
-     "titleFolded"  text collate "C" not null,
-     "content"      text collate "C",
-     "userId"       uuid not null references "users" ("id"),
-     "createdAt"    timestamptz not null
+     "id"            uuid primary key,
+     "id_order"      text collate "C" not null,
+     "title"         text collate "C" not null,
+     "title_folded"  text collate "C" not null,
+     "content"       text collate "C",
+     "user_id"       uuid not null references "users" ("id"),
+     "created_at"    timestamptz not null
    )`,
-  `create index "companies_nameFolded_idx" on "companies" ("nameFolded")`,
-  `create index "users_nameFolded_idx"     on "users" ("nameFolded")`,
-  `create index "users_emailFolded_idx"    on "users" ("emailFolded")`,
-  `create index "users_companyId_idx"      on "users" ("companyId")`,
-  `create index "posts_titleFolded_idx"    on "posts" ("titleFolded")`,
-  `create index "posts_userId_idx"         on "posts" ("userId")`,
-  // `idOrder` é a coluna de desempate de toda página; sem índice a paginação
+  `create index "companies_name_folded_idx" on "companies" ("name_folded")`,
+  `create index "users_name_folded_idx"     on "users" ("name_folded")`,
+  `create index "users_email_folded_idx"    on "users" ("email_folded")`,
+  `create index "users_company_id_idx"      on "users" ("company_id")`,
+  `create index "posts_title_folded_idx"    on "posts" ("title_folded")`,
+  `create index "posts_user_id_idx"         on "posts" ("user_id")`,
+  // `id_order` é a coluna de desempate de toda página; sem índice a paginação
   // profunda vira sort em disco.
-  `create index "companies_idOrder_idx"    on "companies" ("idOrder")`,
-  `create index "users_idOrder_idx"        on "users" ("idOrder")`,
-  `create index "posts_idOrder_idx"        on "posts" ("idOrder")`,
+  `create index "companies_id_order_idx"    on "companies" ("id_order")`,
+  `create index "users_id_order_idx"        on "users" ("id_order")`,
+  `create index "posts_id_order_idx"        on "posts" ("id_order")`,
 ];
 
 /**

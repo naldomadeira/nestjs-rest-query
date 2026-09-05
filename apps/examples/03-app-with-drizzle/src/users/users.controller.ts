@@ -13,9 +13,10 @@ import { userRules } from './users.query';
 /**
  * Forma do usuário **para o Swagger**, não para o runtime.
  *
- * A projeção real é decidida pelas regras e pela URL, e o adapter Drizzle
- * devolve `object`. Esta classe existe só para o schema OpenAPI ter um corpo
- * concreto; ela não participa da autorização nem da execução.
+ * A projeção real é decidida pelas regras e pela URL. Esta classe existe só
+ * para o schema OpenAPI ter um corpo concreto; ela não participa da
+ * autorização nem da execução — quem tipa o retorno em TypeScript é `UserRow`,
+ * em `db/rows.ts`, com a mesma forma.
  */
 class UserView {
   @ApiProperty({ format: 'uuid' })

@@ -165,22 +165,21 @@ export const accessRequestRules = defineQueryRules(
     // Include profundo exige o pai autorizado: sem `items` não existe
     // `items.company` no JSON para pendurar nada.
     includes: ['user', 'items', 'items.company', 'items.module'],
-    // Só `user.firstName`, que atravessa uma relação `one`.
+    // `user.firstName` atravessa uma relação `one`; `items.company.name`
+    // atravessa a coleção `items` **e depois** a relação `company`. Os dois no
+    // mesmo `OR`, um deles existencial de dois saltos, é a forma que os casos
+    // `search/through-many-is-existential` e
+    // `relation-many/chain-through-one-is-existential` do corpus medem.
     //
-    // A whitelist v2 tinha `items.company.name` e `items.company.cnpj`, e os
-    // dois atravessam a coleção `items`. O bug de página curta que este
-    // exemplo encontrou foi corrigido na `3.0.0` — alvo de `search` por
-    // relação `many` compila como `EXISTS` —, mas `items.company.name` cruza
-    // **duas** relações (`items` e depois `company`), e o adapter TypeORM
-    // recusa cadeia existencial de mais de um salto com
-    // `CAPABILITY_UNAVAILABLE`. Prisma e Drizzle compilam essa cadeia; é
-    // divergência aberta, registrada em `docs/v3/status.md`.
+    // Os dois eram a whitelist da v2 deste endpoint, e voltaram: até a
+    // `3.0.0` o primeiro devolvia página curta em silêncio e o segundo era
+    // recusado pelo adapter. O smoke E2E tranca o tamanho da página.
     //
-    // `items.company.cnpj` teria um segundo impedimento, independente e
-    // instrutivo: `search` compara pela coluna dobrada, e `cnpj` não tem uma —
-    // declará-lo derruba a **subida**, não a requisição, com
+    // `items.company.cnpj`, que a v2 também tinha, continua fora — e o motivo
+    // é outro: `search` compara pela coluna dobrada, e `cnpj` não tem uma.
+    // Declará-lo não devolve erro de requisição, derruba a **subida** com
     // `Search field items.company.cnpj declares no folded field`. Buscar por
     // documento segue possível pelo caminho certo: `filter[cnpj][like]`.
-    search: ['user.firstName'],
+    search: ['user.firstName', 'items.company.name'],
   },
 );

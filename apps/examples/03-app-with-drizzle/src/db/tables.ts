@@ -17,6 +17,13 @@ import * as schema from './schema';
  * o Postgres reclama — por isso `assertPhysicalSchemaMatches` roda no load
  * deste módulo e transforma a divergência em erro de inicialização.
  *
+ * Cada campo tem **dois nomes**, e os dois importam. A chave (`companyId`) é o
+ * campo lógico: é o que a API expõe, o que as regras autorizam e o que aparece
+ * em `fields=`. O `name` (`company_id`) é a coluna física, e é o único que vai
+ * ao SQL. Nada obriga as duas convenções a coincidirem — é por isso que a API
+ * pode ser camelCase sobre um banco snake_case sem uma camada de tradução na
+ * aplicação.
+ *
  * `kind` é a decisão mais consequente aqui. `uuid` não é `string`: ele proíbe
  * `gt`/`lt`/`between` sem `portableOrderField` e recusa valor que não seja um
  * UUID canônico, em vez de comparar texto arbitrário.
@@ -34,7 +41,7 @@ export const companiesTable: DrizzleTable = createDrizzleTable({
       portableOrderField: 'idOrder',
     },
     idOrder: {
-      name: 'idOrder',
+      name: 'id_order',
       kind: 'string',
       nullable: false,
       primaryKey: false,
@@ -48,14 +55,14 @@ export const companiesTable: DrizzleTable = createDrizzleTable({
       foldedField: 'nameFolded',
     },
     nameFolded: {
-      name: 'nameFolded',
+      name: 'name_folded',
       kind: 'string',
       nullable: false,
       primaryKey: false,
       internal: true,
     },
     createdAt: {
-      name: 'createdAt',
+      name: 'created_at',
       kind: 'datetime',
       nullable: false,
       primaryKey: false,
@@ -75,7 +82,7 @@ export const usersTable: DrizzleTable = createDrizzleTable({
       portableOrderField: 'idOrder',
     },
     idOrder: {
-      name: 'idOrder',
+      name: 'id_order',
       kind: 'string',
       nullable: false,
       primaryKey: false,
@@ -89,7 +96,7 @@ export const usersTable: DrizzleTable = createDrizzleTable({
       foldedField: 'nameFolded',
     },
     nameFolded: {
-      name: 'nameFolded',
+      name: 'name_folded',
       kind: 'string',
       nullable: false,
       primaryKey: false,
@@ -103,20 +110,20 @@ export const usersTable: DrizzleTable = createDrizzleTable({
       foldedField: 'emailFolded',
     },
     emailFolded: {
-      name: 'emailFolded',
+      name: 'email_folded',
       kind: 'string',
       nullable: false,
       primaryKey: false,
       internal: true,
     },
     companyId: {
-      name: 'companyId',
+      name: 'company_id',
       kind: 'uuid',
       nullable: true,
       primaryKey: false,
     },
     createdAt: {
-      name: 'createdAt',
+      name: 'created_at',
       kind: 'datetime',
       nullable: false,
       primaryKey: false,
@@ -136,7 +143,7 @@ export const postsTable: DrizzleTable = createDrizzleTable({
       portableOrderField: 'idOrder',
     },
     idOrder: {
-      name: 'idOrder',
+      name: 'id_order',
       kind: 'string',
       nullable: false,
       primaryKey: false,
@@ -150,7 +157,7 @@ export const postsTable: DrizzleTable = createDrizzleTable({
       foldedField: 'titleFolded',
     },
     titleFolded: {
-      name: 'titleFolded',
+      name: 'title_folded',
       kind: 'string',
       nullable: false,
       primaryKey: false,
@@ -163,13 +170,13 @@ export const postsTable: DrizzleTable = createDrizzleTable({
       primaryKey: false,
     },
     userId: {
-      name: 'userId',
+      name: 'user_id',
       kind: 'uuid',
       nullable: false,
       primaryKey: false,
     },
     createdAt: {
-      name: 'createdAt',
+      name: 'created_at',
       kind: 'datetime',
       nullable: false,
       primaryKey: false,
@@ -236,12 +243,16 @@ export const postRelations: DrizzleRelationMap = {
  *
  * Existem duas declarações da mesma tabela neste exemplo porque a biblioteca
  * não deriva `DrizzleTable` de um `pgTable`. Sem esta verificação, um
- * `nameFolded` renomeado só apareceria como `column "nameFolded" does not
- * exist` na primeira busca em produção; com ela, a aplicação não sobe.
+ * `name_folded` renomeado no `pgTable` só apareceria como
+ * `column "name_folded" does not exist` na primeira busca em produção; com
+ * ela, a aplicação não sobe.
  *
- * A igualdade exigida é `chave lógica === nome físico`, e não
- * `descritor.name === nome físico`: é a chave que o compilador SQL emite como
- * identificador — `DrizzleColumn.name` não é lido em lugar nenhum.
+ * O que se compara agora é o par inteiro: a **chave** do descritor tem de ser
+ * a propriedade do `pgTable` (as duas são o campo lógico, e é por elas que o
+ * `fields=` e o JSON andam) e o `name` do descritor tem de ser a coluna física
+ * daquela propriedade. Antes do PR5 esta função exigia uma terceira coisa —
+ * que os dois nomes fossem iguais entre si —, porque o compilador emitia a
+ * chave e ignorava `name`. Aquela exigência sumiu com o defeito.
  */
 function assertPhysicalSchemaMatches(
   descriptor: DrizzleTable,
@@ -258,19 +269,11 @@ function assertPhysicalSchemaMatches(
       );
     }
 
-    if (actual.name !== path) {
+    if (actual.name !== column.name) {
       throw new Error(
         `${descriptor.name}: campo lógico "${path}" mapeia a coluna física ` +
-          `"${actual.name}"; o compilador Drizzle emite a chave lógica como ` +
-          `identificador, então os dois nomes precisam coincidir`
-      );
-    }
-
-    if (column.name !== path) {
-      throw new Error(
-        `${descriptor.name}: descritor de "${path}" declara name ` +
-          `"${column.name}"; esse campo é ignorado pelo compilador e ` +
-          `divergir dele só engana quem lê`
+          `"${actual.name}" no pgTable, mas o descritor declara ` +
+          `"${column.name}"; é o descritor que vai ao SQL`
       );
     }
   }

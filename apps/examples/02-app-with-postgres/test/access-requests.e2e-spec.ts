@@ -339,6 +339,29 @@ describe('exemplo 02 — API v3 sobre PostgreSQL', () => {
       expect(body.code).toBe('FIELD_NOT_ALLOWED');
     });
 
+    it('não devolve página curta quando a busca atravessa a coleção', async () => {
+      // Duas regressões num teste só, e nenhuma delas dava erro:
+      //
+      // 1. até a `3.0.0`, alvo de `search` por relação `many` virava LEFT JOIN
+      //    de predicado, o `LIMIT` incidia sobre linhas duplicadas pelo join e
+      //    a página voltava **menor** que `perPage`, calada;
+      // 2. `items.company.name` cruza duas relações, e cadeia existencial de
+      //    mais de um salto era recusada pelo adapter TypeORM.
+      //
+      // `multi` casa duas das quatro empresas do seed, e os itens são
+      // distribuídos em round-robin entre elas — então há roots com mais de um
+      // item casando, que é a condição que produzia a duplicata.
+      const { body } = await get(
+        '/access-requests?search=multi&perPage=5',
+      ).expect(200);
+
+      expect(body.total).toBeGreaterThan(5);
+      expect(body.data).toHaveLength(5);
+      expect(new Set(body.data.map((row: { id: number }) => row.id)).size).toBe(
+        5,
+      );
+    });
+
     it('busca por campo de relação one usando a coluna dobrada', async () => {
       const [minusculas, maiusculas] = await Promise.all([
         get(`/access-requests?search=${encodeURIComponent('cecília')}`).expect(

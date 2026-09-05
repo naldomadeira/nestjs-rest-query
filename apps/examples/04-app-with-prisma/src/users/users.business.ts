@@ -8,6 +8,7 @@ import {
 import { prismaSource } from 'nestjs-rest-query/prisma';
 import { PrismaService } from '../prisma/prisma.service';
 import { APP_MANIFEST } from '../query/manifest';
+import type { UserRow } from '../query/rows';
 
 @Injectable()
 export class UsersBusiness {
@@ -30,9 +31,9 @@ export class UsersBusiness {
   async findAll(
     query: DynamicQueryDto,
     rules: CompiledQueryRules
-  ): Promise<NormalizedQueryResult<object>> {
+  ): Promise<NormalizedQueryResult<UserRow>> {
     return this.queryBuilderService.execute(
-      prismaSource({
+      prismaSource<UserRow>({
         client: this.prisma,
         model: 'user',
         manifest: APP_MANIFEST,
