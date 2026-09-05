@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { DynamicQueryDto } from '@api/dtos';
 import { QueryBuilderService } from '@core/query-builder.v3.service';
 import { RULES_PRESETS } from '../fixtures/rules';
@@ -48,5 +49,36 @@ describe('DynamicQueryDto no uso público', () => {
     query.filter = { price: { gte: '10.50' } };
 
     expect(query.filter).toEqual({ price: { gte: '10.50' } });
+  });
+});
+
+/**
+ * A index signature deixa a DTO carregar qualquer chave; o parser é quem
+ * decide. Este teste existe porque as duas coisas parecem uma só quando lidas
+ * no tipo: compilar não é o mesmo que ser aceito.
+ */
+describe('DynamicQueryDto e params fora da gramática', () => {
+  it('param desconhecido vira 400 com QUERY_SYNTAX_UNKNOWN_PARAM', async () => {
+    const service = new QueryBuilderService({});
+    const query = new DynamicQueryDto();
+    query.utm_source = 'newsletter';
+
+    await expect(
+      service.execute(fakeSource(), query, RULES_PRESETS['user.default'])
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('a DTO recém-construída não é lida como um punhado de params desconhecidos', async () => {
+    // Sob `target: ES2022` os campos declarados viram own properties valendo
+    // `undefined`: se a recusa olhasse a chave em vez do valor, a própria DTO
+    // vazia seria recusada.
+    const service = new QueryBuilderService({});
+    await expect(
+      service.execute(
+        fakeSource(),
+        new DynamicQueryDto(),
+        RULES_PRESETS['user.default']
+      )
+    ).resolves.toBeDefined();
   });
 });
