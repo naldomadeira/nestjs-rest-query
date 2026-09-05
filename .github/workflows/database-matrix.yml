@@ -15,7 +15,7 @@ on:
     branches: [main]
     tags: ['v*']
   pull_request:
-    branches: [main]
+    branches: [main, 'feat/v3-**']
 
 permissions:
   contents: read
@@ -39,8 +39,6 @@ jobs:
       - uses: actions/checkout@v6
 
       - uses: pnpm/action-setup@v6
-        with:
-          version: 9
 
       - uses: actions/setup-node@v6
         with:

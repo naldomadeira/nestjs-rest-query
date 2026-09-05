@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, 'feat/v3-**']
   schedule:
     - cron: '0 6 * * 1'
 
