@@ -75,3 +75,8 @@ tests/v3/package/consumer-fixtures/*/package-lock.json
 
 # Client Prisma gerado pelo harness do corpus (pnpm prisma:generate)
 tests/v3/adapters/prisma/generated/
+
+# Relatório JUnit da matriz de paridade: saída efêmera, gerada e consumida no
+# mesmo job da CI. Uma cópia versionada só envelhece — a que estava aqui era de
+# uma rodada local de MySQL com 66 casos, e o corpus já tinha mudado.
+integration*.xml
