@@ -252,6 +252,15 @@ function relationSteps(
  * aspas o PostgreSQL dobra `articlesId` para minúsculas e não acha a coluna —
  * então só estes três passam pelo `escape` do driver. Uniformizar a citação
  * do compilador inteiro é decisão maior que esta emenda.
+ *
+ * O driver vem por `entityMetadata.connection`, e não pelo `dataSource` que a
+ * 1.x prefere, porque o peer declarado é `^0.3.26 || ^1.0.0` e `dataSource` só
+ * existe na 1.x. Ler o nome novo custou os sete testes desta suíte no job
+ * `Test Peers` sob 0.3.26 e 0.3.27 — `Cannot destructure property 'driver' of
+ * undefined`, ou seja a m2m inteira morta no mínimo do próprio peer. `connection`
+ * está nas duas (na 1.x como getter deprecado), é o que `typeorm.adapter.ts` já
+ * usa, e é uma expressão só: um `dataSource ?? connection` cobriria a 2.0 ao
+ * preço de um branch que nenhuma versão do range executa nos dois lados.
  */
 function manyToManySteps(
   relation: RelationMetadata,
@@ -264,7 +273,7 @@ function manyToManySteps(
   const toTarget = relation.isOwning
     ? owning.inverseJoinColumns
     : owning.joinColumns;
-  const { driver } = relation.entityMetadata.dataSource;
+  const { driver } = relation.entityMetadata.connection;
 
   return [
     {
