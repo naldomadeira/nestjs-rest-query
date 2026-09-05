@@ -148,6 +148,23 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     rules: 'user.default',
     query: { filter: { name: { like: '_' } } },
     expect: { kind: 'rows', ids: [10], total: 1, lastPage: 1 },
+    divergences: {
+      prisma: {
+        reason:
+          "O Prisma compila `contains` para LIKE ('%' || ? || '%') sem " +
+          'cláusula ESCAPE e não escapa metacaracteres, e o client tipado não ' +
+          'expõe ESCAPE. `_` casa qualquer caractere, então o filtro devolve ' +
+          'todos os roots. Vale para like, notLike, ilike, notIlike e search; ' +
+          '`%` só não aparece vermelho porque um único nome do seed contém ' +
+          '"100". Diverge da §11.',
+        expect: {
+          kind: 'rows',
+          ids: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+          total: 11,
+          lastPage: 1,
+        },
+      },
+    },
   },
   {
     id: 'like/backslash-is-literal',

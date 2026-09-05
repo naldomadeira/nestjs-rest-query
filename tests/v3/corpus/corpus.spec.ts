@@ -36,6 +36,42 @@ describe('corpus canônico', () => {
     }
   });
 
+  /**
+   * Divergência intencional é exceção, e exceção precisa doer para entrar.
+   *
+   * Este teste é o inventário: qualquer nova divergência muda a lista abaixo e
+   * aparece na revisão, em vez de passar como mais um objeto no meio dos 85
+   * casos.
+   */
+  it('declara apenas as divergências de adapter já revisadas', () => {
+    const declared = CORPUS_CASES.flatMap((testCase) =>
+      Object.entries(testCase.divergences ?? {}).map(
+        ([adapter, divergence]) => ({
+          case: testCase.id,
+          adapter,
+          reason: divergence.reason,
+        })
+      )
+    );
+
+    expect(declared.map(({ case: id, adapter }) => `${adapter}:${id}`)).toEqual(
+      ['prisma:like/underscore-is-literal']
+    );
+
+    for (const entry of declared) {
+      expect(entry.reason.length).toBeGreaterThan(40);
+    }
+  });
+
+  it('nunca diverge num caso que espera erro', () => {
+    // Um adapter pode não conseguir *executar* algo; recusar uma entrada
+    // inválida é obrigação de todos, e o núcleo decide isso antes do adapter.
+    for (const testCase of CORPUS_CASES) {
+      if (testCase.expect.kind !== 'error') continue;
+      expect(testCase.divergences ?? {}).toEqual({});
+    }
+  });
+
   it('cobre todas as áreas obrigatórias do spec §18.2', () => {
     const tags = new Set(CORPUS_CASES.flatMap((c) => c.tags));
     for (const required of [

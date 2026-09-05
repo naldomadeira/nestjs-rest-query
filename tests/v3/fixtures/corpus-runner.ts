@@ -1,7 +1,11 @@
-import type { DataSource, ObjectLiteral, Repository } from 'typeorm';
+import type { DataSource } from 'typeorm';
+import type { AnyQuerySource } from '@contracts/v3';
 import { QueryBuilderService } from '@core/query-builder.v3.service';
-import { typeormSource } from '@infra/adapters/typeorm';
-import type { CorpusCase } from '../corpus/corpus.types';
+import type {
+  CorpusAdapterId,
+  CorpusCase,
+  CorpusExpectation,
+} from '../corpus/corpus.types';
 import { CORPUS_SEED } from '../corpus/seed';
 import { RULES_PRESETS } from './rules';
 import type { CorpusEntities } from './entity-schemas';
@@ -18,6 +22,20 @@ export interface CorpusOutcome {
 
 const service = new QueryBuilderService({});
 
+/**
+ * Expectativa que vale para este adapter (spec §5 e §24).
+ *
+ * É a canônica, salvo quando o caso declara uma divergência intencional para
+ * ele. A divergente é comparada com o mesmo rigor, então um adapter que volte
+ * a concordar com o canônico quebra o teste — e a divergência tem de sair.
+ */
+export function expectationFor(
+  testCase: CorpusCase,
+  adapter: CorpusAdapterId
+): CorpusExpectation {
+  return testCase.divergences?.[adapter]?.expect ?? testCase.expect;
+}
+
 /** Chave observável de um root: PK simples, ou partes unidas por `|`. */
 function rootKey(
   row: Record<string, unknown>,
@@ -30,28 +48,19 @@ function rootKey(
 /**
  * Roda um caso do corpus e reduz o resultado à forma comparável.
  *
- * A mesma redução vale para os contract tests (SQLite) e para as células reais
- * da matriz, então a comparação entre bancos é de dados — não de
- * comportamento reimplementado por adapter.
+ * Recebe a source pronta, não um repositório: é o que permite os três adapters
+ * atravessarem exatamente o mesmo runner. A comparação entre ORMs e bancos
+ * passa a ser de dados — não de comportamento reimplementado por adapter.
  */
 export async function runCorpusCase(
   testCase: CorpusCase,
-  repository: Repository<ObjectLiteral>
+  source: AnyQuerySource
 ): Promise<CorpusOutcome> {
   const rules = RULES_PRESETS[testCase.rules];
   const primaryKey = rules.registry.get(rules.model)!.primaryKey;
 
   try {
-    const result = await service.execute(
-      typeormSource(repository, {
-        fieldKinds: {
-          post: { id: 'uuid' },
-          tag: { post_id: 'uuid' },
-        },
-      }),
-      testCase.query,
-      rules
-    );
+    const result = await service.execute(source, testCase.query, rules);
 
     const rows = result.data as Record<string, unknown>[];
     // Sem linhas, a lista vazia é observável; com linhas, só se a projeção

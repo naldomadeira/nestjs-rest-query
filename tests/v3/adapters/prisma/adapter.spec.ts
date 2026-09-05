@@ -278,9 +278,12 @@ describe('PrismaAdapter compile', () => {
   });
 
   it('marca in vazio como sempre falso e omite notIn vazio', () => {
+    // `in: []`, e não `OR: []`: o Prisma reduz um `OR` vazio isolado a `1=0`,
+    // mas ignora o mesmo `OR` dentro de um `AND` — e é sempre dentro de um
+    // `AND` que os filtros saem daqui.
     expect(
       compile({ filter: { id: { in: '' } } }, 'user.default').where
-    ).toEqual({ AND: [{ OR: [] }] });
+    ).toEqual({ AND: [{ id: { in: [] } }] });
     expect(
       compile({ filter: { id: { notIn: '' } } }, 'user.default').where
     ).toBeUndefined();
@@ -301,7 +304,9 @@ describe('PrismaAdapter compile', () => {
     expect((data.where as { AND: unknown[] }).AND).toEqual([
       { score: { equals: '9007199254740993' } },
       { balance: { equals: '10.50' } },
-      { born_on: { equals: '1815-12-10' } },
+      // Data civil vira `Date` em meia-noite UTC: o client gerado recusa a
+      // string ISO num campo `DateTime` com erro de validação.
+      { born_on: { equals: new Date('1815-12-10T00:00:00.000Z') } },
     ]);
   });
 

@@ -191,3 +191,58 @@ export const userRelations: DrizzleRelationMap = {
     targetColumn: 'user_id',
   },
 };
+
+export const tagsTable: DrizzleTable = createDrizzleTable({
+  name: 'tags',
+  model: 'tag',
+  columns: {
+    post_id: {
+      name: 'post_id',
+      kind: 'uuid',
+      nullable: false,
+      primaryKey: true,
+      portableOrderField: 'post_id_order',
+    },
+    post_id_order: {
+      name: 'post_id_order',
+      kind: 'string',
+      nullable: false,
+      primaryKey: false,
+      internal: true,
+    },
+    label: {
+      name: 'label',
+      kind: 'string',
+      nullable: false,
+      primaryKey: true,
+    },
+  },
+});
+
+/** Cadeia a partir de `post`. */
+export const postRelations: DrizzleRelationMap = {
+  author: {
+    target: usersTable,
+    cardinality: 'one',
+    nullable: false,
+    sourceColumn: 'user_id',
+    targetColumn: 'id',
+  },
+  tags: {
+    target: tagsTable,
+    cardinality: 'many',
+    nullable: true,
+    sourceColumn: 'id',
+    targetColumn: 'post_id',
+  },
+};
+
+/** Tabelas e relações por model do corpus, para montar a source do preset. */
+export const DRIZZLE_CORPUS: Readonly<
+  Record<string, { table: DrizzleTable; relations: DrizzleRelationMap }>
+> = {
+  user: { table: usersTable, relations: userRelations },
+  company: { table: companiesTable, relations: {} },
+  post: { table: postsTable, relations: postRelations },
+  tag: { table: tagsTable, relations: {} },
+};

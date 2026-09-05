@@ -9,7 +9,7 @@ import type { TypedQueryPlan } from '@core/query-plan';
 import type { QuerySchema } from '@core/schema';
 import { compileWhere } from './drizzle-filter.compiler';
 import { DrizzleJoinPlanner } from './drizzle-join-planner';
-import { compileSelect } from './drizzle-projection.compiler';
+import { compileProjection } from './drizzle-projection.compiler';
 import { buildSourceSchema } from './drizzle-schema.resolver';
 import { compileOrderBy } from './drizzle-sort.compiler';
 import type {
@@ -62,15 +62,16 @@ export class DrizzleAdapter implements RestQueryAdapterV3<
     const where = compileWhere(plan, {
       planner,
       escapeCharacter: ESCAPE_CHARACTER,
+      dialect: source.dialect,
     });
     const orderBy = compileOrderBy(plan, planner);
-    const select = compileSelect(plan, planner);
+    const projection = compileProjection(plan, planner);
 
     const data: DrizzleStatement = {
       dialect: source.dialect,
       table: source.table.name,
       alias: planner.rootAlias,
-      select,
+      select: projection.select,
       joins: planner.all(),
       ...(where ? { where } : {}),
       orderBy,
@@ -81,6 +82,8 @@ export class DrizzleAdapter implements RestQueryAdapterV3<
           }
         : {}),
       countOnly: false,
+      rootKey: plan.schema.primaryKey,
+      manyProjections: projection.many,
     };
 
     const count: DrizzleStatement = {
@@ -92,6 +95,8 @@ export class DrizzleAdapter implements RestQueryAdapterV3<
       ...(where ? { where } : {}),
       orderBy: [],
       countOnly: true,
+      rootKey: plan.schema.primaryKey,
+      manyProjections: [],
     };
 
     return {

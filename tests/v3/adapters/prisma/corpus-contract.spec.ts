@@ -1,28 +1,21 @@
 import { CORPUS_CASES } from '../../corpus/cases';
-import {
-  expectationFor,
-  runCorpusCase,
-  seedCorpus,
-} from '../../fixtures/corpus-runner';
-import { typeormSource } from '@infra/adapters/typeorm';
-import {
-  closeSqlite,
-  corpusEntities,
-  openSqlite,
-  repositoryFor,
-} from './helpers';
+import { expectationFor, runCorpusCase } from '../../fixtures/corpus-runner';
+import { closeSqlite, openSqlite, seedSqlite, sourceFor } from './helpers';
 
 /**
- * Contract test do corpus contra SQLite.
+ * Contract test do corpus contra o adapter Prisma.
  *
- * SQLite **não** é uma célula da matriz de paridade: aqui ele serve como
- * dialeto rápido para provar que o compilador implementa a semântica do plano.
- * A promessa de paridade é medida em `tests/v3/integration`, contra os três
- * bancos do perfil certificado.
+ * Mesmos casos, mesmo runner e mesmas expectativas que os adapters TypeORM e
+ * Drizzle atravessam: é a comparação de resultado que a §5 exige, e não uma
+ * suíte paralela mais permissiva. SQLite continua sendo dialeto de
+ * referência, não célula da matriz — as nove células reais medem a promessa
+ * (spec §18). O client é gerado de verdade (`pnpm prisma:generate`), não
+ * mockado: o generator a partir de `schema.prisma` continua não existindo
+ * (spec §15.2), então o manifesto usado aqui é escrito à mão.
  */
 beforeAll(async () => {
-  const dataSource = await openSqlite();
-  await seedCorpus(dataSource, corpusEntities());
+  openSqlite();
+  await seedSqlite();
 }, 60_000);
 
 afterAll(closeSqlite);
@@ -31,14 +24,9 @@ describe.each(CORPUS_CASES.map((testCase) => [testCase.id, testCase] as const))(
   'corpus %s',
   (_id, testCase) => {
     it(testCase.description, async () => {
-      const actual = await runCorpusCase(
-        testCase,
-        typeormSource(repositoryFor(testCase.rules), {
-          fieldKinds: { post: { id: 'uuid' }, tag: { post_id: 'uuid' } },
-        })
-      );
+      const actual = await runCorpusCase(testCase, sourceFor(testCase.rules));
 
-      const expected = expectationFor(testCase, 'typeorm');
+      const expected = expectationFor(testCase, 'prisma');
 
       if (expected.kind === 'error') {
         expect(actual).toEqual({

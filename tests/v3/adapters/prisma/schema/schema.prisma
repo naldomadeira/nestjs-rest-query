@@ -1,0 +1,87 @@
+// Schema Prisma do modelo canônico do corpus (spec §18.2, tests/v3/corpus/model.ts).
+//
+// Escrito à mão, como o manifesto em src/infra/adapters/prisma/prisma-manifest.ts:
+// o generator que deriva ambos de um `schema.prisma` único ainda não existe
+// (fase 4 não fecha isso, ver MIGRATION.md). Nomes de campo batem exatamente
+// com CORPUS_SCHEMAS (tests/v3/fixtures/schemas.ts) porque o adapter endereça
+// colunas pelos paths do schema lógico, não por um mapeamento próprio.
+//
+// SQLite é o dialeto de referência (nunca célula da matriz): a conexão em
+// runtime usa o driver adapter @prisma/adapter-better-sqlite3 sobre um banco
+// :memory: cujo DDL é escrito à mão em helpers.ts, do mesmo jeito que o
+// harness do Drizzle. `db push`/migrations não entram no laço de teste.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id         Int      @id
+  name       String
+  name_folded String
+  email      String
+  email_folded String
+  document   String
+  zip        String
+  code       String
+  score      BigInt
+  // SQLite não aceita o atributo nativo `@db.Decimal`: o precision/scale
+  // fica só no schema lógico, não no schema.prisma.
+  balance    Decimal
+  active     Boolean
+  // SQLite não aceita `@db.Date`: campo somente-data usa `DateTime` puro, e
+  // é `encodeScalar` (spec §10.1) quem corta para `YYYY-MM-DD` na saída —
+  // não o driver.
+  born_on    DateTime
+  created_at DateTime
+  nickname   String?
+  company_id Int?
+
+  company        Company?  @relation("UserCompany", fields: [company_id], references: [id])
+  posts          Post[]    @relation("UserPosts")
+  ownedCompanies Company[] @relation("CompanyOwner")
+
+  @@map("users")
+}
+
+model Company {
+  id         Int     @id
+  name       String
+  name_folded String
+  owner_id   Int?
+
+  owner     User?  @relation("CompanyOwner", fields: [owner_id], references: [id])
+  employees User[] @relation("UserCompany")
+
+  @@map("companies")
+}
+
+model Post {
+  id           String @id
+  id_order     String
+  title        String
+  title_folded String
+  user_id      Int
+
+  author User  @relation("UserPosts", fields: [user_id], references: [id])
+  tags   Tag[]
+
+  @@map("posts")
+}
+
+model Tag {
+  post_id       String
+  post_id_order String
+  label         String
+
+  post Post @relation(fields: [post_id], references: [id])
+
+  @@id([post_id, label])
+  @@map("tags")
+}
