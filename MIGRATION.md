@@ -101,6 +101,26 @@ The Drizzle adapter has explicit, runtime-enforced constraints. None of these af
 
 If you were using TypeORM with the default `forRoot()`, no application code changes. The default adapter is still TypeORM. The `paginate=false` branch keeps returning `{ data }` exactly as before.
 
+## 3.x preview status
+
+The v3 branch has a canonical semantic core plus TypeORM, Prisma, and Drizzle subpaths, but it is not ready for a stable `3.0.0` release.
+
+Current implementation status:
+
+- TypeORM: the v3 corpus runs locally on SQLite with TypeORM `0.3.x`/`1.1.x`. Source schema mismatches fail as configuration errors, and to-many pagination applies `customize` constraints to the root-key phase.
+- Prisma: `prismaSource`, `PrismaAdapter`, and a manual manifest are implemented. The compiler emits filters, search, `one`/`many` relation predicates (`is`, `some`, `none`), recursive selects, sort, pagination, count, and `customize`. The portable strict profile uses folded fields and never emits Prisma `mode: 'insensitive'`.
+- Drizzle: `drizzleSource`, `DrizzleAdapter`, explicit table/relation metadata, and an abstract statement compiler are implemented. Relations are declared by dotted path (`{ company, 'company.owner', posts }`), so deep chains resolve; `one` chains become idempotent joins with a single alias each, and any `many` hop becomes a correlated `EXISTS` that never joins the root. MySQL/MSSQL search uses folded fields plus escaped `LIKE`, never `ILIKE`. Executing the compiled statement in each dialect is still supplied by the consumer through `DrizzleDatabase`.
+
+Known blockers before stable `3.0.0`:
+
+- The full 3 × 3 ORM/database matrix must pass without hidden skips.
+- SQL Server must be exercised on a Linux x64 runner; local ARM failures are tracked but are not a release substitute.
+- Prisma still needs the generated `schema.prisma` manifest path and real generated-client integration on Prisma `6.19.x` and `7.x`.
+- Drizzle `1.x` is still consumed as `1.0.0-rc.4` in this branch. Keep v3 as a prerelease until Drizzle GA and MSSQL support are stable.
+- The Drizzle adapter compiles to a `DrizzleStatement` but does not materialize it with `drizzle-orm` yet: the consumer implements `DrizzleDatabase`. It also fails closed with `ADAPTER_CONTRACT_VIOLATION` when a projection crosses a to-many relation, because two-phase hydration is not implemented there. Neither is a silent degradation, but neither is the finished phase-5 adapter.
+- The portability profile checker validates facts supplied by the caller, but there is not yet a trusted adapter-level collector/cache for PostgreSQL, MySQL, and SQL Server. Do not market this as a certified profile gate yet.
+- Prisma/Drizzle examples, package-consumer smoke tests, and public matrix/docs must match the CI state exactly.
+
 ## Intentional adapter divergences (parity)
 
 The library aims for behavioral parity across TypeORM, Drizzle, and Prisma. A few spots are documented divergences — same input, different observable outcome by adapter — because the underlying SQL/ORM model makes "the same as TypeORM" either ambiguous or unsafe. The cross-adapter parity matrix in `tests/parity/matrix.spec.ts` encodes each one explicitly so it is impossible to introduce a new silent divergence.

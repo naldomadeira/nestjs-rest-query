@@ -9,9 +9,24 @@ Isso torna a v3 **breaking em vários pontos observáveis**. Este guia lista cad
 mudança com o antes e o depois.
 
 > **Estado desta versão.** O núcleo semântico, a API pública e o adapter
-> TypeORM estão implementados. Os adapters Prisma e Drizzle publicam subpath
-> mas ainda lançam `ADAPTER_CONTRACT_VIOLATION`: eles chegam nas fases 4 e 5 do
-> plano da v3. A `3.0.0` estável depende da matriz completa verde.
+> TypeORM estão implementados. Prisma e Drizzle já têm sources, adapters,
+> compilers e executors funcionais em contrato unitário, mas ainda não atingem
+> a paridade certificada nas nove células ORM × banco. A `3.0.0` estável
+> permanece bloqueada até a matriz completa verde, sem skips escondidos.
+
+## Estado dos adapters nesta branch
+
+Este guia descreve a v3 em desenvolvimento. Ele não deve ser lido como promessa
+de release estável enquanto os gates finais não passarem.
+
+| Adapter | Entregue nesta branch                                                                                                                                                                                                                                                                                                                           | Ainda pendente antes de `3.0.0` estável                                                                                                                                                                                                                                                                     |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| TypeORM | Corpus v3 local em SQLite usando TypeORM `0.3.x`/`1.1.x`, source discriminada, schema lógico validado antes da execução, paginação many com keys distintas e `customize` aplicado também na fase de keys.                                                                                                                                       | Célula SQL Server em runner Linux x64; confirmação da matriz PostgreSQL/MySQL/SQL Server sem skips; collector certificado de perfil por banco.                                                                                                                                                              |
+| Prisma  | Manifesto manual explícito, `prismaSource`, `PrismaAdapter`, compilation de filtros, search, relações `one`/`many` (`is`, `some`, `none`), select recursivo, sort, paginação, count e `customize`; o perfil estrito usa folded fields e nunca emite `mode: 'insensitive'`.                                                                      | Generator a partir de `schema.prisma`, integrações reais com Prisma Client gerado em PostgreSQL/MySQL/SQL Server, suíte de compatibilidade Prisma `6.19.x` e `7.x`.                                                                                                                                         |
+| Drizzle | Source tipada por tabela e relações declaradas por path pontuado (`company`, `company.owner`, `posts`), schema derivado das colunas, planner de junções idempotente, `EXISTS` correlacionado para qualquer salto `many`, junção de predicado separada da de apresentação, count só com as junções de predicado; MySQL e MSSQL não usam `ILIKE`. | Drizzle `1.x` ainda está em RC (`1.0.0-rc.4` nesta branch), não GA; a materialização do `DrizzleStatement` em SQL ainda é do consumidor (`DrizzleDatabase`); projeção através de relação `many` falha fechado por falta de hidratação em duas fases; integração PostgreSQL/MySQL e MSSQL estável pendentes. |
+
+Enquanto o Drizzle 1.x/MSSQL não estiver estável, qualquer publicação v3 deve
+ser `next`/pré-release. Não publique `3.0.0` estável a partir deste estado.
 
 ---
 
@@ -249,6 +264,28 @@ de cada família vive em `test/profiles/`.
 Uma aplicação pode usar outro perfil, mas só recebe o selo de paridade se
 executar e passar o mesmo conformance kit. `checkPortabilityProfile` transforma
 os fatos do catálogo em violações antes de a aplicação aceitar tráfego.
+
+Nesta branch, `portability.enforce` valida os fatos recebidos quando eles são
+fornecidos, mas isso ainda não equivale a coleta certificada. O runtime não
+consulta sozinho o catálogo de PostgreSQL/MySQL/SQL Server nem mantém cache
+confiável por adapter. Até existir esse collector por banco, trate o perfil
+certificado como gate parcialmente implementado e não como selo automático.
+
+## Gates ainda bloqueando `3.0.0`
+
+- Nove células ORM × banco verdes, sem skips e com a mesma matriz pública.
+- SQL Server executado em runner Linux x64; falhas locais em ARM não bloqueiam
+  a branch, mas precisam ficar registradas.
+- Prisma validado com clients gerados em `6.19.x` e `7.x`.
+- Drizzle 1.x GA com MSSQL funcional; enquanto estiver em RC, a v3 permanece
+  pré-release.
+- Exemplos Prisma/Drizzle, smoke de consumidores e isolamento de subpaths
+  exercitados em build/package verification.
+- Executor Drizzle real por dialeto e hidratação em duas fases para projeção
+  através de relação `many`; hoje o adapter compila o statement completo e
+  falha fechado nesse caso, em vez de devolver só as colunas do root.
+- Collector certificado de perfil por adapter/banco, em vez de apenas fatos
+  fornecidos pelo chamador.
 
 ---
 

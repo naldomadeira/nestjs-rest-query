@@ -9,7 +9,10 @@ export {
   type JoinNode,
   type JoinPlan,
 } from './typeorm-join-planner';
-export { containsPattern, escapeLiteralPattern } from './escape-pattern';
+export {
+  containsPattern,
+  escapeLiteralPattern,
+} from '../shared/escape-pattern';
 export {
   compilePlan,
   predicateOnly,

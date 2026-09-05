@@ -53,7 +53,9 @@ describe('package exports', () => {
 
   it('as faixas de peer refletem a matriz suportada', () => {
     expect(pkg.peerDependencies.typeorm).toBe('^0.3.26 || ^1.0.0');
-    expect(pkg.peerDependencies['drizzle-orm']).toBe('^1.0.0');
+    // Drizzle 1.x ainda está em RC nesta branch; o teste deve bloquear a
+    // declaração acidental de GA antes do gate Drizzle/MSSQL.
+    expect(pkg.peerDependencies['drizzle-orm']).toBe('>=1.0.0-rc.4 <2.0.0');
     expect(pkg.peerDependencies['@prisma/client']).toBe('^6.19.0 || ^7.0.0');
   });
 

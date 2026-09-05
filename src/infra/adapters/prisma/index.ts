@@ -1,18 +1,32 @@
-import { configurationError } from '@core/errors';
-
-/**
- * Subpath do Prisma.
- *
- * O adapter chega na fase 4 do plano da v3. O subpath já existe e é
- * publicado para que o exports map, os tipos e o isolamento de peer sejam
- * testáveis desde agora — mas usá-lo falha em voz alta em vez de prometer
- * comportamento que não existe.
- */
-export const PRISMA_ADAPTER_STATUS = 'not-implemented' as const;
-
-export function prismaSource(): never {
-  throw configurationError(
-    'ADAPTER_CONTRACT_VIOLATION',
-    'The Prisma adapter lands in v3 phase 4; it is not implemented yet'
-  );
-}
+export type {
+  CompiledPrismaQuery,
+  PrismaClientLike,
+  PrismaCountArgs,
+  PrismaDelegate,
+  PrismaManifest,
+  PrismaManifestInput,
+  PrismaModelManifest,
+  PrismaNativeQuery,
+  PrismaOrderBy,
+  PrismaProvider,
+  PrismaQueryArgs,
+  PrismaSelect,
+  PrismaSourceInput,
+  PrismaSourceOptions,
+  PrismaWhere,
+} from './prisma-query.interface';
+export { createPrismaManifest } from './prisma-manifest';
+export {
+  compileFilter,
+  compileWhere,
+  scalarCondition,
+} from './prisma-filter.compiler';
+export { compileSelect } from './prisma-projection.compiler';
+export { compileOrderBy } from './prisma-sort.compiler';
+export {
+  leafColumn,
+  nestThroughRelations,
+  relationParentModel,
+} from './prisma-relations';
+export { toPrismaValue, toPrismaValueArray } from './prisma-value';
+export { PrismaAdapter, prismaSource } from './prisma.adapter';
