@@ -303,11 +303,19 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     expect: { kind: 'rows', ids: [], total: 0, lastPage: 1 },
   },
   {
+    /**
+     * `perPage` fixo porque o que este caso prova é o **conjunto inteiro**, e
+     * o seed tem 11 linhas. Sem isso ele dependia calado de
+     * `defaultPerPage`, que a Emenda 4 da ADR-001 devolveu de `20` para `10` —
+     * e a expectativa passaria a mostrar 10 de 11 linhas afirmando "todas".
+     * Um default de configuração não deve poder reescrever o que um caso do
+     * corpus prova.
+     */
     id: 'list/not-in-empty-is-always-true',
     description: 'notIn=[] compila para condição sempre verdadeira',
     tags: ['csv-escape'],
     rules: 'user.default',
-    query: { filter: { id: { notIn: [] } } },
+    query: { filter: { id: { notIn: [] } }, perPage: '20' },
     expect: {
       kind: 'rows',
       ids: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
@@ -642,11 +650,19 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     expect: { kind: 'rows', ids: [1, 4, 5], total: 3, lastPage: 1 },
   },
   {
+    /**
+     * `perPage` fixo porque o que este caso prova é o **conjunto inteiro**, e
+     * o seed tem 11 linhas. Sem isso ele dependia calado de
+     * `defaultPerPage`, que a Emenda 4 da ADR-001 devolveu de `20` para `10` —
+     * e a expectativa passaria a mostrar 10 de 11 linhas afirmando "todas".
+     * Um default de configuração não deve poder reescrever o que um caso do
+     * corpus prova.
+     */
     id: 'sort/duplicate-same-direction-is-deduped',
     description: 'sort repetido com a mesma direção é deduplicado',
     tags: ['sort-tie'],
     rules: 'user.default',
-    query: { sort: 'code,code' },
+    query: { sort: 'code,code', perPage: '20' },
     expect: {
       kind: 'rows',
       ids: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
@@ -663,11 +679,19 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     expect: { kind: 'error', status: 400, code: 'SORT_CONFLICT' },
   },
   {
+    /**
+     * `perPage` fixo porque o que este caso prova é o **conjunto inteiro**, e
+     * o seed tem 11 linhas. Sem isso ele dependia calado de
+     * `defaultPerPage`, que a Emenda 4 da ADR-001 devolveu de `20` para `10` —
+     * e a expectativa passaria a mostrar 10 de 11 linhas afirmando "todas".
+     * Um default de configuração não deve poder reescrever o que um caso do
+     * corpus prova.
+     */
     id: 'sort/descending-reverses-code-order',
     description: 'sort descendente inverte a ordem de code point',
     tags: ['sort-tie'],
     rules: 'user.default',
-    query: { sort: '-code' },
+    query: { sort: '-code', perPage: '20' },
     expect: {
       kind: 'rows',
       ids: [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1],

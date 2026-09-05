@@ -55,7 +55,7 @@ DynamicQueryBuilderModule.forRoot({
 
 // v3
 DynamicQueryBuilderModule.forRoot({
-  pagination: { defaultPerPage: 20, maxPerPage: 100 },
+  pagination: { defaultPerPage: 10, maxPerPage: 100 },
   textProfile: 'portable-strict',
   consistency: 'eventual',
   logging: { enabled: true, level: 'info', redactValues: true },
@@ -67,7 +67,12 @@ DynamicQueryBuilderModule.forRoot({
 `forRoot no longer accepts "<chave>"; see the v2 to v3 migration guide`. A
 restrição de operadores agora é **por campo**, declarada nas regras do endpoint.
 
-O default de `defaultPerPage` mudou de `10` para `20`.
+Os defaults de paginação **não mudaram**: `defaultPerPage` continua `10` e
+`maxPerPage` continua `100`. O design de 2026-09-03 trazia `20` no bloco de
+exemplo da §8.2 e o código o seguiu; a
+[Emenda 4 da ADR-001](../superpowers/specs/2026-09-04-v3-adr-001-matriz-e-escopo-da-3.0.0.md)
+desfez isso. Se você leu uma versão anterior deste guia que mandava fixar
+`defaultPerPage`, não precisa mais.
 
 ## 2. Schema lógico e regras de endpoint
 

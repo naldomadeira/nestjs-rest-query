@@ -181,17 +181,12 @@ O `forRoot` aceita um objeto `QueryBuilderConfigV3`.
 
 | Opção            | Tipo     | Default | Descrição                                                  |
 | ---------------- | -------- | ------- | ---------------------------------------------------------- |
-| `defaultPerPage` | `number` | `20`    | Itens por página quando a requisição não traz `perPage`.   |
+| `defaultPerPage` | `number` | `10`    | Itens por página quando a requisição não traz `perPage`.   |
 | `maxPerPage`     | `number` | `100`   | Teto. Um `perPage` maior é `400`, não um corte silencioso. |
 
 As duas são validadas na inicialização: `defaultPerPage` abaixo de `1`, ou um
 `maxPerPage` menor que o `defaultPerPage`, estoura
 `SOURCE_CONFIGURATION_INVALID` enquanto o módulo carrega.
-
-<Callout type="info">
-  O `defaultPerPage` era `10` na `2.x` e é `20` na `3.x`. Fixe-o explicitamente
-  se seus clientes dependem do tamanho de página antigo.
-</Callout>
 
 ### `logging`
 
