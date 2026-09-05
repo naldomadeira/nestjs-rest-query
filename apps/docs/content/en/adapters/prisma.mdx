@@ -148,9 +148,12 @@ typed `Readonly<Record<string, PrismaDelegate>>`, and no real `PrismaClient`
 satisfied it — a class gets no implicit string index signature in TypeScript, so
 every consumer needed an assertion.
 
-`prismaSource` fixes the row type at `object`; only `typeormSource` is generic in
-the row, so annotate `Promise<NormalizedQueryResult<object>>` rather than
-casting.
+`prismaSource<TRow>` is generic in the row type. Nothing in the options carries
+it — the delegate comes from the manifest, not from a typed client — so this is
+the one factory where you name the type argument yourself:
+`prismaSource<UserDto>({ client, model, manifest })` lets the method be
+annotated `Promise<NormalizedQueryResult<UserDto>>` with no cast. Omit it and
+you get `object`, as above.
 
 ## Refused operators, by provider
 

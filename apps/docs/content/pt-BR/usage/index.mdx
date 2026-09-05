@@ -143,6 +143,10 @@ source e [Customizando a Query](/pt-BR/docs/advanced/customizing) para as
 
 Detalhes fáceis de errar:
 
+- **Parâmetro fora desta tabela é `400`**, não um no-op silencioso:
+  `QUERY_SYNTAX_UNKNOWN_PARAM`, com o nome da chave em `details.param` e nunca
+  o valor. Um `?utm_source=`, um `?_=` de cache-buster, um `?lang=` de
+  middleware — todos recusados. Tire-os antes de a query chegar à DTO.
 - O parâmetro é `sort`, singular. A propriedade das **regras** é `sorts`.
 - `filter[name]=Ada` é a forma curta de `filter[name][eq]=Ada`.
 - Listas aceitam parâmetro repetido/array (preferível, o `qs` expande) ou CSV. O
@@ -254,22 +258,22 @@ Quem produz esse JSON é o núcleo, não o adapter. Duas consequências:
 
 Ramifique no `code`, nunca na `message`.
 
-| Código                         | Status     | Quando                                                                                                                                                                                                         |
-| ------------------------------ | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `QUERY_SYNTAX_INVALID`         | 400        | path ou operador fora do alfabeto seguro, lista malformada                                                                                                                                                     |
-| `QUERY_SYNTAX_UNKNOWN_PARAM`   | 400        | declarado no contrato, **não emitido hoje**                                                                                                                                                                    |
-| `FIELD_NOT_ALLOWED`            | 400        | o path não está na whitelist daquele escopo                                                                                                                                                                    |
-| `FIELD_NOT_FOUND`              | 400        | o path está na whitelist mas não existe no schema                                                                                                                                                              |
-| `RELATION_NOT_FOUND`           | 400        | um salto de relação do path não existe                                                                                                                                                                         |
-| `OPERATOR_NOT_ALLOWED`         | 400        | o campo não autoriza aquele operador                                                                                                                                                                           |
-| `OPERATOR_TYPE_MISMATCH`       | 400        | o operador não faz sentido para aquele kind — `like` num integer, `sort` através de relação `many`                                                                                                             |
-| `FILTER_VALUE_INVALID`         | 400        | o valor não decodifica para o kind declarado                                                                                                                                                                   |
-| `PAGINATION_INVALID`           | 400        | `page`, `perPage` ou `paginate` não é literal válido, ou excede o `maxPerPage`                                                                                                                                 |
-| `SORT_CONFLICT`                | 400        | o mesmo path foi pedido ascendente e descendente                                                                                                                                                               |
-| `CAPABILITY_UNAVAILABLE`       | 400 ou 500 | o operador ou a forma não pode ser atendida: sem coluna dobrada, sem ordem portável, padrões do Prisma em `sqlite`/`sqlserver` (400); chave primária sem ordem portável ou cadeia existencial no TypeORM (500) |
-| `PORTABILITY_PROFILE_MISMATCH` | 500        | `portability.enforce` ligado e os fatos do perfil da source não batem                                                                                                                                          |
-| `SOURCE_CONFIGURATION_INVALID` | 500        | o schema declarado não bate com a source, ou o `forRoot` recebeu chave removida                                                                                                                                |
-| `ADAPTER_CONTRACT_VIOLATION`   | 500        | o adapter não consegue compilar uma forma que o plano pediu                                                                                                                                                    |
+| Código                         | Status     | Quando                                                                                                                                                                                    |
+| ------------------------------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `QUERY_SYNTAX_INVALID`         | 400        | path ou operador fora do alfabeto seguro, lista malformada                                                                                                                                |
+| `QUERY_SYNTAX_UNKNOWN_PARAM`   | 400        | parâmetro de query fora da gramática de oito nomes; `details.param` é a chave, nunca o valor                                                                                              |
+| `FIELD_NOT_ALLOWED`            | 400        | o path não está na whitelist daquele escopo                                                                                                                                               |
+| `FIELD_NOT_FOUND`              | 400        | o path está na whitelist mas não existe no schema                                                                                                                                         |
+| `RELATION_NOT_FOUND`           | 400        | um salto de relação do path não existe                                                                                                                                                    |
+| `OPERATOR_NOT_ALLOWED`         | 400        | o campo não autoriza aquele operador                                                                                                                                                      |
+| `OPERATOR_TYPE_MISMATCH`       | 400        | o operador não faz sentido para aquele kind — `like` num integer, `sort` através de relação `many`                                                                                        |
+| `FILTER_VALUE_INVALID`         | 400        | o valor não decodifica para o kind declarado                                                                                                                                              |
+| `PAGINATION_INVALID`           | 400        | `page`, `perPage` ou `paginate` não é literal válido, ou excede o `maxPerPage`                                                                                                            |
+| `SORT_CONFLICT`                | 400        | o mesmo path foi pedido ascendente e descendente                                                                                                                                          |
+| `CAPABILITY_UNAVAILABLE`       | 400 ou 500 | o operador ou a forma não pode ser atendida: sem coluna dobrada, sem ordem portável, padrões do Prisma em `sqlite`/`sqlserver` (400); chave primária sem ordem portável (500)             |
+| `PORTABILITY_PROFILE_MISMATCH` | 500        | `portability.enforce` ligado e os fatos do perfil da source não batem                                                                                                                     |
+| `SOURCE_CONFIGURATION_INVALID` | 500        | o schema declarado não bate com a source, ou o `forRoot` recebeu chave removida ou valor que nenhum adapter implementa (`textProfile: 'database-native'`, `consistency: 'transactional'`) |
+| `ADAPTER_CONTRACT_VIOLATION`   | 500        | o adapter não consegue compilar uma forma que o plano pediu                                                                                                                               |
 
 A divisão é deliberada: entrada do cliente é `400`, e erro na sua declaração é
 `500`, porque é bug da aplicação e não da requisição. A maior parte dos erros de

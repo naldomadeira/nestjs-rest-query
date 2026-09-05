@@ -37,9 +37,12 @@ Duas consequências que vale dizer sem rodeio:
 | **Prisma**  | `prismaSource({ client, model, manifest })`        | `nestjs-rest-query/prisma`  | O schema lógico **e** um manifesto escrito à mão (`provider`, `registry`, `models`).                                                 |
 | **Drizzle** | `drizzleSource({ db, dialect, table, relations })` | `nestjs-rest-query/drizzle` | Um descritor lógico da tabela mais as relações por path pontuado; `drizzleDatabase({ client, dialect })` uma vez.                    |
 
-Só `typeormSource<T>(repository)` é genérico no tipo da linha. `prismaSource` e
-`drizzleSource` o fixam em `object`, então esses serviços anotam
-`Promise<NormalizedQueryResult<object>>` — apertar mais exigiria um cast.
+As três fábricas são genéricas no tipo da linha. O
+`typeormSource<T>(repository)` infere `T` do repositório; o
+`drizzleSource<TRow>` recebe o tipo do executor que você montou com
+`drizzleDatabase<TRow>({ ... })`, então também sai por inferência; o
+`prismaSource<TRow>` é o único que você nomeia explicitamente. Um serviço pode
+anotar `Promise<NormalizedQueryResult<UserDto>>` sem cast em lugar nenhum.
 
 ## Paridade, e como ela é medida
 
@@ -65,26 +68,28 @@ Cada uma fica declarada como dado no próprio caso do corpus, com justificativa
 obrigatória, então um adapter que volte a concordar quebra o build e força a
 remoção da exceção.
 
-| Adapter     | Caso                                                                                                                                         | Resultado                                                                                                                                                                                                                        |
-| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Prisma**  | `like`, `notLike`, `ilike`, `notIlike`, `search` em `sqlite` e `sqlserver`                                                                   | Recusado, `400 CAPABILITY_UNAVAILABLE`. O Prisma compila `contains` sem cláusula `ESCAPE` e esses dois dialetos não têm caractere de escape default, então `%` e `_` não podem ser literais. Funciona em `postgresql` e `mysql`. |
-| **TypeORM** | Condição existencial (filtro **ou** `search`) que atravessa uma relação `many` e depois continua por outra relação, ex. `items.company.name` | Recusado, `CAPABILITY_UNAVAILABLE`. Prisma e Drizzle compilam.                                                                                                                                                                   |
-| **TypeORM** | Condição existencial através de uma relação **many-to-many**                                                                                 | Recusado, `CAPABILITY_UNAVAILABLE`. Prisma e Drizzle compilam.                                                                                                                                                                   |
-| **Drizzle** | Projetar uma coleção `many` aninhada sob outra relação                                                                                       | Recusado, `ADAPTER_CONTRACT_VIOLATION`. Coleções de primeiro nível são suportadas.                                                                                                                                               |
-| **Drizzle** | `DrizzleColumn.name`                                                                                                                         | Declarado e **ignorado**: o compilador emite a **chave** de `columns` como identificador SQL. Mantenha chave e nome físico idênticos até isto ser corrigido.                                                                     |
+| Adapter     | Caso                                                                       | Resultado                                                                                                                                                                                                                        |
+| ----------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Prisma**  | `like`, `notLike`, `ilike`, `notIlike`, `search` em `sqlite` e `sqlserver` | Recusado, `400 CAPABILITY_UNAVAILABLE`. O Prisma compila `contains` sem cláusula `ESCAPE` e esses dois dialetos não têm caractere de escape default, então `%` e `_` não podem ser literais. Funciona em `postgresql` e `mysql`. |
+| **Drizzle** | Projetar uma coleção `many` aninhada sob outra relação                     | Recusado, `ADAPTER_CONTRACT_VIOLATION`. Coleções de primeiro nível são suportadas.                                                                                                                                               |
 
-As duas linhas do TypeORM são **lacuna aberta**, não comportamento pretendido:
-um único salto `many` compila como `EXISTS` correlacionado nos três adapters, e
-isso é caso de corpus. Qualquer coisa mais profunda é recusada em vez de
-compilada errado — uma revisão anterior emitia `EXISTS` sintaticamente válido
-contra a tabela errada no caso many-to-many, o que é pior.
+Condição existencial **não** está nessa lista. Um filtro ou alvo de `search`
+que atravessa uma relação `many` compila nos três adapters em qualquer
+profundidade — um salto, mais um salto `one` (`posts.author.name`), uma segunda
+coleção, ou uma **many-to-many** (`posts.tags.label`) —, e cada uma dessas
+formas é caso de corpus sem divergência declarada. O TypeORM emite **um**
+`EXISTS` correlacionado ao root uma só vez, com os saltos seguintes como
+`INNER JOIN` dentro da subconsulta; na many-to-many o `FROM` da subconsulta é a
+tabela de junção, e o alvo entra por join a partir dela.
 
 <Callout type="info">
   A whitelist de `search` do
   [`02-app-with-postgres`](https://github.com/naldomadeira/nestjs-rest-query/blob/main/apps/examples/02-app-with-postgres/src/access-requests/access-requests.query.ts)
-  ilustra bem: ela mantém `user.firstName` (um salto `one`) e deixa
-  `items.company.name` fora exatamente por causa do limite do TypeORM acima,
-  embora o mesmo path funcione sob Prisma e Drizzle.
+  ilustra bem: ela mantém `user.firstName` (um salto `one`) **e**
+  `items.company.name` (atravessando a coleção `items` e depois `company`), e as
+  mesmas regras rodam sem mudança sob Prisma e Drizzle. `items.company.cnpj`
+  fica fora por outro motivo — `search` compara pela coluna dobrada, e `cnpj`
+  não declara nenhuma.
 </Callout>
 
 Todo o resto — operadores de filtro, `search`, forma da paginação,

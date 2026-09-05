@@ -221,9 +221,11 @@ anywhere — it would produce **wrong results**, because pagination and boolean
 coercion come from the dialect — so `drizzleSource` compares the two and fails
 closed.
 
-`drizzleSource` fixes the row type at `object`; only `typeormSource` is generic
-in the row, so annotate `Promise<NormalizedQueryResult<object>>` rather than
-casting.
+`drizzleSource<TRow>` is generic in the row type, and `TRow` arrives from the
+executor: build it as `drizzleDatabase<UserRow>({ client, dialect })` and
+`drizzleSource({ db, ... })` infers `UserRow`, so the method can be annotated
+`Promise<NormalizedQueryResult<UserRow>>` with no cast. The `object` above is
+only the default you get when you do not narrow it.
 
 ## What the compiler does
 
@@ -232,20 +234,26 @@ any `many` hop — including chains, with the second hop as a join **inside** th
 subquery — and first-level collections hydrated by their own query. `ILIKE` is
 never emitted.
 
-## Limits
+**The logical key and the physical column are two different things, and both
+are honoured.** The `columns` key is the logical field — what `fields=`, the
+rules and the JSON speak — and `DrizzleColumn.name` is the physical column the
+compiler puts in the SQL through `sql.identifier(...)`. A descriptor key that
+differs from the physical column name is a supported mapping, not a bug.
 
-**The logical column key is the SQL identifier.** The compiler emits the
-`columns` key through `sql.identifier(...)`; the `name` field on
-`DrizzleColumn` is declared and never read. A descriptor key that differs from
-the physical column name compiles, passes the source check, boots — and then
-fails in the database with `column "companyId" does not exist`. Keep key and
-physical name identical.
+A field that is not declared fails closed while the application boots, not in
+the database: `buildSourceSchema` runs every relation's `sourceColumn` and
+`targetColumn` through the same lookup, so an undeclared join column is
+`SOURCE_CONFIGURATION_INVALID` —
+`Drizzle table users has no column declared for field companyId` — at source
+construction.
 
-That is why
 [`03-app-with-drizzle`](https://github.com/naldomadeira/nestjs-rest-query/tree/main/apps/examples/03-app-with-drizzle)
-names its physical columns in camelCase (`"companyId"`, `"createdAt"`) and adds
-a startup assertion against `getTableColumns(pgTable)` to turn a mismatch into a
-boot error. It is a workaround for a library gap, not the intended design.
+uses the mapping: snake_case physical names (`id_order`, `name_folded`,
+`created_at`) behind camelCase logical keys, with a startup assertion against
+`getTableColumns(pgTable)` that each key is the `pgTable` property and each
+`name` is that property's physical column.
+
+## Limits
 
 **Collections nested under another relation fail closed.** Projecting a to-many
 relation that hangs off another relation is refused with

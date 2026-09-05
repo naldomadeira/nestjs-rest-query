@@ -26,9 +26,10 @@ An adapter never sees a query string, and never has to guess a type. By the time
 1. **Parsed** the input against a safe path alphabet. `*`, `;`, `..`, an empty
    path and anything that could escape into SQL are rejected as
    `QUERY_SYNTAX_INVALID` — which is what keeps the projection wildcard out of a
-   client's reach. (`QUERY_SYNTAX_UNKNOWN_PARAM` is in the error contract but is
-   not emitted today: a query parameter the grammar does not know is ignored,
-   not refused.)
+   client's reach. A parameter outside the eight-name grammar (`filter`, `sort`,
+   `fields`, `includes`, `search`, `page`, `perPage`, `paginate`) is refused
+   with `400 QUERY_SYNTAX_UNKNOWN_PARAM`, never ignored; the key name travels in
+   `details`, the value never does.
 2. **Authorised** every path against the endpoint's compiled rules, by **exact**
    match, and every operator against the per-field list.
 3. **Coerced** every value by the field's declared `kind` — never by how the
@@ -136,7 +137,10 @@ this split was introduced to make impossible.
 
 `transactionalConsistency: false` makes `consistency: 'transactional'` fail
 early instead of running data and count under different snapshots. All three
-shipped adapters report `false` today.
+shipped adapters report `false` today, which is why `forRoot` refuses
+`consistency: 'transactional'` at startup with `SOURCE_CONFIGURATION_INVALID`.
+The per-source capability check stays: it is what decides the case for a fourth
+adapter that does offer the guarantee.
 
 ## The source
 

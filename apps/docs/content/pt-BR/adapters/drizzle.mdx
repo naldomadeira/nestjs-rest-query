@@ -220,9 +220,11 @@ O `dialect` declarado tem de ser o do executor. Divergir não daria erro em luga
 nenhum — daria **resultado errado**, porque paginação e coerção de boolean saem
 do dialeto —, então o `drizzleSource` compara os dois e falha fechado.
 
-O `drizzleSource` fixa o tipo da linha em `object`; só o `typeormSource` é
-genérico no row, então anote `Promise<NormalizedQueryResult<object>>` em vez de
-usar cast.
+O `drizzleSource<TRow>` é genérico no tipo da linha, e o `TRow` chega pelo
+executor: monte-o como `drizzleDatabase<UserRow>({ client, dialect })` e o
+`drizzleSource({ db, ... })` infere `UserRow`, então o método pode ser anotado
+`Promise<NormalizedQueryResult<UserRow>>` sem cast. O `object` acima é só o
+default de quem não estreita o tipo.
 
 ## O que o compilador faz
 
@@ -231,21 +233,27 @@ correlacionado para qualquer salto `many` — inclusive cadeias, com o segundo
 salto como join **dentro** da subconsulta — e coleção de primeiro nível
 hidratada por consulta própria. `ILIKE` nunca é emitido.
 
-## Limites
+**A chave lógica e a coluna física são coisas diferentes, e as duas são
+honradas.** A chave de `columns` é o campo lógico — o que o `fields=`, as regras
+e o JSON falam — e o `DrizzleColumn.name` é a coluna física que o compilador
+põe no SQL por `sql.identifier(...)`. Uma chave de descritor diferente do nome
+físico da coluna é mapeamento suportado, não defeito.
 
-**A chave lógica da coluna é o identificador SQL.** O compilador emite a chave
-de `columns` por `sql.identifier(...)`; o campo `name` do `DrizzleColumn` é
-declarado e nunca lido. Uma chave de descritor diferente do nome físico da
-coluna compila, passa na verificação da source, sobe — e então falha no banco
-com `column "companyId" does not exist`. Mantenha chave e nome físico
-idênticos.
+Campo não declarado falha fechado enquanto a aplicação sobe, não no banco: o
+`buildSourceSchema` passa o `sourceColumn` e o `targetColumn` de cada relação
+pela mesma resolução, então coluna de junção não declarada é
+`SOURCE_CONFIGURATION_INVALID` —
+`Drizzle table users has no column declared for field companyId` — na
+construção da source.
 
-É por isso que o
+O
 [`03-app-with-drizzle`](https://github.com/naldomadeira/nestjs-rest-query/tree/main/apps/examples/03-app-with-drizzle)
-nomeia as colunas físicas em camelCase (`"companyId"`, `"createdAt"`) e adiciona
-uma verificação na subida contra `getTableColumns(pgTable)` para transformar a
-divergência em erro de inicialização. É contorno de lacuna da biblioteca, não o
-desenho pretendido.
+usa o mapeamento: nomes físicos em snake_case (`id_order`, `name_folded`,
+`created_at`) atrás de chaves lógicas em camelCase, com uma verificação na
+subida contra `getTableColumns(pgTable)` de que cada chave é a propriedade do
+`pgTable` e cada `name` é a coluna física daquela propriedade.
+
+## Limites
 
 **Coleção aninhada sob outra relação falha fechado.** Projetar uma relação
 `many` pendurada em outra relação é recusado com `ADAPTER_CONTRACT_VIOLATION` —
