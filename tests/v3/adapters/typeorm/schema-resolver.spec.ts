@@ -196,8 +196,9 @@ describe('buildSchemaRegistry sobre declarações não canônicas', () => {
   });
 
   it('descreve a cardinalidade many-to-many como many', () => {
-    // O planner e o compilador dependem disso para não juntar a relação: a
-    // recusa explícita da many-to-many acontece depois, no compilador.
+    // O planner e o compilador dependem disso para não juntar a relação: com
+    // cardinalidade `many`, o caminho vira `EXISTS` e a travessia da tabela de
+    // junção acontece depois, no compilador.
     const article = buildSchemaRegistry(localRepository('article')).get(
       'article'
     )!;

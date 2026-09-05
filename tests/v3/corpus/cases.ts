@@ -466,6 +466,58 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     expect: { kind: 'rows', ids: [1, 2, 3], total: 3, lastPage: 1 },
   },
   {
+    /**
+     * Cadeia `many` → `one` (spec §11.1).
+     *
+     * `posts.author` volta ao próprio autor do post, então "algum post cujo
+     * autor se chama Ada" é o usuário 1 — e **só** ele: os usuários 4 e 5
+     * também se chamam Ada, mas não têm post nenhum. Um segundo salto
+     * correlacionado com o root em vez de com o post daria os três.
+     *
+     * O usuário 1 tem três posts, todos de autoria dele: `total` 1 é a prova
+     * de que a cadeia mora dentro de um `EXISTS` e não num join, que
+     * devolveria a mesma linha três vezes e contaria 3.
+     */
+    id: 'relation-many/chain-through-one-is-existential',
+    description: 'cadeia many → one continua existencial e não duplica roots',
+    tags: ['relation-many', 'relation-deep'],
+    rules: 'user.deep',
+    query: { filter: { 'posts.author.name': { eq: 'Ada' } } },
+    expect: { kind: 'rows', ids: [1], total: 1, lastPage: 1 },
+  },
+  {
+    /**
+     * Cadeia `many` → `many`: duas coleções no mesmo caminho.
+     *
+     * A tag `history` está no post 1 (usuário 1) e no post 4 (usuário 2). O
+     * segundo salto tem de ser resolvido *dentro* da subconsulta: trazido para
+     * o statement externo, ele multiplicaria o root por item da segunda
+     * coleção e o `total` deixaria de contar roots.
+     */
+    id: 'relation-many/chain-through-two-collections',
+    description: 'cadeia que cruza duas relações many é existencial',
+    tags: ['relation-many', 'relation-deep'],
+    rules: 'user.deep',
+    query: { filter: { 'posts.tags.label': { eq: 'history' } } },
+    expect: { kind: 'rows', ids: [1, 2], total: 2, lastPage: 1 },
+  },
+  {
+    /**
+     * O mesmo caminho, com um root casando por **dois** itens da folha.
+     *
+     * O post 1 tem `history` e `math`, os dois na lista: o usuário 1 casa duas
+     * vezes pela cadeia e ainda assim é uma linha e um root no `total`. É a
+     * forma existencial ("algum item corresponde") medida onde ela dói —
+     * compilada como join, esta consulta devolveria três linhas e `total` 3.
+     */
+    id: 'relation-many/chain-through-two-collections-deduplicates',
+    description: 'root que casa por dois itens da cadeia conta uma vez só',
+    tags: ['relation-many', 'relation-deep'],
+    rules: 'user.deep',
+    query: { filter: { 'posts.tags.label': { in: 'history,math' } } },
+    expect: { kind: 'rows', ids: [1, 2], total: 2, lastPage: 1 },
+  },
+  {
     id: 'relation-many/sort-through-many-is-not-allowed',
     description: 'sort direto por folha através de many é inválido',
     tags: ['relation-many', 'sort-tie'],

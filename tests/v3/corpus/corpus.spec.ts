@@ -40,7 +40,7 @@ describe('corpus canônico', () => {
    * Divergência intencional é exceção, e exceção precisa doer para entrar.
    *
    * Este teste é o inventário: qualquer nova divergência muda a lista abaixo e
-   * aparece na revisão, em vez de passar como mais um objeto no meio dos 71
+   * aparece na revisão, em vez de passar como mais um objeto no meio dos 74
    * casos.
    */
   it('declara apenas as divergências de adapter já revisadas', () => {

@@ -19,8 +19,10 @@ import { buildSchemaRegistry } from '@infra/adapters/typeorm';
  * - `article` declara colunas por construtor (`@Column()` sem `type`, a forma
  *   mais comum em app NestJS) e um enum portável, os dois caminhos de tipo que
  *   o corpus nunca produz porque fixa os tipos físicos por dialeto.
- * - `article.labels` é **many-to-many**, cardinalidade `many` que o adapter
- *   recusa por não saber correlacionar pela tabela de junção.
+ * - `article.labels` é **many-to-many**: a única forma no repo cuja subquery
+ *   existencial precisa atravessar uma **tabela de junção**, e a única que
+ *   exercita os dois lados dela — `article.labels` é o lado dono, que guarda a
+ *   junção, e `label.articles` é o inverso, que só a alcança pelo dono.
  * - `moment` tem **PK `datetime`**: o único tipo de chave cuja forma crua (a
  *   string do driver) e cuja forma hidratada (`Date`) não coincidem, o que
  *   expõe o limite da reordenação em memória da paginação.
@@ -121,6 +123,9 @@ const label = new EntitySchema<ObjectLiteral>({
   columns: {
     id: { type: 'integer', primary: true },
     name: { type: 'varchar' },
+    // Coluna dobrada: sem ela `labels.name` não pode ser alvo de `search`, e é
+    // pela busca que se prova que a travessia da junção não é só do filtro.
+    name_folded: { type: 'varchar' },
   },
   relations: {
     articles: {
@@ -179,6 +184,12 @@ export function ledgerRules(): CompiledQueryRules {
       { path: 'entries', operators: ['isNull'] },
       { path: 'entries.note', operators: ['isNull'] },
       { path: 'entries.amount', operators: ['eq', 'in', 'notIn', 'between'] },
+      // Cadeia de dois saltos, `many` e depois `one`, com **FK composta nos
+      // dois**: é a única forma no repo em que o par de colunas aparece tanto
+      // na correlação com o root quanto no `INNER JOIN` de dentro da
+      // subquery. Que o segundo salto volte para `ledger` é irrelevante para o
+      // compilador e conveniente para o fixture — o que se mede é a cadeia.
+      { path: 'entries.ledger.title', operators: ['eq'] },
       {
         path: 'entries.label',
         operators: ['like', 'notLike', 'ilike', 'notIlike'],
@@ -241,6 +252,32 @@ export function articleRules(): CompiledQueryRules {
         default: ['id', 'title'],
       },
     },
+    // `labels.name` também como alvo de busca, pela mesma razão que
+    // `entries.label` é no `ledger`: filtro e busca compartilham a maquinaria
+    // do `EXISTS`, e só um alvo existencial atravessando a junção prova que a
+    // busca herdou a travessia em vez de reaprendê-la.
+    search: ['labels.name'],
+  });
+}
+
+/**
+ * Regras do `label`: o **lado inverso** da many-to-many.
+ *
+ * O lado inverso não guarda `junctionEntityMetadata` nem as join columns — a
+ * metadata do TypeORM só as registra no dono. Sem um root deste lado, a
+ * travessia da junção ficaria provada numa direção só, e a outra emitiria SQL
+ * contra a tabela errada sem nenhum teste notando.
+ */
+export function labelRules(): CompiledQueryRules {
+  const registry = buildSchemaRegistry(localRepository('label'));
+
+  return defineQueryRules(registry, 'label', {
+    filters: [
+      { path: 'id', operators: ['eq'] },
+      { path: 'articles.title', operators: ['eq'] },
+    ],
+    sorts: ['id'],
+    fields: { root: { allowed: ['id', 'name'], default: ['id', 'name'] } },
   });
 }
 
@@ -289,6 +326,8 @@ export async function seedLocal(): Promise<void> {
     entries.map((row) => ({ ...row, label_folded: foldText(row.label) }))
   );
 
+  await seedLocalArticles();
+
   await localRepository('moment').insert([
     { at: new Date('2020-01-03T00:00:00Z'), name: 'ccc' },
     { at: new Date('2020-01-01T00:00:00Z'), name: 'aaa' },
@@ -298,4 +337,70 @@ export async function seedLocal(): Promise<void> {
     { id: 1, moment_at: new Date('2020-01-01T00:00:00Z'), body: 'primeira' },
     { id: 2, moment_at: new Date('2020-01-01T00:00:00Z'), body: 'segunda' },
   ]);
+}
+
+/**
+ * Semeia a many-to-many: três artigos, dois rótulos e a tabela de junção.
+ *
+ * O artigo 1 carrega **os dois** rótulos e o 3 não carrega nenhum. É o que
+ * torna observável a diferença entre `EXISTS` e join: com join, um termo que
+ * casasse os dois rótulos devolveria o artigo 1 duas vezes e um `total` de 3;
+ * o artigo sem rótulo é o lado oposto, o root que a subquery tem de excluir.
+ *
+ * A junção é preenchida por SQL cru porque ela não tem entidade própria — é
+ * metadata sintetizada pelo TypeORM, e é justamente a tabela que a travessia
+ * precisa alcançar.
+ */
+export async function seedLocalArticles(): Promise<void> {
+  await localRepository('article').insert([
+    {
+      id: 1,
+      title: 'Alpha',
+      live: true,
+      published_at: new Date('2020-01-01T00:00:00Z'),
+      status: 'published',
+    },
+    {
+      id: 2,
+      title: 'Beta',
+      live: true,
+      published_at: new Date('2020-01-02T00:00:00Z'),
+      status: 'draft',
+    },
+    {
+      id: 3,
+      title: 'Gama',
+      live: false,
+      published_at: new Date('2020-01-03T00:00:00Z'),
+      status: 'review',
+    },
+  ]);
+
+  await localRepository('label').insert(
+    // Rótulos com prefixo comum: um único termo de busca casa os dois, que é o
+    // que faz o artigo 1 casar duas vezes pela junção.
+    [
+      { id: 1, name: 'oss' },
+      { id: 2, name: 'oss-core' },
+    ].map((row) => ({ ...row, name_folded: foldText(row.name) }))
+  );
+
+  // Nome da junção e das duas colunas vêm da metadata, não da convenção de
+  // nomes do TypeORM: se ela mudar, o seed acompanha e o teste continua
+  // medindo a travessia, não o nome que alguém digitou aqui.
+  const relation =
+    localRepository('article').metadata.findRelationWithPropertyPath('labels')!;
+  const table = relation.junctionEntityMetadata!.tableName;
+  const toArticle = relation.joinColumns[0].databaseName;
+  const toLabel = relation.inverseJoinColumns[0].databaseName;
+
+  for (const [articleId, labelId] of [
+    [1, 1],
+    [1, 2],
+    [2, 1],
+  ]) {
+    await dataSource!.query(
+      `INSERT INTO "${table}" ("${toArticle}", "${toLabel}") VALUES (${articleId}, ${labelId})`
+    );
+  }
 }

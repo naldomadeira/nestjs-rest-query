@@ -153,29 +153,36 @@ describe('guardas de contrato do planner', () => {
   });
 });
 
-describe('limites declarados do filtro existencial', () => {
-  it('recusa filtro existencial que cruza duas relações many', () => {
-    // `posts.tags.label` exigiria um EXISTS aninhado correlacionado em dois
-    // níveis. Enquanto isso não existir, a recusa tem de ser explícita: um
-    // EXISTS de um nível só compilaria a correlação errada e devolveria roots
-    // que não casam com o filtro pedido.
+describe('cadeia existencial sobre o modelo canônico', () => {
+  it('cruza duas relações many num único EXISTS, com o segundo salto por join', () => {
+    // `posts.tags.label` era recusado com CAPABILITY_UNAVAILABLE enquanto o
+    // compilador só sabia correlacionar um salto. A forma que passou a ser
+    // emitida é a mesma que o Drizzle já emitia — e a asserção é a irmã da que
+    // vive em `tests/v3/adapters/drizzle/sql-compiler.spec.ts`, para que a
+    // paridade das duas fique medida na mesma forma de SQL, e não afirmada.
     const rules = defineQueryRules(CORPUS_SCHEMAS, 'user', {
       filters: [{ path: 'posts.tags.label', operators: ['eq'] }],
       sorts: ['id'],
       fields: { root: { allowed: ['id', 'name'], default: ['id', 'name'] } },
     });
     const plan = buildQueryPlan(
-      { filter: { 'posts.tags.label': { eq: 'oss' } } },
+      { filter: { 'posts.tags.label': { eq: 'history' } } },
       rules
     );
 
-    expect(() =>
-      compilePlan(plan, repositoryFor('user.deep'), ESCAPE_CHARACTER)
-    ).toThrow(
-      expect.objectContaining({
-        code: 'CAPABILITY_UNAVAILABLE',
-        message: expect.stringContaining('nested many'),
-      })
+    const sql = compilePlan(plan, repositoryFor('user.deep'), ESCAPE_CHARACTER)
+      .data.getQuery()
+      .replace(/"/g, '');
+
+    expect(sql).toContain(
+      'EXISTS (SELECT 1 FROM posts dqb_ex_posts ' +
+        'INNER JOIN tags dqb_ex_posts_tags ' +
+        'ON dqb_ex_posts_tags.post_id = dqb_ex_posts.id ' +
+        'WHERE dqb_ex_posts.user_id = root.id ' +
+        'AND dqb_ex_posts_tags.label = :dqb_0)'
     );
+    // Correlacionar o segundo salto por fora inflaria os roots: o join da
+    // segunda coleção não pode aparecer no statement externo.
+    expect(sql).not.toMatch(/JOIN tags root_/);
   });
 });

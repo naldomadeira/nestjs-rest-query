@@ -10,8 +10,9 @@ import type { PlanFilter } from '@core/semantic-validator';
 import type { TypedQueryPlan } from '@core/query-plan';
 import { containsPattern } from '../shared/escape-pattern';
 import {
-  correlationColumns,
+  existentialChain,
   ROOT_ALIAS,
+  type ExistentialStep,
   type JoinPlan,
 } from './typeorm-join-planner';
 
@@ -69,11 +70,8 @@ export function compileFilters<T extends ObjectLiteral>(
 
           where.orWhere(
             target.existential
-              ? existsThroughMany(
-                  qb,
-                  target.path,
-                  target.relationPath,
-                  (alias) => like(`${alias}.${leafColumn(target.column)}`)
+              ? existsThroughMany(qb, target.relationPath, (alias) =>
+                  like(`${alias}.${leafColumn(target.column)}`)
                 )
               : like(columnRef(target.column, context))
           );
@@ -194,7 +192,6 @@ function existentialCondition<T extends ObjectLiteral>(
 ): string {
   const exists = existsThroughMany(
     qb,
-    filter.path,
     filter.relationPath,
     // Alvo é a própria relação: a condição é só a correlação, sem folha.
     filter.target === 'relation'
@@ -215,45 +212,58 @@ function existentialCondition<T extends ObjectLiteral>(
 }
 
 /**
- * `EXISTS` correlacionado por um caminho que cruza `many`.
+ * `EXISTS` correlacionado por um caminho que cruza `many`, de qualquer
+ * profundidade.
  *
  * É a mesma maquinaria para filtro e para busca — inclusive a correlação por
  * FK composta —, porque a semântica é a mesma: "algum item corresponde". O
  * chamador só fornece a condição da folha, já qualificada pelo alias da
  * subquery, ou `null` quando a pergunta é sobre a própria coleção.
+ *
+ * A correlação com o root acontece **uma só vez**, no primeiro salto; os
+ * saltos seguintes são `INNER JOIN` dentro da subquery. Correlacionar cada
+ * salto por fora traria a coleção para o `FROM` externo, inflaria os roots e
+ * estragaria o `total` — o problema que o `EXISTS` resolve.
  */
 function existsThroughMany<T extends ObjectLiteral>(
   qb: SelectQueryBuilder<T>,
-  path: string,
   relationPath: readonly string[],
   leaf: ((subAlias: string) => string) | null
 ): string {
-  if (relationPath.length !== 1) {
-    throw configurationError(
-      'CAPABILITY_UNAVAILABLE',
-      `Existential conditions through nested many relations are not supported yet: ${path}`,
-      { path }
+  const [head, ...tail] = existentialChain(
+    qb.expressionMap.mainAlias!.metadata,
+    relationPath
+  );
+
+  const correlation = linkCondition(head, ROOT_ALIAS);
+
+  // Cada passo se liga ao alias imediatamente anterior — inclusive a tabela de
+  // junção de uma many-to-many, que é um passo como os outros.
+  const joins: string[] = [];
+  let parentAlias = head.alias;
+  for (const step of tail) {
+    joins.push(
+      ` INNER JOIN ${step.table} ${step.alias} ON ${linkCondition(step, parentAlias)}`
     );
+    parentAlias = step.alias;
   }
 
-  const relation =
-    qb.expressionMap.mainAlias!.metadata.findRelationWithPropertyPath(
-      relationPath[0]
-    )!;
-  const { owner, pairs } = correlationColumns(relation);
-  const subAlias = `dqb_ex_${relationPath[0]}`;
+  const conditions = [correlation];
+  // A folha é sempre qualificada pelo último alias da cadeia: é lá que a
+  // coluna do filtro (ou da busca) mora.
+  if (leaf) conditions.push(leaf(parentAlias));
 
-  const correlation = pairs
+  return `EXISTS (SELECT 1 FROM ${head.table} ${head.alias}${joins.join('')} WHERE ${conditions.join(' AND ')})`;
+}
+
+/** Igualdade entre as colunas de um passo e as do alias anterior. */
+function linkCondition(step: ExistentialStep, parentAlias: string): string {
+  return step.on
     .map(
       (pair) =>
-        `${subAlias}.${pair.ownerColumn} = ${ROOT_ALIAS}.${pair.referencedColumn}`
+        `${step.alias}.${pair.column} = ${parentAlias}.${pair.parentColumn}`
     )
     .join(' AND ');
-
-  const conditions = [correlation];
-  if (leaf) conditions.push(leaf(subAlias));
-
-  return `EXISTS (SELECT 1 FROM ${owner.tableName} ${subAlias} WHERE ${conditions.join(' AND ')})`;
 }
 
 function existentialLeafCondition(
