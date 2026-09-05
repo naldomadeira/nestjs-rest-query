@@ -16,6 +16,7 @@
     "db:generate": "prisma generate",
     "seed": "ts-node prisma/seed.ts",
     "db:setup": "pnpm db:generate && pnpm seed",
+    "pretypecheck": "pnpm db:generate",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
