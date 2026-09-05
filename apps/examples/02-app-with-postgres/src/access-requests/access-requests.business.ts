@@ -27,9 +27,10 @@ export class AccessRequestsBusiness {
    * `search/through-many-is-existential` do corpus trava a correção nos três
    * adapters.
    *
-   * A whitelist de `search` daqui, porém, segue em `user.firstName`: os paths
-   * da v2 cruzavam **duas** relações, e cadeia existencial de mais de um salto
-   * é recusada pelo adapter TypeORM. Ver `access-requests.query.ts`.
+   * A whitelist voltou a ter `items.company.name`, que cruza duas relações —
+   * a coleção e depois a empresa. Isso era recusado pelo adapter TypeORM até a
+   * `3.0.0`, e hoje compila como um único `EXISTS` correlacionado ao root uma
+   * só vez, com o segundo salto por join dentro da subconsulta.
    */
   async findAll(
     query: DynamicQueryDto,
