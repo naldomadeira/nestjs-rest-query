@@ -7,13 +7,23 @@ import {
 } from 'nestjs-rest-query';
 import { drizzleSource, type DrizzleDatabase } from 'nestjs-rest-query/drizzle';
 import { DRIZZLE_EXECUTOR } from '../db/database.module';
+import type { UserRow } from '../db/rows';
 import { userRelations, usersTable } from '../db/tables';
 
 @Injectable()
 export class UsersService {
   constructor(
+    /**
+     * O executor é quem promete a forma da linha.
+     *
+     * O provider devolve um `DrizzleDatabase` sem tipo de linha, porque ele
+     * serve a todas as tabelas; cada serviço declara aqui o que a *sua*
+     * consulta devolve, e `drizzleSource` propaga isso até `execute()`. É a
+     * mesma divisão do `Repository<T>` do TypeORM — a promessa fica no ponto
+     * onde as linhas nascem, não num cast no fim.
+     */
     @Inject(DRIZZLE_EXECUTOR)
-    private readonly db: DrizzleDatabase,
+    private readonly db: DrizzleDatabase<UserRow>,
     private readonly queryBuilderService: QueryBuilderService
   ) {}
 
@@ -31,15 +41,15 @@ export class UsersService {
    * coerção de boolean saem do dialeto —, então `drizzleSource` compara os dois
    * e falha fechado.
    *
-   * `NormalizedQueryResult<object>` não é preguiça: `drizzleSource` fixa o tipo
-   * da linha em `object` (só `typeormSource` é genérico no row), e apertar isso
-   * aqui exigiria um cast — que o gate de "nenhum cast no uso documentado"
-   * proíbe.
+   * `UserRow` chega ao retorno por inferência, sem argumento de tipo e sem
+   * cast: ele vem do executor injetado. Até o PR5 isto era
+   * `NormalizedQueryResult<object>`, porque `drizzleSource` fixava a linha em
+   * `object` e só `typeormSource` era genérico.
    */
   async findAll(
     query: DynamicQueryDto,
     rules: CompiledQueryRules
-  ): Promise<NormalizedQueryResult<object>> {
+  ): Promise<NormalizedQueryResult<UserRow>> {
     return this.queryBuilderService.execute(
       drizzleSource({
         db: this.db,

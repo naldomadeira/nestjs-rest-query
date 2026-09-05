@@ -10,15 +10,15 @@ import { index, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
  * descritor lógico de um `pgTable`; `assertPhysicalSchemaMatches` (em
  * `tables.ts`) transforma a divergência entre elas em falha de inicialização.
  *
- * ## Por que os nomes físicos são camelCase
+ * ## Por que os nomes físicos são snake_case
  *
- * O compilador SQL do adapter Drizzle emite **a chave lógica do campo** como
- * identificador da coluna (`sql.identifier(selection.column)`); o campo
- * `DrizzleColumn.name` do descritor nunca é lido. Logo, path lógico e nome
- * físico têm de ser a mesma string. Como a API REST deste exemplo expõe
- * `companyId` e `createdAt` (igual ao 01), as colunas no Postgres também se
- * chamam `"companyId"` e `"createdAt"` — identificadores citados, que o
- * Drizzle sempre emite entre aspas.
+ * A API REST deste exemplo expõe `companyId` e `createdAt`, como a do 01; o
+ * banco chama as mesmas colunas de `company_id` e `created_at`, que é a
+ * convenção normal em Postgres. As duas convenções coexistem porque
+ * `DrizzleColumn.name` é honrado: a **chave** do descritor é o campo lógico
+ * (JSON, regras, `fields=`) e `name` é o identificador que vai ao SQL. Até o
+ * PR5 não era assim — o compilador emitia a chave e ignorava `name` —, e este
+ * exemplo precisava nomear as colunas físicas em camelCase para funcionar.
  *
  * ## Por que existem colunas a mais
  *
@@ -40,36 +40,36 @@ export const companies = pgTable(
   'companies',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    idOrder: text('idOrder').notNull(),
+    idOrder: text('id_order').notNull(),
     name: text('name').notNull(),
-    nameFolded: text('nameFolded').notNull(),
-    createdAt: timestamp('createdAt', { withTimezone: true })
+    nameFolded: text('name_folded').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),
   },
-  (table) => [index('companies_nameFolded_idx').on(table.nameFolded)]
+  (table) => [index('companies_name_folded_idx').on(table.nameFolded)]
 );
 
 export const users = pgTable(
   'users',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    idOrder: text('idOrder').notNull(),
+    idOrder: text('id_order').notNull(),
     name: text('name').notNull(),
-    nameFolded: text('nameFolded').notNull(),
+    nameFolded: text('name_folded').notNull(),
     email: text('email').notNull().unique(),
-    emailFolded: text('emailFolded').notNull(),
+    emailFolded: text('email_folded').notNull(),
     // Nullable de propósito: é o que dá sentido a `filter[company][isNull]` e
     // ao `LEFT JOIN` que devolve `company: null` em vez de omitir a linha.
-    companyId: uuid('companyId').references(() => companies.id),
-    createdAt: timestamp('createdAt', { withTimezone: true })
+    companyId: uuid('company_id').references(() => companies.id),
+    createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),
   },
   (table) => [
-    index('users_nameFolded_idx').on(table.nameFolded),
-    index('users_emailFolded_idx').on(table.emailFolded),
-    index('users_companyId_idx').on(table.companyId),
+    index('users_name_folded_idx').on(table.nameFolded),
+    index('users_email_folded_idx').on(table.emailFolded),
+    index('users_company_id_idx').on(table.companyId),
   ]
 );
 
@@ -77,20 +77,20 @@ export const posts = pgTable(
   'posts',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    idOrder: text('idOrder').notNull(),
+    idOrder: text('id_order').notNull(),
     title: text('title').notNull(),
-    titleFolded: text('titleFolded').notNull(),
+    titleFolded: text('title_folded').notNull(),
     content: text('content'),
-    userId: uuid('userId')
+    userId: uuid('user_id')
       .notNull()
       .references(() => users.id),
-    createdAt: timestamp('createdAt', { withTimezone: true })
+    createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),
   },
   (table) => [
-    index('posts_titleFolded_idx').on(table.titleFolded),
-    index('posts_userId_idx').on(table.userId),
+    index('posts_title_folded_idx').on(table.titleFolded),
+    index('posts_user_id_idx').on(table.userId),
   ]
 );
 

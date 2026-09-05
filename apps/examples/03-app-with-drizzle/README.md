@@ -69,11 +69,13 @@ monta. Passar `adapter` ou `operators` é rejeitado na inicialização com
   coluna de ordem portável, relações por path pontuado).
 
 A biblioteca não deriva um do outro, então `tables.ts` confere os dois no load e
-transforma divergência em erro de inicialização. A regra que ele impõe: **path
-lógico e nome físico têm de ser a mesma string**, porque o compilador SQL do
-adapter emite a chave lógica como identificador da coluna. É por isso que as
-colunas no Postgres se chamam `"companyId"` e `"createdAt"`, e não
-`company_id`/`created_at`.
+transforma divergência em erro de inicialização. Cada campo tem **dois nomes**:
+a chave do descritor (`companyId`) é o campo lógico — o que a API expõe, o que
+as regras autorizam, o que aparece em `fields=` — e `name` (`company_id`) é a
+coluna física, o único dos dois que vai ao SQL. É por isso que a API é camelCase
+sobre um banco snake_case sem nenhuma camada de tradução na aplicação, e o que a
+verificação do load impõe é o par inteiro: chave contra propriedade do
+`pgTable`, `name` contra a coluna daquela propriedade.
 
 ### 3. Regras por endpoint, whitelist exata
 
