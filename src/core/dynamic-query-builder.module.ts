@@ -12,7 +12,7 @@ type ResolvedConfig = Required<
 >;
 
 const DEFAULTS: ResolvedConfig = {
-  pagination: { defaultPerPage: 20, maxPerPage: 100 },
+  pagination: { defaultPerPage: 10, maxPerPage: 100 },
   textProfile: 'portable-strict',
   consistency: 'eventual',
   logging: { enabled: false, level: 'info', redactValues: true },

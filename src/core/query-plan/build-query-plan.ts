@@ -23,7 +23,7 @@ export interface BuildPlanOptions {
 }
 
 const DEFAULT_LIMITS: PaginationLimits = {
-  defaultPerPage: 20,
+  defaultPerPage: 10,
   maxPerPage: 100,
 };
 

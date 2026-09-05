@@ -180,17 +180,12 @@ implicit default adapter: the adapter is decided by the **source** you pass to
 
 | Option           | Type     | Default | Description                                                     |
 | ---------------- | -------- | ------- | --------------------------------------------------------------- |
-| `defaultPerPage` | `number` | `20`    | Items per page when the request carries no `perPage`.           |
+| `defaultPerPage` | `number` | `10`    | Items per page when the request carries no `perPage`.           |
 | `maxPerPage`     | `number` | `100`   | Upper bound. A larger `perPage` is a `400`, not a silent clamp. |
 
 Both are validated at startup: `defaultPerPage` below `1`, or a `maxPerPage`
 smaller than `defaultPerPage`, throws `SOURCE_CONFIGURATION_INVALID` while the
 module loads.
-
-<Callout type="info">
-  `defaultPerPage` was `10` in `2.x` and is `20` in `3.x`. Pin it explicitly if
-  your clients depend on the old page size.
-</Callout>
 
 ### `logging`
 

@@ -87,8 +87,7 @@ optional.
   DynamicQueryBuilderModule.forRoot({
 -   adapter: new DrizzleAdapter(),
 -   operators: { allowed: ['eq', 'like'] },
--   pagination: { defaultPerPage: 10, maxPerPage: 100 },
-+   pagination: { defaultPerPage: 20, maxPerPage: 100 },
+    pagination: { defaultPerPage: 10, maxPerPage: 100 },
 +   textProfile: 'portable-strict', // already the default; shown for clarity
   });
 ```
@@ -100,8 +99,9 @@ guide is this section. There is no implicit default adapter any more: the
 adapter is decided by the source you pass to `execute()`.
 
 Operator restriction moved from a global list to a **per-field** declaration in
-the endpoint rules. `defaultPerPage` defaults to `20` (it was `10`), so pin it
-explicitly if your clients depend on the old page size.
+the endpoint rules. Pagination defaults are unchanged: `defaultPerPage` is still
+`10` and `maxPerPage` is still `100`, so page sizes you never configured keep
+the size they had.
 
 ### Step 3 — logical schema and endpoint rules
 
@@ -481,7 +481,6 @@ At minimum these change what your clients receive:
 | `in=[]`                 | filter ignored, returns everything        | always-false condition, returns zero rows (`notIn=[]` always true) |
 | Duplicate `sort`        | last/first/both, depending on adapter     | deduplicated; conflicting directions are `400 SORT_CONFLICT`       |
 | `%` and `_` in patterns | wildcards                                 | literal characters (see the divergence section)                    |
-| `defaultPerPage`        | `10`                                      | `20`                                                               |
 | Primary key in the JSON | always injected                           | removed when not part of the visible projection                    |
 | Error body              | `{ statusCode, message: "<prose>" }`      | stable envelope with a machine-readable `code`                     |
 | Swagger decorator       | `@ApiDynamicQuery<T>(whitelists)`         | `@ApiDynamicQuery(compiledRules)`                                  |

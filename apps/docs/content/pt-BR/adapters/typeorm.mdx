@@ -25,7 +25,7 @@ import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
 @Module({
   imports: [
     DynamicQueryBuilderModule.forRoot({
-      pagination: { defaultPerPage: 20, maxPerPage: 100 },
+      pagination: { defaultPerPage: 10, maxPerPage: 100 },
     }),
   ],
 })
