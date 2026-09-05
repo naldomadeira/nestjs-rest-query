@@ -89,7 +89,7 @@ export class QueryBuilderService {
       const plan = this.buildPlan(query, rules, options as ExecuteOptions);
 
       await this.assertSourceMatchesRules(source, plan);
-      this.assertPortabilityProfile(source, plan);
+      this.assertPortabilityProfile(source);
       this.assertConsistencySupported(source, plan);
       this.logPlan(source, plan);
 
@@ -132,11 +132,15 @@ export class QueryBuilderService {
   }
 
   private assertPortabilityProfile<TSource, TCompiled, TRow, TNative>(
-    source: QuerySource<TSource, TCompiled, TRow, TNative>,
-    plan: TypedQueryPlan
+    source: QuerySource<TSource, TCompiled, TRow, TNative>
   ): void {
+    // `portability.enforce` é o único interruptor desta checagem. Havia um
+    // segundo — `textProfile !== 'portable-strict'` dispensava o perfil —, e
+    // ele entregava exatamente o que a §5.6 proíbe: quem pedisse
+    // `database-native` perdia a verificação e continuava recebendo compilação
+    // portável, calado. Hoje o perfil reservado morre em `forRoot`, e sobrar a
+    // dispensa aqui só recriaria o buraco por outro caminho (`transformPlan`).
     if (!this.config.portability?.enforce) return;
-    if (plan.textProfile !== 'portable-strict') return;
 
     if (!source.portabilityProfile) {
       throw configurationError(

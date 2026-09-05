@@ -66,3 +66,68 @@ describe('DynamicQueryBuilderModule.forRoot', () => {
     });
   });
 });
+
+/**
+ * Opção declarada tem de fazer o que promete, ou não ser aceita.
+ *
+ * As duas chaves abaixo eram configuráveis e inúteis: `database-native` não
+ * mudava compilação nenhuma — só desligava a checagem de portabilidade, o que
+ * deixava o consumidor com o pior dos dois mundos — e `transactional` reprovava
+ * cada requisição, porque nenhum adapter embarcado oferece a garantia. A §17
+ * decide as duas: configuração inválida falha na inicialização.
+ */
+describe('DynamicQueryBuilderModule.forRoot e opções reservadas', () => {
+  it('recusa textProfile database-native na inicialização', () => {
+    expect(() =>
+      DynamicQueryBuilderModule.forRoot({ textProfile: 'database-native' })
+    ).toThrow(
+      expect.objectContaining({
+        code: 'SOURCE_CONFIGURATION_INVALID',
+        statusCode: 500,
+      })
+    );
+  });
+
+  it('diz que o perfil é reservado, e não apenas inválido', () => {
+    expect(() =>
+      DynamicQueryBuilderModule.forRoot({ textProfile: 'database-native' })
+    ).toThrow(/reserved and not implemented/);
+  });
+
+  it('aceita o textProfile implementado', () => {
+    expect(() =>
+      DynamicQueryBuilderModule.forRoot({ textProfile: 'portable-strict' })
+    ).not.toThrow();
+  });
+
+  it('recusa consistency transactional na inicialização', () => {
+    expect(() =>
+      DynamicQueryBuilderModule.forRoot({ consistency: 'transactional' })
+    ).toThrow(
+      expect.objectContaining({
+        code: 'SOURCE_CONFIGURATION_INVALID',
+        statusCode: 500,
+      })
+    );
+  });
+
+  it('explica que a recusa seria por requisição, e nomeia o código', () => {
+    expect(() =>
+      DynamicQueryBuilderModule.forRoot({ consistency: 'transactional' })
+    ).toThrow(/CAPABILITY_UNAVAILABLE/);
+  });
+
+  it('aceita a consistência que os adapters oferecem', () => {
+    expect(() =>
+      DynamicQueryBuilderModule.forRoot({ consistency: 'eventual' })
+    ).not.toThrow();
+  });
+
+  it('mantém os defaults quando as chaves reservadas são omitidas', () => {
+    DynamicQueryBuilderModule.forRoot({});
+    expect(DynamicQueryBuilderModule.config.textProfile).toBe(
+      'portable-strict'
+    );
+    expect(DynamicQueryBuilderModule.config.consistency).toBe('eventual');
+  });
+});
