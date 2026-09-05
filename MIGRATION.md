@@ -448,8 +448,31 @@ boot.
 ### Step 8 — behaviour that changed on the wire
 
 Retract the "Behavior is preserved 1:1" paragraph in the `1.0.0` section
-below — **it does not apply to v3.** At minimum these change what your clients
-receive:
+below — **it does not apply to v3.**
+
+<!-- prettier-ignore -->
+> **Read this one first.** An unknown query parameter is now a `400`, not
+> something the library ignores. v2 accepted anything it did not recognise; v3
+> refuses with `QUERY_SYNTAX_UNKNOWN_PARAM` and names the offending key. The
+> grammar is exactly eight parameters: `filter`, `sort`, `fields`, `includes`,
+> `search`, `page`, `perPage`, `paginate`.
+>
+> This is the change most likely to produce a "worked in v2, 400s in v3"
+> report, because the extra parameter usually does not come from your code:
+> `?utm_source=…` from a campaign link, `?_=1699999999` from a jQuery
+> cache-buster, a `?lang=` your own middleware appends. The endpoint used to
+> return the list and quietly drop the key.
+>
+> If your endpoint legitimately takes its own parameters, do not hand the
+> library `req.query` wholesale — pass only the grammar subset, which is what
+> `@Query() query: DynamicQueryDto` gives you when the DTO is the parameter
+> type.
+>
+> The reason it changed is the same one behind exact paths and typed coercion:
+> the v3 core does not ignore input it was not asked about (design §5.6). A
+> filter silently dropped is a page of results that is quietly wrong.
+
+At minimum these change what your clients receive:
 
 | Behaviour               | v2                                        | v3                                                                 |
 | ----------------------- | ----------------------------------------- | ------------------------------------------------------------------ |
@@ -478,38 +501,31 @@ Branch on `code`, never on the message. `details` never echoes the value the
 client sent. The full code list and the full coercion table are in
 [`docs/v3/migration-from-v2.md`](./docs/v3/migration-from-v2.md) §4 and §8.
 
-### Step 9 — your `search` whitelist can keep its `many` paths
+### Step 9 — your `search` whitelist can keep its relation paths
 
-A `search` target that crosses a `many` relation compiles to a correlated
-`EXISTS`, the same way a filter on that path does, so the page keeps the size
-you asked for and `total` keeps counting roots. You do not have to restrict
-`search` to root or `one` paths.
+A `search` target that crosses relations compiles to a correlated `EXISTS`, the
+same way a filter on that path does, so the page keeps the size you asked for
+and `total` keeps counting roots. One hop or several, collection or
+many-to-many: you do not have to restrict `search` to root paths.
 
-Worth a line of history, because a 2.x consumer may have hit it: until the
-`3.0.0` release this was a predicate join, which duplicated root rows before
-`LIMIT` and silently returned a short page — measured in example 02 against
-PostgreSQL, where `perPage=5` came back with 4 rows out of 24 matching roots.
-The corpus case that proves the three adapters agree is
-`search/through-many-is-existential`.
+Worth a paragraph of history, because a 2.x consumer may have hit both halves.
+Until `3.0.0`, a `search` target crossing a `many` relation became a predicate
+join, which duplicated root rows before `LIMIT` and silently returned a short
+page — measured in example 02 against PostgreSQL, where `perPage=5` came back
+with 4 rows out of 24 matching roots. And a path crossing **more than one**
+relation, or a many-to-many, was refused outright by the TypeORM adapter while
+Prisma and Drizzle compiled it. Both are closed: example 02 declares
+`search: ['user.firstName', 'items.company.name']` again — a `one` hop and a
+two-relation chain in the same `OR` — and its smoke E2E asserts the page length.
+The corpus cases that hold the three adapters together are
+`search/through-many-is-existential` and
+`relation-many/chain-through-one-is-existential`.
 
-Two limits that bite right after this one, and example 02 hits both — which is
-why its whitelist stayed at `search: ['user.firstName']` even after the fix:
-
-- **More than one relation in the path.** Under the TypeORM adapter, an
-  existential condition through a `many` hop **followed by another relation**
-  (`items.company.name`), or through a many-to-many, is refused with
-  `CAPABILITY_UNAVAILABLE`. Prisma and Drizzle compile both. This is a declared
-  pending item, not intended behaviour — see
-  [`docs/v3/status.md`](./docs/v3/status.md).
-- **Every `search` target needs a folded column, including through a
-  relation.** `items.company.cnpj` has none, and declaring it does not fail the
-  request — it fails **boot**, with
-  `Search field items.company.cnpj declares no folded field`. The corpus case that proves the
-  three adapters agree is `search/through-many-is-existential`.
-
-The one remaining limit: `search` through **two** `many` relations in the same
-path (`posts.tags.label`) is refused with `CAPABILITY_UNAVAILABLE` — the same
-declared limit filters have.
+The one rule that still constrains the whitelist: **every `search` target needs
+a folded column, including through a relation.** That is why example 02 leaves
+`items.company.cnpj` out — the field has none, and declaring it does not fail
+the request, it fails **boot**, with
+`Search field items.company.cnpj declares no folded field`.
 
 ### TypeORM specifics
 

@@ -2,12 +2,11 @@
 
 **Versão-alvo:** `3.0.0` · **Última verificação:** 2026-09-04 (Node v24.15.0)
 
-> A `3.0.0` estável ainda **não** sai deste estado, e o motivo mudou de novo. A
-> fase 7 fechou quase inteira: os quatro exemplos rodam na v3, o guia de
-> migração foi exercido em três consumidores v2 reais, e os três adapters estão
-> a 100% de branches. O que falta é uma rodada da matriz — o corpus cresceu de
-> 66 para 71 casos e a matriz verde de hoje foi medida com 66 — mais os dois
-> gates que só alguém de fora prova. A lista está no fim.
+> A `3.0.0` estável está a **dois gates** de sair, e nenhum dos dois é
+> trabalho: a matriz de paridade fechou verde nas nove células com 74 casos
+> cada, a fase 7 terminou, e o que resta — varredura de segurança sobre código
+> v3 e validação por um consumidor de fora — só existe depois que o stack
+> aterrissar em `main` e o `3.0.0-alpha.1` for publicado. A lista está no fim.
 
 Esta página descreve o que existe e o que falta. O
 [design aprovado](../superpowers/specs/2026-09-03-v3-paridade-orm-bancos-design.md)
@@ -36,27 +35,27 @@ qualquer par delas é a forma mais fácil de superestimar o estado:
 
 ## Fases de entrega
 
-| Fase | Escopo                | Estado             | Evidência                                                                                    |
-| ---- | --------------------- | ------------------ | -------------------------------------------------------------------------------------------- |
-| 0    | Contrato e baseline   | **completa**       | corpus em `tests/v3/corpus/`, perfis em `test/profiles/`                                     |
-| 1    | Core semântico        | **completa**       | parser, AST, autorização exata, codecs, plano, normalizador                                  |
-| 2    | API e distribuição    | **completa**       | sources discriminadas, `transformPlan`, `customize` com escopo, 4 subpaths, `verify:package` |
-| 3    | TypeORM de referência | **completa**       | corpus verde em SQLite e nas três células reais; branches em 100%                            |
-| 4    | Prisma                | **completa**       | idem, com client gerado por dialeto e manifesto validado contra os 4 `schema.prisma`         |
-| 5    | Drizzle               | **completa**       | idem, via `postgres-js`, `mysql2` e `node-mssql`                                             |
-| 6    | Paridade completa     | **medida com 66**  | nove células verdes em 2026-09-04, `assert-no-skips` em todas — **vencida**, o corpus tem 71 |
-| 7    | Hardening e release   | **quase completa** | exemplos, guias e cobertura fechados; falta datar segurança e publicar alpha/rc              |
+| Fase | Escopo                | Estado       | Evidência                                                                                        |
+| ---- | --------------------- | ------------ | ------------------------------------------------------------------------------------------------ |
+| 0    | Contrato e baseline   | **completa** | corpus em `tests/v3/corpus/`, perfis em `test/profiles/`                                         |
+| 1    | Core semântico        | **completa** | parser, AST, autorização exata, codecs, plano, normalizador                                      |
+| 2    | API e distribuição    | **completa** | sources discriminadas, `transformPlan`, `customize` com escopo, 4 subpaths, `verify:package`     |
+| 3    | TypeORM de referência | **completa** | corpus verde em SQLite e nas três células reais; branches em 100%                                |
+| 4    | Prisma                | **completa** | idem, com client gerado por dialeto e manifesto validado contra os 4 `schema.prisma`             |
+| 5    | Drizzle               | **completa** | idem, via `postgres-js`, `mysql2` e `node-mssql`                                                 |
+| 6    | Paridade completa     | **completa** | nove células verdes com 74 casos cada, `assert-no-skips` em todas                                |
+| 7    | Hardening e release   | **completa** | exemplos, guias, cobertura e bench fechados; falta publicar alpha/rc e datar segurança em `main` |
 
 ## Estado por adapter
 
-|                                 | TypeORM                                | Prisma                                          | Drizzle                                                           |
-| ------------------------------- | -------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------- |
-| Corpus no dialeto de referência | 71/71                                  | 71/71 (7 com recusa declarada)                  | 71/71                                                             |
-| Usa o ORM de verdade            | sim                                    | sim, client gerado por dialeto                  | sim                                                               |
-| PostgreSQL / MySQL / SQL Server | verde com 66 casos                     | verde com 66 casos                              | verde com 66 casos                                                |
-| Branches                        | **100%**                               | **100%**                                        | **100%**                                                          |
-| Divergências declaradas         | cadeia existencial de mais de um salto | 5 operadores de padrão em SQLite e MSSQL        | nenhuma                                                           |
-| Lacuna própria                  | —                                      | generator a partir de `schema.prisma` (`3.1.0`) | coleção aninhada sob outra relação; `DrizzleColumn.name` ignorado |
+|                                 | TypeORM            | Prisma                                          | Drizzle                            |
+| ------------------------------- | ------------------ | ----------------------------------------------- | ---------------------------------- |
+| Corpus no dialeto de referência | 74/74              | 74/74 (7 com recusa declarada)                  | 74/74                              |
+| Usa o ORM de verdade            | sim                | sim, client gerado por dialeto                  | sim                                |
+| PostgreSQL / MySQL / SQL Server | **74/74 nas três** | **74/74 nas três**                              | **74/74 nas três**                 |
+| Branches                        | **100%**           | **100%**                                        | **100%**                           |
+| Divergências declaradas         | nenhuma            | 5 operadores de padrão em SQLite e MSSQL        | nenhuma                            |
+| Lacuna própria                  | —                  | generator a partir de `schema.prisma` (`3.1.0`) | coleção aninhada sob outra relação |
 
 ### TypeORM
 
@@ -64,13 +63,22 @@ Adapter de referência. Junções idempotentes para filter, search, sort e field
 mesmo sem `includes`; joins de predicado separados dos de apresentação; PKs
 compostas; paginação em duas fases quando a projeção inclui relação `many`;
 `EXISTS` correlacionado — com correlação por FK composta — para filtro e para
-busca que cruzem uma relação `many`.
+busca que cruzem relação, de qualquer profundidade.
 
-Relação many-to-many em condição existencial é **recusada**
-(`CAPABILITY_UNAVAILABLE`). Até o PR5 o caminho não era recusado: ele emitia
-`EXISTS` sintaticamente válido contra a **tabela errada**, porque a guarda
-testava `joinColumns.length === 0` e numa m2m o lado dono tem join columns — as
-da tabela de junção. Resultado válido e errado, em silêncio.
+A cadeia sai como **um único `EXISTS`**, correlacionado ao root uma só vez, com
+os saltos seguintes como `INNER JOIN` dentro da subconsulta; correlacionar por
+fora inflaria roots e estragaria o `total`. Many-to-many entra pela **tabela de
+junção**, com o alvo por join. Até o PR5 as duas formas eram recusadas, e antes
+disso a m2m era pior que recusada: emitia `EXISTS` sintaticamente válido contra
+a **tabela errada**, porque a guarda testava `joinColumns.length === 0` e numa
+m2m o lado dono tem join columns — as da junção. Resultado válido e errado, em
+silêncio.
+
+Os identificadores da junção são citados pelo `escape` do driver, e são os
+únicos do SQL emitido que recebem esse tratamento: a naming strategy do TypeORM
+os gera em camelCase (`articlesId`), e sem aspas o PostgreSQL os dobraria para
+minúsculas. Uniformizar a citação no resto do compilador é dívida declarada no
+plano de entrega.
 
 ### Prisma
 
@@ -112,23 +120,22 @@ Atenção ao ler o corpus: `like/percent-is-literal` passa no Prisma **por
 coincidência** — exatamente um nome do seed contém "100". Aquele verde não é
 cobertura.
 
-**Limite do TypeORM ainda não declarado como caso de corpus:** condição
-existencial que atravessa mais de uma relação (`items.company.name`) ou uma
-relação many-to-many é recusada, enquanto Prisma e Drizzle compilam as duas
-formas. Não é violação da §5 — nenhum caso do corpus cruza mais de uma relação
-existencialmente, e o §411 promete um salto, que os três cumprem —, e é
-pendência decidida em
-[Emenda 1 do plano de entrega](../superpowers/specs/2026-09-04-v3-plano-de-entrega.md).
+**Uma divergência só, e é a do Prisma.** O limite do TypeORM que esta página
+declarava — condição existencial atravessando mais de uma relação, ou uma
+many-to-many — deixou de existir: a
+[Emenda 1 do plano de entrega](../superpowers/specs/2026-09-04-v3-plano-de-entrega.md)
+foi implementada, os três adapters compilam as mesmas formas, e três casos
+novos do corpus medem isso **sem** exceção declarada.
 
 ## Gates da `3.0.0` (§23)
 
 | Gate                                            | Estado                                                                                      |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Nove combinações reais verdes, sem skips        | **vencido** — verde com 66 casos; o corpus tem 71 e exige nova rodada                       |
+| Nove combinações reais verdes, sem skips        | **sim** — 74 casos por célula, `assert-no-skips` em todas, medido em 2026-09-04             |
 | Peer do Drizzle fechado nos RCs medidos         | sim — `>=1.0.0-rc.4 <1.0.0`                                                                 |
 | Nenhum cast no uso público documentado          | sim — provado pelos quatro exemplos em `strict`, que foi o que o achou                      |
 | Nenhum peer opcional carregado pelo core        | sim — provado por consumer fixture                                                          |
-| Exemplos compilam e passam smoke E2E            | **sim** — 60 testes E2E, job `examples` na CI                                               |
+| Exemplos compilam e passam smoke E2E            | **sim** — 61 testes E2E, job `examples` na CI                                               |
 | Códigos de erro e JSON canônico idênticos       | sim — mesmo runner e mesmas expectativas nas nove células                                   |
 | Cobertura de branches críticos acima de 95%     | **sim** — três adapters em 100%, com piso por área no `jest.config.ts`                      |
 | Nenhum achado de segurança alto ou crítico      | **não datável ainda** — CodeQL e Scorecard rodam contra `main`, que não tem uma linha da v3 |
@@ -152,7 +159,7 @@ Benchmark com I/O mediria a latência do banco, não da biblioteca.
 
 ### Cobertura
 
-Medida na última execução completa de `pnpm test:cov` (52 suites, **872
+Medida na última execução completa de `pnpm test:cov` (52 suites, **912
 testes**, zero skip):
 
 | Área                       | Statements | Branches   | Piso no `jest.config.ts` |
@@ -185,67 +192,43 @@ nada.
 
 ## Bloqueadores e pendências nomeadas
 
-1. **A matriz precisa de nova rodada.** O corpus foi de 66 para 71 casos: 4 de
-   `notIn` com valores (o caminho `NOT IN` não era compilado por **nenhum**
-   adapter, porque só existia `notIn=[]`, que é sempre-verdadeiro e é elidido) e
-   1 de `search` através de relação `many`. Célula verde medida com corpus
-   antigo não vale como gate.
-2. **Cadeia existencial de mais de um salto e many-to-many no TypeORM** —
-   pendência decidida, ver Emenda 1 do plano. Prisma e Drizzle compilam ambas.
-3. **`DrizzleColumn.name` é declarado e ignorado.** O compilador emite a
-   **chave** do objeto `columns` como identificador SQL
-   (`sql.identifier(selection.column)`), então
-   `{ companyId: { name: 'company_id' } }` compila, passa em
-   `assertSourceMatchesRules`, sobe, e só falha no banco com
-   `column "companyId" does not exist`. Achado pelo exemplo 03, que contornou
-   nomeando as colunas físicas em camelCase mais uma verificação própria no
-   load. Conserto: emitir `column.name`, ou recusar `name !== chave` em
-   `createDrizzleTable`.
-4. **`drizzleSource` e `prismaSource` fixam `TRow = object`;** só
-   `typeormSource<T>` é genérico. Um consumidor v2 com
-   `Promise<QueryResult<UserDto>>` não reproduz isso na v3 sem cast.
-5. **Coleção aninhada sob outra relação no Drizzle** falha fechado.
-6. **`decimal(38,6)` não passa como parâmetro vinculado no tedious.** O
+O que sobrou depois do PR5 — e os dois primeiros são os únicos que impedem a
+`3.0.0` de sair.
+
+1. **Publicar `3.0.0-alpha.1`.** Dois gates da §23 — build em consumidor
+   isolado e guia de migração validado num projeto v2 de terceiro — só podem ser
+   provados por alguém de fora. Pular o alpha significa descobri-los num rc.
+2. **O gate de segurança não é datável a partir daqui.** CodeQL e Scorecard
+   rodam contra `main`, e `main` não tem uma linha da v3: datar a varredura
+   atual seria pendurar num gate da `3.0.0` o resultado de uma varredura de
+   código v2. Fecha quando o stack aterrissar.
+3. **Coleção aninhada sob outra relação no Drizzle** falha fechado.
+4. **`decimal(38,6)` não passa como parâmetro vinculado no tedious.** O
    `Decimal` do tedious 20 faz `parseFloat` na validação e `writeUInt64LE`
    depois, então os 8 bytes altos da forma de 16 saem zerados. O seed contorna
    com literal SQL; um consumidor que grave decimal de alta precisão em SQL
    Server pelo TypeORM encontra o mesmo teto.
-7. **Operadores de padrão do Prisma em SQLite e SQL Server** são recusados. É
+5. **Operadores de padrão do Prisma em SQLite e SQL Server** são recusados. É
    decisão declarada (ADR-001, emenda 2), não pendência.
-8. **O gate de segurança não é datável a partir daqui.** CodeQL e Scorecard
-   rodam contra `main`, e `main` não tem uma linha da v3: datar a varredura
-   atual seria pendurar num gate da `3.0.0` o resultado de uma varredura de
-   código v2. Fecha quando o stack aterrissar.
-9. **`reorderByKeys` é rede, não mecanismo.** A ordem da paginação em duas fases
+6. **Citação de identificadores é inconsistente no adapter TypeORM.** Só os da
+   tabela de junção passam pelo `escape` do driver, porque a naming strategy os
+   gera em camelCase e sem aspas o PostgreSQL os dobraria. O resto do
+   compilador emite identificador cru. Funciona hoje porque os demais nomes vêm
+   do consumidor, que os escolhe compatíveis; uniformizar é decisão maior que a
+   emenda que criou o caso.
+7. **`reorderByKeys` é rede, não mecanismo.** A ordem da paginação em duas fases
    é imposta pelo `ORDER BY` que o clone de hidratação herda do plano; a
    reordenação em memória só casa chave crua com chave hidratada quando as duas
    representações coincidem, o que não acontece para PK `datetime` ou binária
    (`getRawMany` devolve o valor do driver, `getMany` devolve `Date`). Hoje é
    benigno e `composite-pagination.spec.ts` trava a ordem observável; deixa de
    ser no dia em que algo puder remover o `ORDER BY` da hidratação.
-10. **`CAPABILITY_UNAVAILABLE` sai com dois status HTTP diferentes.** A recusa
-    de padrão do Prisma usa `inputError` (**400**); as recusas existenciais do
-    TypeORM e o desempate de PK `uuid` usam `configurationError` (**500**).
-    Mesmo código, dois status — e o 500 é disparado por _query de cliente_
-    (um path de filtro que cruza duas relações), o que faz condição causada
-    pelo cliente sair como erro de servidor.
-11. **`QUERY_SYNTAX_UNKNOWN_PARAM` é declarado e nunca lançado.** Parâmetro
-    desconhecido é ignorado, e o JSDoc de `DynamicQueryDto` afirma o contrário
-    — a index signature de `QueryInputLike` existe para permitir a recusa que
-    ninguém implementou. Decidir entre implementar ou marcar o código como
-    reservado.
-12. **`textProfile: 'database-native'` não muda compilação nenhuma.** É lido
-    num único ponto (`query-builder.v3.service.ts:139`), e só para _pular_ a
-    checagem de portabilidade; nenhum adapter o consulta, e
-    `validate-filter.ts` usa a coluna dobrada sempre. Hoje é opção reservada
-    vendida como perfil.
-13. **`consistency: 'transactional'` reprova toda requisição.** Os três
-    adapters declaram `transactionalConsistency: false` e o serviço recusa
-    quando a opção é pedida. Está configurável e é inutilizável.
-14. **Publicar `3.0.0-alpha.1`.** Dois gates da §23 — build em consumidor
-    isolado e guia de migração validado num projeto v2 real de terceiro — só
-    podem ser provados por alguém de fora. Pular o alpha significa descobri-los
-    num rc.
+8. **`dynamic-query-builder.module.ts` não é medido por cobertura.** O
+   `coveragePathIgnorePatterns` exclui `.module.ts$`, e as duas guardas novas do
+   `forRoot` — as que recusam `database-native` e `transactional` — são testadas
+   sem serem medidas. É o mesmo "parece medido" que `src/contracts` tinha, e a
+   mesma decisão está aberta: estreitar o pattern ou provar que não há o que
+   medir.
 
 ## O que o PR5 encontrou
 
@@ -277,6 +260,28 @@ e ordenava por coluna de root, deixando metade de `prisma-sort.compiler.ts` sem
 executar; outro passava pelo motivo errado, porque a PK que ele dizia reparar já
 entrava no select de graça. Foram encontrados exatamente por perseguir os ramos
 descobertos.
+
+**Uma opção de configuração que reprovava 100% das requisições, e outra que
+degradava calada.** `consistency: 'transactional'` era aceita por `forRoot` e
+recusada em todo `execute`, porque nenhum adapter embarcado oferece a garantia.
+`textProfile: 'database-native'` era aceita e dava o pior dos dois mundos —
+pulava a checagem de portabilidade e mantinha compilação `portable-strict`. As
+duas passaram a falhar na inicialização, que é o que a §17 manda
+("configuração inválida falha na inicialização").
+
+**Parâmetro de query desconhecido era ignorado em silêncio**, com o código
+`QUERY_SYNTAX_UNKNOWN_PARAM` declarado, nunca lançado, e o JSDoc da
+`DynamicQueryDto` afirmando que a recusa existia. Agora é 400 com a chave
+ofensora em `details`. É a mudança de comportamento mais provável de aparecer
+como "funcionava na v2": `?utm_source=`, cache-buster de jQuery e `?lang=` de
+middleware passam a ser recusados.
+
+**Um campo público declarado e ignorado.** `DrizzleColumn.name` prometia o nome
+físico da coluna e o compilador emitia a **chave** do objeto `columns` como
+identificador. `{ companyId: { name: 'company_id' } }` compilava, passava na
+validação de source, a aplicação subia, e o erro aparecia no banco como
+`column "companyId" does not exist`. Achado pelo exemplo 03, que pagou o preço
+nomeando as colunas físicas em camelCase.
 
 **Erro de lint fora do glob não era pego por gate nenhum.** `pnpm lint` era
 `eslint "src/**/*.ts"`; virou `eslint .` e passou a cobrir `src`, `tests`,
@@ -324,7 +329,7 @@ docker compose -f test/profiles/docker-compose.yml exec -T mssql \
 `pnpm test` gera o client Prisma de SQLite antes de rodar (`pretest`) e usa
 `--experimental-vm-modules`, porque o runtime do Prisma 7 se carrega por
 `import()` dinâmico. O `test:integration` precisa da mesma flag — sem ela, 42
-dos 66 casos da célula do Prisma falham por callback de import dinâmico.
+dos 74 casos da célula do Prisma falham por callback de import dinâmico.
 
 O `provider` do `datasource` do Prisma tem de ser literal, então existe um
 `schema.prisma` por dialeto em `tests/v3/adapters/prisma/schema/` e o client da
