@@ -22,6 +22,7 @@
     "build": "tsup",
     "clean": "rm -rf dist",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "pretypecheck:tests": "pnpm prisma:generate",
     "typecheck:tests": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
