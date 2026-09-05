@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, 'feat/v3-**']
 
 # O job do Drizzle sai daqui até a fase 5 da v3: sem adapter Drizzle, ele
 # ficaria verde sem exercitar nada e sugeriria suporte à linha 0.45, que a v3
@@ -21,8 +21,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
-        with:
-          version: 9
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -43,8 +41,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
-        with:
-          version: 9
       - uses: actions/setup-node@v6
         with:
           node-version: 24
