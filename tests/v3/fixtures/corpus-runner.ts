@@ -122,6 +122,16 @@ export async function seedCorpus(
     CORPUS_SEED.users.map((user) => ({
       ...user,
       score: user.score.toString(),
+      // `balance` entra como literal SQL, não como parâmetro vinculado.
+      //
+      // O driver do SQL Server (tedious) escreve DECIMAL passando o valor por
+      // `parseFloat` e serializando só 64 bits de mantissa — os 8 bytes altos
+      // da forma de 16 bytes saem zerados. `decimal(38, 6)` acima de ~19
+      // dígitos significativos nem chega ao banco (RangeError ao escrever), e
+      // o que chega já perdeu precisão no `parseFloat`. Como literal, os bytes
+      // gravados são exatamente os que o corpus declara — e são os mesmos nos
+      // três bancos, que é a premissa do seed único.
+      balance: () => user.balance,
       created_at: new Date(user.created_at),
     }))
   );
