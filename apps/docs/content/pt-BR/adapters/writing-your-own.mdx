@@ -26,9 +26,10 @@ Um adapter nunca vê uma query string, e nunca precisa adivinhar um tipo. Quando
 1. **Fez o parse** da entrada contra um alfabeto seguro de paths. `*`, `;`,
    `..`, path vazio e qualquer caractere que pudesse escapar para o SQL são
    recusados como `QUERY_SYNTAX_INVALID` — é isso que mantém o wildcard de
-   projeção fora do alcance do cliente. (`QUERY_SYNTAX_UNKNOWN_PARAM` está no
-   contrato de erros mas não é emitido hoje: um parâmetro de query que a
-   gramática não conhece é ignorado, não recusado.)
+   projeção fora do alcance do cliente. Parâmetro fora da gramática de oito
+   nomes (`filter`, `sort`, `fields`, `includes`, `search`, `page`, `perPage`,
+   `paginate`) é recusado com `400 QUERY_SYNTAX_UNKNOWN_PARAM`, nunca ignorado;
+   o nome da chave vai em `details`, o valor nunca vai.
 2. **Autorizou** cada path contra as regras compiladas do endpoint, por
    correspondência **exata**, e cada operador contra a lista do campo.
 3. **Coagiu** cada valor pelo `kind` declarado do campo — nunca pela aparência
@@ -136,7 +137,10 @@ essa separação foi introduzida para tornar impossível.
 
 `transactionalConsistency: false` faz `consistency: 'transactional'` falhar cedo
 em vez de rodar dados e contagem sob snapshots diferentes. Os três adapters
-entregues reportam `false` hoje.
+entregues reportam `false` hoje, e é por isso que o `forRoot` recusa
+`consistency: 'transactional'` já na inicialização, com
+`SOURCE_CONFIGURATION_INVALID`. A checagem por source continua valendo: é ela
+que decide o caso de um quarto adapter que ofereça a garantia.
 
 ## A source
 

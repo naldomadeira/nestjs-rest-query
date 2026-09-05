@@ -229,10 +229,11 @@ factory — the request path never queries catalogs.
 | `consistency` | `'eventual' \| 'transactional'` | `'eventual'` |
 
 <Callout type="warn">
-  **No shipped adapter supports `'transactional'` today.** TypeORM, Prisma and
-  Drizzle all report `transactionalConsistency: false`, so setting it makes
-  every request fail early with `CAPABILITY_UNAVAILABLE` rather than run data
-  and count under different snapshots. Leave it at `'eventual'`.
+  **No shipped adapter supports `'transactional'` today**, so `forRoot` refuses
+  the value: TypeORM, Prisma and Drizzle all report `transactionalConsistency:
+  false`, and a setting that would fail every request dies at startup with
+  `SOURCE_CONFIGURATION_INVALID` instead. `'eventual'` is the only value that
+  boots.
 </Callout>
 
 ### `textProfile`
@@ -246,9 +247,11 @@ folded column against a folded term, so no `ILIKE` and no
 `mode: 'insensitive'` is ever emitted.
 
 <Callout type="info">
-  Treat `'database-native'` as reserved. The value travels on the plan, but no
-  adapter reads it: folding is applied by the core either way. Its only
-  observable effect today is that the `portability.enforce` check is skipped.
+  `'database-native'` is reserved, and `forRoot` refuses it with
+  `SOURCE_CONFIGURATION_INVALID`. No adapter reads the value — folding is
+  applied by the core either way — so accepting it would have meant silently
+  losing the `portability.enforce` check while still compiling
+  `portable-strict`. `'portable-strict'` is the only value that boots.
 </Callout>
 
 ## Next steps

@@ -70,9 +70,10 @@ export class UsersBusiness {
 }
 ```
 
-`typeormSource` is the only source factory that is **generic in the row type**,
-so a `Promise<NormalizedQueryResult<User>>` annotation works here and does not
-under Prisma or Drizzle.
+`typeormSource` infers the row type from the repository you hand it, so the
+`Promise<NormalizedQueryResult<User>>` annotation needs no type argument here.
+`prismaSource<TRow>` and `drizzleSource<TRow>` are generic in the row type as
+well; only the way the type arrives differs.
 
 ### Source options
 
@@ -153,28 +154,34 @@ always `nullable: true`, and a `ManyToOne` over a `NOT NULL` foreign key must be
 - **Two-phase pagination** when the projection includes a `many` relation, so a
   page is never inflated by the join.
 - **Correlated `EXISTS`** — with correlation over composite foreign keys — for a
-  filter or a `search` target that crosses one `many` relation. `total` keeps
-  counting root rows and the page keeps the size you asked for.
+  filter or a `search` target that crosses a `many` relation, at any depth.
+  `total` keeps counting root rows and the page keeps the size you asked for.
 
-## Limits
+## Existential chains, at any depth
 
-Two existential shapes are refused rather than compiled, with
-`CAPABILITY_UNAVAILABLE`:
+An existential condition — a filter **or** a `search` target whose path crosses
+a `many` relation — compiles whatever comes after that hop: another `one`
+relation (`posts.author.name`), a second collection, or a **many-to-many**
+(`posts.tags.label`). No shape is refused, and the adapter emits no
+`CAPABILITY_UNAVAILABLE` at all.
 
-| Shape                                                           | Message                                                                              |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| A path that crosses a `many` relation and then another relation | `Existential conditions through nested many relations are not supported yet: <path>` |
-| A path through a **many-to-many** relation                      | `Existential filters through many-to-many relations are not supported yet: <path>`   |
+The compiled form is always a single `EXISTS` correlated to the root **once**,
+at the first hop; every later hop is an `INNER JOIN` inside the subquery, and
+the leaf predicate is qualified by the last alias. Correlating each hop from the
+outside would pull the collection into the outer `FROM`, inflate the root rows
+and break `total` — the exact problem `EXISTS` is there to avoid.
 
-Prisma and Drizzle compile both. This is a declared open gap, tracked in
-[`docs/v3/status.md`](https://github.com/naldomadeira/nestjs-rest-query/blob/main/docs/v3/status.md),
-not intended behaviour — and refusing is deliberate: until PR5 the many-to-many
-path emitted syntactically valid `EXISTS` against the wrong table, which
-returned wrong rows in silence.
+For a many-to-many the junction table is a step like any other, so it is the
+subquery's `FROM` and the target table joins in from it. Those junction
+identifiers are the only ones this compiler takes from TypeORM's naming
+strategy rather than from your entities (`articlesId`), so they go through the
+driver's `escape`.
 
-Note that this bites the **rules** you can declare in practice, not only the
-requests clients send: putting `search: ['items.company.name']` in an endpoint's
-rules compiles fine at boot and then fails on the first search.
+The **rules** you can declare are not constrained either — the limit used to bite
+there first, at boot, and it is gone: `search: ['items.company.name']` boots and
+runs, which is what
+[`02-app-with-postgres`](https://github.com/naldomadeira/nestjs-rest-query/blob/main/apps/examples/02-app-with-postgres/src/access-requests/access-requests.query.ts)
+declares.
 
 ## ESM: `@nestjs/typeorm` 12
 
