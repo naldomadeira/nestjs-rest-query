@@ -1,10 +1,17 @@
 name: CI
 
+# A CI também roda em PR empilhada, e não só nas que miram `main`.
+#
+# Sem isto, uma PR cuja base é outra branch de feature não dispara workflow
+# nenhum: o filtro `branches` do `pull_request` casa a **base**, não a head.
+# O efeito prático numa entrega empilhada é o pior possível — a PR que carrega
+# mais risco é a última da fila e ficaria sem um único check até as anteriores
+# entrarem, que é exatamente quando já não dá para reagir barato.
 on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, 'feat/v3-**']
 
 jobs:
   test:
