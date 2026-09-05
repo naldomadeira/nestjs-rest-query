@@ -514,6 +514,26 @@ o cliente precisa enviar o valor no formato do tipo.
 
 ## 8. Erros
 
+**Antes do envelope, a armadilha.** Parâmetro de query desconhecido virou
+`400 QUERY_SYNTAX_UNKNOWN_PARAM`, com o nome da chave ofensora em `details`. A
+v2 aceitava qualquer coisa que não reconhecesse; a v3 recusa. A gramática são
+oito parâmetros e nada mais: `filter`, `sort`, `fields`, `includes`, `search`,
+`page`, `perPage`, `paginate`.
+
+É a mudança com maior chance de virar "funcionava na v2, dá 400 na v3", porque
+o parâmetro extra em geral não vem do seu código: `?utm_source=` de link de
+campanha, `?_=1699999999` de cache-buster de jQuery, `?lang=` que um middleware
+seu acrescenta. Antes o endpoint devolvia a lista e descartava a chave calado.
+
+Se o seu endpoint legitimamente tem parâmetros próprios, não entregue
+`req.query` inteiro à biblioteca — passe só o subconjunto da gramática, que é o
+que `@Query() query: DynamicQueryDto` já lhe dá quando a DTO é o tipo do
+parâmetro.
+
+A razão é a mesma dos paths exatos e da coerção por tipo declarado: o núcleo da
+v3 não ignora entrada que não lhe foi perguntada (§5.6 do design). Filtro
+descartado em silêncio é página de resultado silenciosamente errada.
+
 As mensagens em string saem; o corpo passa a ser um envelope estável.
 
 ```jsonc
@@ -776,39 +796,37 @@ UUID" é o erro: o caso comum é este.
 **O schema declarado é conferido campo a campo contra a source** —
 [§2.2](#22-o-que-é-conferido-contra-a-source-e-o-que-não-é).
 
-## 15. `search` através de relação `many`
+## 15. `search` através de relação
 
-Alvo de `search` que atravessa uma relação `many` compila como `EXISTS`
-correlacionado, igual a um filtro no mesmo path: a página mantém o tamanho
-pedido e o `total` continua contando roots. Sua whitelist v2 pode manter esses
-paths.
+Alvo de `search` que atravessa relação compila como `EXISTS` correlacionado,
+igual a um filtro no mesmo path: a página mantém o tamanho pedido e o `total`
+continua contando roots. Um salto ou vários, coleção ou many-to-many — sua
+whitelist v2 pode manter esses paths.
 
-Vale a nota histórica, porque um consumidor v2 pode ter esbarrado nisso: até a
-`3.0.0` o alvo virava junção de predicado, que duplicava linhas do root antes do
-`LIMIT` e devolvia página curta **em silêncio** — medido no exemplo 02 contra
-PostgreSQL, com `perPage=5` voltando 4 linhas para 24 roots que casavam.
+Vale a nota histórica, porque um consumidor v2 pode ter esbarrado nas duas
+metades disto. Até a `3.0.0`, alvo que cruzava uma relação `many` virava junção
+de predicado, que duplicava linhas do root antes do `LIMIT` e devolvia página
+curta **em silêncio** — medido no exemplo 02 contra PostgreSQL, com `perPage=5`
+voltando 4 linhas para 24 roots que casavam. A causa estava no plano:
+`PlanFilter` carregava a marca `existential` e `PlanSearch.targets` não
+carregava nenhuma, então Prisma e Drizzle acertavam por derivar a cardinalidade
+sozinhos e o TypeORM, que confia no plano, errava. E path que cruzasse **mais de
+uma** relação, ou uma many-to-many, era recusado pelo adapter TypeORM enquanto
+os outros dois compilavam.
 
-Aquele exemplo, porém, **manteve** `search: ['user.firstName']` depois do
-conserto, porque os paths da v2 dele esbarram em dois outros limites:
+As duas estão fechadas, e o exemplo 02 voltou a declarar
+`search: ['user.firstName', 'items.company.name']` — um salto `one` e uma cadeia
+de duas relações no mesmo `OR` —, com o smoke E2E afirmando o tamanho da página.
+No corpus, `search/through-many-is-existential` e
+`relation-many/chain-through-one-is-existential` travam a convergência dos três
+adapters, e as nove células da matriz as executam em PostgreSQL, MySQL e SQL
+Server.
 
-- os dois cruzam **duas** relações (`items` e depois `company`), e o adapter
-  TypeORM recusa cadeia existencial de mais de um salto — assim como recusa
-  many-to-many — enquanto Prisma e Drizzle compilam as duas formas. É pendência
-  declarada, ver [`status.md`](./status.md);
-- `items.company.cnpj` não tem coluna dobrada, e **todo** alvo de `search`
-  exige uma, inclusive através de relação: declará-lo derruba a subida, não a
-  requisição. A
-  causa era o plano: `PlanFilter` carregava a marca `existential` e
-  `PlanSearch.targets` não carregava nenhuma, de modo que Prisma e Drizzle
-  acertavam por derivar a cardinalidade sozinhos e o TypeORM, que confia no
-  plano, errava. O caso `search/through-many-is-existential` do corpus é o que
-  trava a convergência dos três.
-
-Limite que resta: `search` atravessando **duas** relações `many` no mesmo path
-(`posts.tags.label`) é recusado com `CAPABILITY_UNAVAILABLE` — o mesmo limite
-declarado dos filtros.
-
----
+A regra que ainda restringe a whitelist é outra: **todo alvo de `search` exige
+coluna dobrada, inclusive através de relação.** Foi por isso que
+`items.company.cnpj` ficou fora do exemplo 02 — sem `cnpj_folded`, declará-lo
+derruba a subida, não a requisição. Buscar por documento segue possível pelo
+caminho certo: `filter[cnpj][like]`.
 
 ## Diferenças em relação ao design aprovado
 
