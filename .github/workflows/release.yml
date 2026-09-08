@@ -41,10 +41,20 @@ jobs:
       # `main`, a PR fica `BLOCKED` até alguém entrar no Actions e aprovar —
       # em toda release, e sem nada na interface dizendo por quê.
       #
-      # Um PAT em `RELEASE_PAT` (escopos `repo` e `workflow`) evita isso: a PR
-      # nasce como o usuário e dispara CI sozinha. O `||` mantém o workflow
-      # funcionando sem o secret, que é como ele está hoje — sem PAT o
-      # comportamento é o atual, incluindo a aprovação manual.
+      # Um `RELEASE_PAT` evita isso: a PR nasce como o usuário e dispara CI
+      # sozinha. **Não é a configuração recomendada**, e o secret não existe: um
+      # PAT com escrita reintroduz a credencial de longa duração que o Trusted
+      # Publishing foi adotado para eliminar, e o que se compra é ~10 segundos
+      # por release. Aprovar os runs na aba Actions é a operação normal aqui.
+      #
+      # Se o volume de releases um dia justificar automatizar, o caminho que
+      # mantém a postura é um GitHub App com `actions/create-github-app-token`:
+      # token de vida curta, gerado por execução, sem credencial pessoal parada.
+      #
+      # O `||` existe para que essa decisão seja reversível sem tocar no
+      # workflow. Se um PAT for mesmo criado, fine-grained neste repo com
+      # `Contents: write` e `Pull requests: write` basta — `workflow` não, porque
+      # a PR de release só toca `package.json`, `CHANGELOG.md` e `.changeset/`.
       - uses: changesets/action@v1
         with:
           publish: pnpm run release

@@ -53,5 +53,5 @@ Maintainers only. Merging the auto-generated "chore: release" PR publishes to np
 
 Two things about that PR that are not obvious:
 
-- **It is opened by `github-actions[bot]`, so its workflow runs start in `action_required`.** Until someone approves them in the Actions tab, it reports no checks at all and stays `BLOCKED` behind the required ones. Setting a `RELEASE_PAT` secret (scopes `repo` and `workflow`) makes it open as a user and trigger CI on its own.
+- **It is opened by `github-actions[bot]`, so its workflow runs start in `action_required`.** Until a maintainer approves them in the Actions tab, it reports no checks at all and stays `BLOCKED` behind the required ones. That approval is the normal operation here, not a defect: the alternative is a long-lived write credential, which is what Trusted Publishing was adopted to avoid. `release.yml` reads an optional `RELEASE_PAT` if one ever exists, but none is configured on purpose.
 - **The repo is currently in changesets pre mode (`alpha`).** Releases publish under the `alpha` dist tag and `latest` stays on `2.x`. Promoting to a stable `3.0.0` is `pnpm changeset pre exit`, then the release PR that follows.
