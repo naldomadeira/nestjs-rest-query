@@ -19,21 +19,37 @@ async listCompanies(@Query() query: ListCompaniesQuery) {
   return { data, page, perPage, total, lastPage: Math.ceil(total / perPage) };
 }`;
 
-const afterCode = `@Get()
-@ApiDynamicQuery<Company>({
-  filters: ['name', 'cnpj', 'createdAt'],
+const afterCode = `// company.query.ts — declarado uma vez, fora do controller
+export const companyRules = defineQueryRules(COMPANY_SCHEMAS, 'company', {
+  filters: [
+    { path: 'name', operators: ['eq', 'ilike'] },
+    { path: 'cnpj', operators: ['eq', 'in'] },
+    { path: 'createdAt', operators: ['gte', 'lt', 'between'] },
+  ],
   sorts: ['name', 'createdAt'],
-  fields: ['id', 'name', 'cnpj', 'createdAt'],
-})
-findAll(@Query() query: QueryInput, @QueryRules() rules: RulesConfig) {
-  return this.qb.execute(this.companies, query, rules);
+  fields: {
+    root: {
+      allowed: ['id', 'name', 'cnpj', 'createdAt'],
+      default: ['id', 'name', 'cnpj', 'createdAt'],
+    },
+  },
+});
+
+// company.controller.ts
+@Get()
+@ApiDynamicQuery(companyRules)
+findAll(
+  @Query() query: DynamicQueryDto,
+  @QueryRules() rules: CompiledQueryRules,
+) {
+  return this.qb.execute(typeormSource(this.companies), query, rules);
 }`;
 
 export const ptBR: Dictionary = {
   meta: {
     title: 'nestjs-rest-query',
     description:
-      'Query params REST declarativos com whitelist para NestJS, TypeORM e Drizzle.',
+      'Query params REST declarativos com whitelist para NestJS, sobre um núcleo semântico único compartilhado pelos adapters TypeORM, Prisma e Drizzle.',
   },
   nav: {
     docs: 'Docs',
@@ -41,19 +57,24 @@ export const ptBR: Dictionary = {
     github: 'GitHub',
   },
   home: {
+    notice: {
+      title: 'Estas páginas descrevem a v3, publicada como prerelease',
+      body: 'A API 3.x mostrada aqui está no npm como 3.0.0-alpha.0, sob a tag alpha. A tag latest continua apontando para a 2.1.0, então uma instalação normal entrega a API 2.x — peça nestjs-rest-query@alpha para receber a v3. A 3.0.0 estável depende da validação deste alpha. A v3 não tem modo de compatibilidade; leia o guia de migração antes de subir.',
+      linkLabel: 'Gates que faltam para a release',
+    },
     hero: {
-      eyebrow: 'NestJS · TypeORM · Drizzle',
+      eyebrow: 'NestJS · TypeORM · Prisma · Drizzle',
       title: 'Transforme query strings REST em queries seguras.',
       subtitle:
-        'nestjs-rest-query dá aos endpoints NestJS filtros dinâmicos, ordenação, paginação, seleção de campos e carregamento de relations com whitelist por endpoint para TypeORM e Drizzle.',
+        'nestjs-rest-query transforma filtros, ordenação, paginação, seleção de campos, carregamento de relações e busca textual num plano de query tipado, autoriza esse plano contra uma whitelist por endpoint e deixa um adapter de ORM compilá-lo. Três adapters, um núcleo semântico, uma resposta para a mesma requisição.',
       ctaPrimary: 'Começar',
       ctaSecondary: 'Ler a documentação',
       previewAlt: 'nestjs-rest-query — visão geral',
     },
     beforeAfter: {
-      title: 'Do encanamento manual de queries para um único decorator',
+      title: 'Do encanamento manual de queries para duas declarações',
       description:
-        'Cada endpoint declara os campos, sorts e operadores que aceita. A lib parseia a query string, valida contra a whitelist e executa a consulta via TypeORM ou Drizzle.',
+        'O schema diz o que o modelo é — tipos, nulabilidade, relações. As regras de endpoint dizem o que aquela rota autoriza — paths exatos, operadores por campo, projeções. As regras compiladas são a fonte única tanto da autorização em runtime quanto dos parâmetros OpenAPI gerados, então as duas não podem divergir.',
       beforeLabel: 'Antes — escrito à mão',
       afterLabel: 'Depois — nestjs-rest-query',
       beforeCode,
@@ -62,23 +83,23 @@ export const ptBR: Dictionary = {
     compatibility: {
       title: 'Compatibilidade de adapters',
       description:
-        'TypeORM e Drizzle são estáveis. Prisma está no roadmap e usará os mesmos decorators e o mesmo contrato de whitelist.',
-      headers: { name: 'Adapter', status: 'Status', note: 'Notas' },
+        'Os três adapters compilam o mesmo plano de query e são medidos pelo mesmo corpus de paridade em PostgreSQL, MySQL e SQL Server. O adapter não é configuração global — ele vem da source que você passa para execute(), e cada factory de source vive no seu próprio subpath.',
+      headers: { name: 'Adapter', status: 'Status', note: 'Factory de source' },
       rows: [
         {
           name: 'TypeORM',
           status: 'Estável',
-          note: 'Adapter padrão, construído sobre SelectQueryBuilder.',
+          note: 'typeormSource(repository) — de nestjs-rest-query/typeorm. Adapter de referência.',
+        },
+        {
+          name: 'Prisma',
+          status: 'Estável',
+          note: 'prismaSource({ client, model, manifest }) — de nestjs-rest-query/prisma. Operadores de padrão são recusados em SQL Server e SQLite.',
         },
         {
           name: 'Drizzle',
           status: 'Estável',
-          note: 'Ativado via DrizzleAdapter, com mapa explícito de relations.',
-        },
-        {
-          name: 'Prisma',
-          status: 'Roadmap',
-          note: 'Planejado. Mesmos decorators, motor diferente.',
+          note: 'drizzleSource({ db, dialect, table, relations }) — de nestjs-rest-query/drizzle. Exige drizzle-orm 1.x; 0.45.x não é aceito.',
         },
       ],
     },
@@ -87,30 +108,38 @@ export const ptBR: Dictionary = {
       steps: [
         {
           title: 'Instalar',
-          body: 'Adicione o pacote ao seu app NestJS.',
-          code: 'pnpm add nestjs-rest-query',
+          body: 'Adicione o pacote e, depois, o único ORM que você usa. Todo peer de ORM é opcional e o entrypoint raiz não carrega nenhum deles.',
+          code: `pnpm add nestjs-rest-query
+pnpm add typeorm @nestjs/typeorm`,
         },
         {
           title: 'Registrar o módulo',
-          body: 'Importe o DynamicQueryBuilderModule uma vez, no AppModule.',
+          body: 'Importe o DynamicQueryBuilderModule uma vez, no AppModule. Nenhum adapter entra aqui — o forRoot configura apenas política comum.',
           code: `import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
 
 @Module({
-  imports: [DynamicQueryBuilderModule.forRoot()],
+  imports: [
+    DynamicQueryBuilderModule.forRoot({
+      pagination: { defaultPerPage: 10, maxPerPage: 100 },
+    }),
+  ],
 })
 export class AppModule {}`,
         },
         {
-          title: 'Declarar a whitelist',
-          body: 'Cada endpoint declara quais campos, sorts e includes os clientes podem usar.',
-          code: `@Get()
-@ApiDynamicQuery<Company>({
-  filters: ['name', 'cnpj', 'createdAt'],
-  sorts: ['name', 'createdAt'],
-})
-findAll(@Query() q: QueryInput, @QueryRules() rules: RulesConfig) {
-  return this.qb.execute(this.companies, q, rules);
-}`,
+          title: 'Declarar o schema e as regras',
+          body: 'O schema descreve o modelo; as regras descrevem o que aquele endpoint autoriza. A whitelist é exata — autorizar company não autoriza company.name.',
+          code: `export const companyRules = defineQueryRules(
+  COMPANY_SCHEMAS,
+  'company',
+  {
+    filters: [{ path: 'name', operators: ['eq', 'ilike'] }],
+    sorts: ['name', 'createdAt'],
+    fields: {
+      root: { allowed: ['id', 'name'], default: ['id', 'name'] },
+    },
+  },
+);`,
         },
       ],
       cta: 'Ler os pré-requisitos',
@@ -136,6 +165,7 @@ findAll(@Query() q: QueryInput, @QueryRules() rules: RulesConfig) {
     skills: 'Skills',
     github: 'GitHub',
     license: 'Licença MIT',
-    tagline: 'Uma camada de query NestJS focada em TypeORM e Drizzle.',
+    tagline:
+      'Uma camada de query NestJS com um núcleo semântico único para TypeORM, Prisma e Drizzle.',
   },
 };

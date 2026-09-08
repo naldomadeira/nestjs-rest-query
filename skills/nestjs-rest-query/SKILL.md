@@ -1,11 +1,13 @@
 ---
 name: nestjs-rest-query
 description: |
-  Setting up, configuring, and using nestjs-rest-query in NestJS projects with TypeORM, Drizzle, or Prisma.
+  Setting up, configuring, and using nestjs-rest-query 2.x in NestJS projects with TypeORM, Drizzle, or Prisma.
   Use when: installing the library, configuring filters/sorting/pagination, creating dynamic
   endpoints, defining whitelist rules, restricting operators globally or per endpoint,
   switching between TypeORM, Drizzle, and Prisma adapters, adding Swagger support for dynamic queries,
   troubleshooting query parsing or operator errors.
+  Covers the 2.x API published on npm. Do NOT apply it to 3.x: v3 replaced RulesConfig with
+  defineQuerySchema + defineQueryRules, and forRoot({ adapter }) is refused at startup there.
   Keywords: nestjs-rest-query, REST query, dynamic query, filter, sort, pagination, TypeORM,
   Drizzle, Prisma, NestJS, whitelist, operators, RulesConfig, DynamicQueryDto, ApiDynamicQuery,
   QueryRules, TypeOrmAdapter, DrizzleAdapter, PrismaAdapter.
@@ -16,8 +18,29 @@ description: |
 A NestJS library that turns REST query parameters into safe, whitelisted database queries against TypeORM, Drizzle, or Prisma. Handles filtering, sorting, pagination, field selection, relation includes, and optional full-text search.
 
 **Package:** `nestjs-rest-query` (public on npm)
+**API covered here:** `2.x` — what the `latest` tag on npm resolves to (`2.1.0`)
 **Requires:** NestJS `^11`, Node `>= 20`, and one ORM: TypeORM `^0.3.26`, Drizzle `^0.45`, or Prisma Client `^5 || ^6 || ^7`
 **Repo & docs:** https://github.com/naldomadeira/nestjs-rest-query · https://naldomadeira.github.io/nestjs-rest-query/
+
+> **This skill teaches the `2.x` API and does not apply to `3.x`.** v3 is
+> published as `3.0.0-alpha.0` under the `alpha` tag, and it changed the public
+> surface in ways that make the guidance below fail closed rather than misbehave
+> quietly. Check which one the project actually installed before applying any of
+> it — `nestjs-rest-query@alpha` is v3:
+>
+> - `RulesConfig` no longer exists — authorisation comes from
+>   `defineQuerySchema` + `defineQueryRules`, and paths are matched exactly.
+> - `forRoot({ adapter })` and `forRoot({ operators })` are **refused at
+>   startup** with `SOURCE_CONFIGURATION_INVALID`. The adapter comes from the
+>   source you pass to `execute()` (`typeormSource`, `prismaSource`,
+>   `drizzleSource`), each from its own subpath.
+> - `%` and `_` are literals in filter values, and `ilike`/`search` query a
+>   declared folded column instead of emitting `ILIKE`.
+>
+> For v3, read the
+> [published docs](https://naldomadeira.github.io/nestjs-rest-query/docs) and
+> [MIGRATION.md](https://github.com/naldomadeira/nestjs-rest-query/blob/main/MIGRATION.md#2x--3x)
+> instead. A v3 edition of this skill has not been written yet.
 
 ---
 

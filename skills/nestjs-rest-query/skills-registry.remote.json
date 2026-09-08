@@ -1,7 +1,7 @@
 {
   "name": "nestjs-rest-query",
   "version": "2.0.0",
-  "description": "Guia para instalar, configurar e usar a biblioteca nestjs-rest-query em projetos NestJS com TypeORM ou Drizzle, cobrindo filtros, ordenação, paginação, includes, busca textual e troubleshooting.",
+  "description": "Guia para instalar, configurar e usar a biblioteca nestjs-rest-query 2.x em projetos NestJS com TypeORM, Drizzle ou Prisma, cobrindo filtros, ordenacao, paginacao, includes, busca textual e troubleshooting. Cobre a API 2.x publicada no npm; a 3.x tem outra superficie publica e ainda nao tem edicao desta skill.",
   "tags": [
     "nestjs",
     "typeorm",
@@ -16,7 +16,7 @@
   ],
   "author": "Naldo Madeira",
   "category": "backend",
-  "content": "# nestjs-rest-query\n\nSkill para orientar setup, uso e troubleshooting da biblioteca `nestjs-rest-query` em APIs NestJS com TypeORM ou Drizzle.",
+  "content": "# nestjs-rest-query (2.x)\n\nSkill para orientar setup, uso e troubleshooting da biblioteca `nestjs-rest-query` em APIs NestJS com TypeORM, Drizzle ou Prisma. Cobre a API `2.x`; nao se aplica a `3.x`.",
   "url": "https://github.com/naldomadeira/nestjs-rest-query/tree/main/skills/nestjs-rest-query",
   "extension": "directory",
   "packageType": "directory",

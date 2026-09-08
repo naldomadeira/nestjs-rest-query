@@ -1,5 +1,10 @@
 import Link from 'next/link';
-import { ArrowRight, CheckCircle2, CircleDashed } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  CircleDashed,
+} from 'lucide-react';
 import { defaultLocale, getDictionary, type Locale } from '../lib/i18n';
 
 type HomeContentProps = {
@@ -8,6 +13,14 @@ type HomeContentProps = {
 
 const localePrefix = (locale: Locale) =>
   locale === defaultLocale ? '' : `/${locale}`;
+
+/**
+ * v3 is implemented in this repository but the latest npm release is still on
+ * the 2.x API, so the landing page has to say so where the reader lands — the
+ * `/docs` tree carries the same warning at the top of its introduction.
+ */
+const STATUS_DOC_URL =
+  'https://github.com/naldomadeira/nestjs-rest-query/blob/main/docs/v3/status.md';
 
 const statusTone: Record<string, string> = {
   Stable: 'text-emerald-600 dark:text-emerald-400',
@@ -23,6 +36,24 @@ export const HomeContent = ({ locale }: HomeContentProps) => {
 
   return (
     <main className="mx-auto mt-[var(--fd-nav-height)] w-full max-w-5xl overflow-x-clip px-4 pb-24 pt-16 sm:px-6 lg:pt-24">
+      {/* Prerelease notice */}
+      <aside className="mb-12 flex flex-col gap-2 rounded-lg border border-amber-500/40 bg-amber-500/[0.06] p-5">
+        <p className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400">
+          <AlertTriangle className="size-4 shrink-0" aria-hidden />
+          {t.home.notice.title}
+        </p>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          {t.home.notice.body}
+        </p>
+        <a
+          href={STATUS_DOC_URL}
+          className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-amber-700 underline underline-offset-4 dark:text-amber-400"
+        >
+          {t.home.notice.linkLabel}
+          <ArrowRight className="size-3.5" aria-hidden />
+        </a>
+      </aside>
+
       {/* Hero */}
       <section className="flex flex-col gap-6 border-b border-border/60 pb-16">
         <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
