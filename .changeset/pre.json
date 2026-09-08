@@ -1,0 +1,13 @@
+{
+  "mode": "pre",
+  "tag": "alpha",
+  "initialVersions": {
+    "nestjs-rest-query": "2.1.0",
+    "docs": "0.0.0",
+    "01-starter-app": "0.0.1",
+    "02-app-with-postgres": "0.0.1",
+    "03-app-with-drizzle": "0.0.3",
+    "04-app-with-prisma": "0.0.2"
+  },
+  "changesets": []
+}
