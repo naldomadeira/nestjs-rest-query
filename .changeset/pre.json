@@ -9,5 +9,13 @@
     "03-app-with-drizzle": "0.0.3",
     "04-app-with-prisma": "0.0.2"
   },
-  "changesets": []
+  "changesets": [
+    "parity-18-divergence",
+    "parity-19-drizzle-null-probe",
+    "parity-20-isnull-many",
+    "parity-g1-drizzle-search-escape",
+    "parity-g2-prisma-empty-in",
+    "parity-g7-error-messages",
+    "v3-semantic-core"
+  ]
 }
