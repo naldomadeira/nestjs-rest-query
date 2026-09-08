@@ -1,381 +1,296 @@
 ---
 title: Drizzle Adapter
-description: Use nestjs-rest-query with Drizzle ORM - type-safe, modern, and with fine-grained control over relations.
+description: Use nestjs-rest-query with Drizzle ORM - a declared logical descriptor, an explicit dialect, and the limits it declares.
 ---
 
-The Drizzle adapter lets you use `nestjs-rest-query` with Drizzle ORM. Drizzle offers strict typing, type-safe schema generation, and a functional style that pairs well with NestJS decorators.
+The Drizzle adapter compiles the query plan into an explicit statement —
+aliases, joins, conditions, order, pagination — which an executor then
+materialises in the declared dialect.
 
 ## Install
 
-Install Drizzle and the database driver:
-
 ```bash
 pnpm add drizzle-orm postgres
-# ou com mysql: drizzle-orm mysql2
-# ou com sqlite: drizzle-orm better-sqlite3
+# mysql2 for MySQL, or the SQL Server driver
 ```
 
-Then install `nestjs-rest-query`:
+<Callout type="warn" title="0.45.x is not supported">
 
-```bash
-pnpm add nestjs-rest-query
-```
+The peer range is `>=1.0.0-rc.4 <1.0.0` — closed on the release candidates the
+parity matrix was measured against. A `2.x` consumer on `0.45.x` must upgrade,
+and four things break on the way, none of them phrased by Drizzle's own release
+notes in a way you would connect to this library:
 
-<Callout type="info">
-  Starting with version 2.0.0, `typeorm` is an **optional peer dependency**. If
-  you use only Drizzle, you do not need to install TypeORM.
+1. **`drizzle(client, { schema })` no longer exists.** The 1.x signature leaves
+   only `drizzle({ client })`. The `{ schema }` argument served the relational
+   API (`db.query.*`), which this adapter does not use.
+2. **`relations()` was removed** from `drizzle-orm` (replaced by
+   `defineRelations`). Under v3 the right answer is to delete those
+   declarations: relations are declared on the logical descriptor instead, by
+   dotted path.
+3. **`declaration: true` + TypeScript 6 + `drizzle-orm` 1.x is TS2883.** The
+   types `pgTable()` and `drizzle()` infer are not nameable from outside the
+   package. An application does not publish types, so set
+   `"declaration": false`. `skipLibCheck` does not help with this one — it is
+   still needed for a different reason, because `drizzle-orm@1.0.0-rc.4` errors
+   inside its own `.d.cts` under TypeScript 6.
+4. **`db.all()` only exists in the SQLite family.** PostgreSQL, MySQL and SQL
+   Server expose `execute()`, and each returns a different shape. Which method
+   to call comes from the dialect you declare, never from inspecting the object
+   — which is why the dialect is a required argument.
+
 </Callout>
 
-## Module setup
+## The executor, once
 
-```typescript title="app.module.ts"
-import { Module } from '@nestjs/common';
-import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
-import { DrizzleAdapter } from 'nestjs-rest-query/drizzle';
+What your services inject is not Drizzle's `db`: it is the `DrizzleDatabase`
+that `drizzleDatabase()` returns.
 
+```typescript title="db/database.module.ts"
+import { Global, Module } from '@nestjs/common';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import {
+  drizzleDatabase,
+  type DrizzleDatabase,
+} from 'nestjs-rest-query/drizzle';
+
+export function createDatabase(url: string) {
+  return drizzle({ client: postgres(url, { max: 5 }) });
+}
+
+export type AppDatabase = ReturnType<typeof createDatabase>;
+
+export const APP_DATABASE = Symbol('APP_DATABASE');
+export const DRIZZLE_EXECUTOR = Symbol('DRIZZLE_EXECUTOR');
+
+@Global()
 @Module({
-  imports: [
-    DynamicQueryBuilderModule.forRoot({
-      adapter: new DrizzleAdapter(),
-      pagination: { defaultPerPage: 20, maxPerPage: 100 },
-    }),
-  ],
-})
-export class AppModule {}
-```
-
-## Defining `DrizzleSource`
-
-Each Drizzle endpoint passes a `DrizzleSource` object to `queryBuilderService.execute()`. This object describes:
-
-- **`db`** - the Drizzle instance (`db` from your PostgreSQL, MySQL, etc. client)
-- **`table`** - the root table (for example, `users`)
-- **`primaryKey`** - the root table PK column (for example, `users.id`)
-- **`relations`** (optional) - relation map for JOINs
-- **`columnMap`** (optional) - explicit mapping for non-trivial columns
-
-Schema example:
-
-```typescript title="db/schema.ts"
-import {
-  pgTable,
-  serial,
-  varchar,
-  text,
-  timestamp,
-  integer,
-} from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
-
-export const users = pgTable('users', {
-  id: serial('id').primaryKey(),
-  name: varchar('name', { length: 255 }).notNull(),
-  email: varchar('email', { length: 255 }).notNull().unique(),
-  companyId: integer('company_id'),
-  createdAt: timestamp('created_at').defaultNow(),
-});
-
-export const companies = pgTable('companies', {
-  id: serial('id').primaryKey(),
-  name: varchar('name', { length: 255 }).notNull(),
-});
-
-export const posts = pgTable('posts', {
-  id: serial('id').primaryKey(),
-  title: varchar('title', { length: 255 }).notNull(),
-  userId: integer('user_id').notNull(),
-  createdAt: timestamp('created_at').defaultNow(),
-});
-
-// Relations (optional, for the ORM - not used directly by the adapter)
-export const usersRelations = relations(users, ({ one, many }) => ({
-  company: one(companies, {
-    fields: [users.companyId],
-    references: [companies.id],
-  }),
-  posts: many(posts),
-}));
-```
-
-Now, in your controller:
-
-```typescript title="users.controller.ts"
-import { Controller, Get, Query } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
-import {
-  ApiDynamicQuery,
-  QueryRules,
-  QueryBuilderService,
-  RulesConfig,
-  QueryInput,
-} from 'nestjs-rest-query';
-import { DrizzleService } from './drizzle.service';
-import { users, companies, posts } from './db/schema';
-
-const rules: RulesConfig = {
-  alias: 'user',
-  filters: ['email', 'name', 'createdAt', 'company.name'],
-  sorts: ['name', 'createdAt'],
-  fields: ['id', 'name', 'email'],
-  includes: ['company', 'posts'],
-  search: ['name', 'email'],
-};
-
-@Controller('users')
-export class UsersController {
-  constructor(
-    private readonly drizzleService: DrizzleService,
-    private readonly qb: QueryBuilderService
-  ) {}
-
-  @Get()
-  @ApiDynamicQuery(rules)
-  list(@Query() query: QueryInput, @QueryRules() endpointRules = rules) {
-    return this.qb.execute(
-      {
-        db: this.drizzleService.db,
-        table: users,
-        primaryKey: users.id,
-        relations: {
-          company: {
-            table: companies,
-            on: eq(users.companyId, companies.id),
-            cardinality: 'one',
-          },
-          posts: {
-            table: posts,
-            on: eq(posts.userId, users.id),
-            cardinality: 'many',
-            primaryKey: posts.id,
-          },
-        },
-      },
-      query,
-      endpointRules
-    );
-  }
-}
-```
-
-## The relations map is required for dotted paths
-
-Unlike TypeORM, which auto-discovers relations via `@OneToOne` and `@OneToMany`, **Drizzle will not discover relations automatically**. If your query string includes a dotted path (for example, `?filter[company.name][eq]=Acme`), you **must** register the relation in the `relations` map.
-
-If you try to use an unregistered path:
-
-```http
-GET /users?filter[company.name][eq]=Acme
-```
-
-And `relations` does not contain `company`, the adapter will throw:
-
-```
-DrizzleAdapter: no relation registered for "company". Add it to DrizzleSource.relations.
-```
-
-The `relations` map is keyed by `joinPath` (for example, `"company"`, `"company.owner"`):
-
-```typescript
-relations: {
-  company: {
-    table: companies,
-    on: eq(users.companyId, companies.id),
-    cardinality: 'one',
-  },
-  'company.owner': {
-    table: ownerUsers, // the User table again, for owner
-    on: eq(companies.ownerId, ownerUsers.id),
-    cardinality: 'one',
-  },
-}
-```
-
-## Field paths in query strings
-
-Field paths in the query string must correspond to:
-
-1. **Direct columns on the root table** - for example, `name` → `users.name`
-2. **Columns on registered relations** - for example, `company.name` → `companies.name` (if `relations.company` is registered)
-3. **Mapped via `columnMap`** - for example, if `columnMap['company.name'] = companies.name`, the `company.name` path is resolved
-
-If a column is not found:
-
-```
-DrizzleAdapter: column "name" not found on relation "company".
-Map it explicitly via DrizzleSource.columnMap["company.name"].
-```
-
-Use `columnMap` for non-trivial columns or when the schema structure makes automatic discovery difficult:
-
-```typescript
-columnMap: {
-  'company.name': companies.name,
-  'company.owner.email': ownerUsers.email,
-}
-```
-
-## `cardinality: 'many'` requires `primaryKey`
-
-When you declare a 1:N relation (`cardinality: 'many'`), **you MUST provide the related table PK column**. This is required for the adapter to deduplicate rows during aggregation.
-
-```typescript
-relations: {
-  posts: {
-    table: posts,
-    on: eq(posts.userId, users.id),
-    cardinality: 'many',
-    primaryKey: posts.id, // required for 'many'
-  },
-}
-```
-
-If you forget:
-
-```
-DrizzleAdapter: relation "posts" has cardinality 'many' but no primaryKey. 'many' relations require relations["posts"].primaryKey for deduplication. If this is a 1:1 relation, change cardinality to 'one' (or omit it).
-```
-
-This is checked at **compile time** (the TypeScript discriminated union prevents invalid syntax) and at **runtime** (when `createQueryBuilder` is called).
-
-## ORDER BY through a 'many' relation is NOT supported
-
-If you try to sort by a column from a 1:N relation:
-
-```http
-GET /users?sort=-posts.createdAt
-```
-
-The adapter will throw:
-
-```
-DrizzleAdapter: ORDER BY a column from 'many' relation "posts" is not supported. Sort by root or 'one' relation columns. To order presented relation arrays, use the customize hook to add per-relation ORDER BY in your application layer.
-```
-
-**Why?** When you JOIN 1:N, each user appears multiple times in the result set. Doing ORDER BY while collapsing those rows with DISTINCT makes the sort meaning undefined - which `createdAt` are you sorting, the first post or the last one?
-
-**Workaround:** use the `customize` hook to apply relation ordering after the adapter pipeline, in the application layer:
-
-```typescript
-return this.qb.execute(drizzleSource, query, rules, (qb) => {
-  // qb is the Drizzle query builder - you can run custom operations
-  // After the adapter runs, you can transform the data in the application
-});
-```
-
-Or, in the controller layer, after receiving `data`, sort the relation arrays:
-
-```typescript
-const result = await this.qb.execute(...);
-result.data = result.data.map(row => ({
-  ...row,
-  posts: row.posts.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
-}));
-return result;
-```
-
-## Result shape - flat, TypeORM-compatible
-
-`DrizzleAdapter` returns rows in the same flat shape as `TypeOrmAdapter`. Root columns stay at the top level; relations are keys at the same level (object for `'one'`, array for `'many'`).
-
-```http
-GET /users?filter[email][ilike]=%@acme.com&includes=company,posts&page=1&perPage=2
-```
-
-```json
-{
-  "data": [
+  providers: [
+    { provide: APP_DATABASE, useFactory: () => createDatabase(databaseUrl()) },
     {
-      "id": 1,
-      "name": "Ana",
-      "email": "ana@acme.com",
-      "createdAt": "2024-01-15T10:00:00Z",
-      "company": { "id": 101, "name": "Acme" },
-      "posts": [
-        {
-          "id": 201,
-          "title": "Hello",
-          "userId": 1,
-          "createdAt": "2024-01-20T14:00:00Z"
-        },
-        {
-          "id": 202,
-          "title": "World",
-          "userId": 1,
-          "createdAt": "2024-01-21T09:00:00Z"
-        }
-      ]
+      provide: DRIZZLE_EXECUTOR,
+      inject: [APP_DATABASE],
+      // No cast: the postgres-js `db` satisfies DrizzleClientLike structurally,
+      // because it exposes execute().
+      useFactory: (client: AppDatabase): DrizzleDatabase =>
+        drizzleDatabase({ client, dialect: 'postgres' }),
     },
-    {
-      "id": 2,
-      "name": "Bia",
-      "email": "bia@acme.com",
-      "createdAt": "2024-02-01T08:00:00Z",
-      "company": { "id": 101, "name": "Acme" },
-      "posts": []
-    }
   ],
-  "page": 1,
-  "perPage": 2,
-  "total": 17,
-  "lastPage": 9
-}
+  exports: [APP_DATABASE, DRIZZLE_EXECUTOR],
+})
+export class DatabaseModule {}
 ```
 
-**Notes:**
+## The logical descriptor
 
-- Root columns go directly to the top of the object. There is no wrapper key (`root`/`user`/etc.).
-- 1:N relations (like `posts`) appear as arrays, deduplicated by `posts.id`.
-- 1:1 relations (like `company`) appear as scalar objects (or `null` if the LEFT JOIN finds no match).
-- There is no deep nesting (no `company.owner` inside `company`). If you need that, wait for the future `DrizzleRelationalAdapter` based on `db.query.<table>.findMany({ with })`.
-- `rules.alias` is still useful for logging and error messages, but it does not affect the response shape.
-- **Warning**: if a root-table column has the same name as a relation key, the relation overwrites the column in the object. Avoid that in the schema design.
+The adapter does **not** inspect your `pgTable`. You declare a logical
+descriptor, and it is that descriptor which decides value kinds, nullability,
+which columns are internal, which folded column backs `search`/`ilike` and which
+column gives a portable total order.
 
-## Two-phase pagination (transparent)
+```typescript title="db/tables.ts"
+import {
+  createDrizzleTable,
+  type DrizzleRelationMap,
+  type DrizzleTable,
+} from 'nestjs-rest-query/drizzle';
 
-When a `'many'` relation is present, the adapter enables **two-phase pagination**:
-
-1. **Phase 1:** SELECT DISTINCT root.id WHERE ... ORDER BY ... LIMIT/OFFSET
-   - Finds matching user IDs, respecting page/limit
-2. **Phase 2:** SELECT root._, relations._ WHERE root.id IN (...) ORDER BY ...
-   - Fetches all data and relations for those users
-3. **Phase 3:** Client-side aggregation - groups by root.id, arrays for 'many', scalars for 'one'
-
-**Result:**
-
-- `data.length <= perPage` always (never inflated by 1:N JOINs)
-- `total` = distinct user count (not result rows)
-- `lastPage` is correct
-
-**Trade-off:** 3 queries per request instead of 1. In-memory aggregation cost ≈ `perPage × Σ(cardinality of each 'many' relation)`.
-
-**Recommendation:** for endpoints expecting many children per parent, keep `perPage` modest (≤50). Or consider a separate endpoint to enumerate children.
-
-## Customize hook for advanced cases
-
-Sometimes you want to apply Drizzle operations that the adapter does not expose:
-
-```typescript
-return this.qb.execute(drizzleSource, query, rules, (qb) => {
-  // qb is the accumulated Drizzle query builder
-  // You can call custom methods here
+export const companiesTable: DrizzleTable = createDrizzleTable({
+  name: 'companies',
+  model: 'company',
+  columns: {
+    id: {
+      name: 'id',
+      kind: 'uuid',
+      nullable: false,
+      primaryKey: true,
+      // Without this, every request fails: the pagination tie-break is always
+      // applied over the primary key, and uuid has no portable total order.
+      portableOrderField: 'idOrder',
+    },
+    idOrder: {
+      name: 'idOrder',
+      kind: 'string',
+      nullable: false,
+      primaryKey: false,
+      internal: true,
+    },
+    name: {
+      name: 'name',
+      kind: 'string',
+      nullable: false,
+      primaryKey: false,
+      foldedField: 'nameFolded',
+    },
+    nameFolded: {
+      name: 'nameFolded',
+      kind: 'string',
+      nullable: false,
+      primaryKey: false,
+      internal: true,
+    },
+    createdAt: {
+      name: 'createdAt',
+      kind: 'datetime',
+      nullable: false,
+      primaryKey: false,
+    },
+  },
 });
 ```
 
-Example: sort relation arrays after aggregation (as mentioned in the ORDER BY section):
+`kind` is the most consequential decision here. `uuid` is not `string`: it
+forbids `gt`/`lt`/`between` without a `portableOrderField` and refuses a value
+that is not a canonical UUID, instead of comparing arbitrary text.
+
+### Relations, by dotted path
 
 ```typescript
-const result = await this.qb.execute(drizzleSource, query, rules);
-result.data = result.data.map((row) => ({
-  ...row,
-  posts: [...(row.posts || [])].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  ),
-}));
-return result;
+export const userRelations: DrizzleRelationMap = {
+  company: {
+    target: companiesTable,
+    cardinality: 'one',
+    // companyId is nullable, so the relation is too: a LEFT JOIN with no match
+    // becomes company: null, not an object full of nulls.
+    nullable: true,
+    sourceColumn: 'companyId',
+    targetColumn: 'id',
+  },
+  posts: {
+    target: postsTable,
+    cardinality: 'many',
+    nullable: true,
+    sourceColumn: 'id',
+    targetColumn: 'userId',
+  },
+};
 ```
+
+The key is the path as seen from the root: `company` is one hop, `company.owner`
+would be the next. Only the dot-free keys enter the root's logical schema; the
+dotted ones exist so the compiler knows how to join or correlate deep paths.
+
+`sourceColumn`/`targetColumn` are the join columns **in the direction of the
+path**, not "the real foreign key": on a `many` relation the root side enters
+with `id` and the target with `userId`, the reverse of a `one` relation.
+
+## Build the registry from the descriptor
+
+```typescript title="users/users.query.ts"
+import { defineQueryRules } from 'nestjs-rest-query';
+import type { SchemaRegistry } from 'nestjs-rest-query';
+import { buildSourceSchema } from 'nestjs-rest-query/drizzle';
+
+export const USER_SCHEMAS: SchemaRegistry = new Map([
+  ['user', buildSourceSchema(usersTable, userRelations)],
+  ['company', buildSourceSchema(companiesTable, {})],
+  ['post', buildSourceSchema(postsTable, {})],
+]);
+```
+
+`buildSourceSchema` is the function `drizzleSource` uses internally to describe
+the source, so deriving the registry from it removes a whole class of
+`SOURCE_CONFIGURATION_INVALID`: writing `defineQuerySchema` by hand here would
+give two truths about one table, and the core compares them before executing.
+
+## The source, per request
+
+```typescript title="users/users.service.ts"
+import { drizzleSource, type DrizzleDatabase } from 'nestjs-rest-query/drizzle';
+
+async findAll(
+  query: DynamicQueryDto,
+  rules: CompiledQueryRules,
+): Promise<NormalizedQueryResult<object>> {
+  return this.queryBuilderService.execute(
+    drizzleSource({
+      db: this.db,            // the DrizzleDatabase, not the raw drizzle db
+      dialect: 'postgres',    // must match the executor; fails closed otherwise
+      table: usersTable,
+      relations: userRelations,
+    }),
+    query,
+    rules,
+  );
+}
+```
+
+The declared `dialect` has to be the executor's. Diverging would not error
+anywhere — it would produce **wrong results**, because pagination and boolean
+coercion come from the dialect — so `drizzleSource` compares the two and fails
+closed.
+
+`drizzleSource<TRow>` is generic in the row type, and `TRow` arrives from the
+executor: build it as `drizzleDatabase<UserRow>({ client, dialect })` and
+`drizzleSource({ db, ... })` infers `UserRow`, so the method can be annotated
+`Promise<NormalizedQueryResult<UserRow>>` with no cast. The `object` above is
+only the default you get when you do not narrow it.
+
+## What the compiler does
+
+Relations by dotted path, an idempotent join planner, correlated `EXISTS` for
+any `many` hop — including chains, with the second hop as a join **inside** the
+subquery — and first-level collections hydrated by their own query. `ILIKE` is
+never emitted.
+
+**The logical key and the physical column are two different things, and both
+are honoured.** The `columns` key is the logical field — what `fields=`, the
+rules and the JSON speak — and `DrizzleColumn.name` is the physical column the
+compiler puts in the SQL through `sql.identifier(...)`. A descriptor key that
+differs from the physical column name is a supported mapping, not a bug.
+
+A field that is not declared fails closed while the application boots, not in
+the database: `buildSourceSchema` runs every relation's `sourceColumn` and
+`targetColumn` through the same lookup, so an undeclared join column is
+`SOURCE_CONFIGURATION_INVALID` —
+`Drizzle table users has no column declared for field companyId` — at source
+construction.
+
+[`03-app-with-drizzle`](https://github.com/naldomadeira/nestjs-rest-query/tree/main/apps/examples/03-app-with-drizzle)
+uses the mapping: snake_case physical names (`id_order`, `name_folded`,
+`created_at`) behind camelCase logical keys, with a startup assertion against
+`getTableColumns(pgTable)` that each key is the `pgTable` property and each
+`name` is that property's physical column.
+
+## Limits
+
+**Collections nested under another relation fail closed.** Projecting a to-many
+relation that hangs off another relation is refused with
+`ADAPTER_CONTRACT_VIOLATION` —
+`Drizzle adapter cannot project the nested to-many relation <path>` — rather
+than silently returning an empty collection. First-level collections are
+supported.
+
+**`drizzle-kit push`/`generate` cannot express the certified profile.** They do
+not emit `COLLATE "C"`, and code-point collation on portable text columns is
+part of the parity promise. Example 03 issues explicit DDL from
+[`src/database/bootstrap.ts`](https://github.com/naldomadeira/nestjs-rest-query/blob/main/apps/examples/03-app-with-drizzle/src/database/bootstrap.ts)
+instead; see
+[`test/profiles/`](https://github.com/naldomadeira/nestjs-rest-query/tree/main/test/profiles)
+for the reference DDL per family.
+
+## Migrating a `2.x` Drizzle source
+
+v2 handed the adapter Drizzle column objects; v3 takes a logical descriptor and
+plain names:
+
+| v2                                      | v3                                                            |
+| --------------------------------------- | ------------------------------------------------------------- |
+| `source.db` = the Drizzle `db`          | `drizzleDatabase({ client: db, dialect })`                    |
+| `source.table` = a `pgTable`            | `createDrizzleTable({ name, model, columns })` (a descriptor) |
+| `source.primaryKey` = a column          | `columns[x].primaryKey: true`                                 |
+| `relations.x.table`                     | `relations.x.target` (another descriptor)                     |
+| `relations.x.on: eq(a, b)`              | `relations.x.sourceColumn` + `.targetColumn`                  |
+| `relations.x.primaryKey` (was required) | **removed**                                                   |
+| —                                       | `relations.x.nullable` (required)                             |
+| —                                       | `relations['x.y']` for deep hops                              |
+
+`columnMap` is gone as well: paths resolve through the logical descriptor.
 
 ## Next steps
 
-- **Migrating from a previous version?** See the [1.x → 2.x migration guide](https://github.com/naldomadeira/nestjs-rest-query/blob/main/MIGRATION.md) for details on optional peer dependencies, response shape changes, and adapter error messages.
-- For a complete guide to parameters, operators, and the whitelist, see [Usage Guide](/docs/usage).
-- If you want to implement your own adapter, see [Writing your own](/docs/adapters/writing-your-own).
+- [Usage Guide](/docs/usage) for every parameter, operator and error code.
+- [Adapters overview](/docs/adapters) for the full divergence table.
+- The [full migration guide](https://github.com/naldomadeira/nestjs-rest-query/blob/main/MIGRATION.md#drizzle-specifics)
+  for the `2.x` → `3.x` path.

@@ -2,15 +2,23 @@
   "compilerOptions": {
     "ignoreDeprecations": "6.0",
     "outDir": "./dist",
+    "rootDir": ".",
     "rootDirs": ["./src", "./test", "./tests"],
     "baseUrl": "./",
-    "module": "commonjs",
+    "module": "Node16",
     "target": "ES2022",
     "lib": ["esnext"],
     "alwaysStrict": true,
     "strict": true,
     "strictPropertyInitialization": false,
-    "moduleResolution": "node",
+    "isolatedModules": true,
+    // Alinhado com tsconfig.build.json, que já pulava a checagem de libs.
+    // Sem isto o editor e a suíte divergem do gate: drizzle-orm@1.0.0-rc.4
+    // produz 44 erros nos próprios .d.cts sob TypeScript 6 (variance em
+    // ColumnBuilder, `config` ausente em cockroach-core), nenhum deste
+    // repositório. Reavaliar no GA do Drizzle 1.x.
+    "skipLibCheck": true,
+    "moduleResolution": "node16",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "removeComments": true,
@@ -27,6 +35,7 @@
       "@domain/*": ["src/domain/*"],
       "@contracts/*": ["src/contracts/*"],
       "@contracts": ["src/contracts/index.ts"],
+      "@contracts/v3": ["src/contracts/v3/index.ts"],
       "@domain/handlers": ["src/domain/handlers/index.ts"],
       "@infra/*": ["src/infra/*"],
       "@test/*": ["test/*"]

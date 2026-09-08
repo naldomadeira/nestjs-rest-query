@@ -1,0 +1,74 @@
+# Perfis certificados de banco (spec §6.3).
+#
+# Cada serviço sobe a versão-alvo da matriz com encoding Unicode, collation
+# binária, sessão em UTC e modo estrito. Sem volume persistente: cada execução
+# parte do mesmo estado reproduzível.
+# As imagens são parametrizáveis para permitir validar localmente com uma
+# versão já em cache; o default é o alvo principal da matriz (spec §6.1).
+services:
+  postgres:
+    image: ${DQB_PG_IMAGE:-postgres:18}
+    environment:
+      POSTGRES_USER: dqb
+      POSTGRES_PASSWORD: dqb
+      POSTGRES_DB: dqb
+      # Locale C garante ordenação e comparação por code point.
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C'
+      PGTZ: UTC
+    command:
+      - postgres
+      - -c
+      - timezone=UTC
+    ports:
+      - '55432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U dqb -d dqb']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - ./postgres/profile.sql:/docker-entrypoint-initdb.d/profile.sql:ro
+
+  mysql:
+    image: ${DQB_MYSQL_IMAGE:-mysql:8.4}
+    environment:
+      MYSQL_ROOT_PASSWORD: dqb
+      MYSQL_DATABASE: dqb
+      MYSQL_USER: dqb
+      MYSQL_PASSWORD: dqb
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_bin
+      - --default-time-zone=+00:00
+      - --sql-mode=STRICT_ALL_TABLES,NO_ENGINE_SUBSTITUTION
+    ports:
+      - '53306:3306'
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-udqb', '-pdqb']
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    volumes:
+      - ./mysql/profile.sql:/docker-entrypoint-initdb.d/profile.sql:ro
+
+  mssql:
+    image: ${DQB_MSSQL_IMAGE:-mcr.microsoft.com/mssql/server:2022-latest}
+    # Runner Linux x64 (spec §19). Em ARM a célula roda sob emulação e é
+    # opcional localmente, mas obrigatória em CI.
+    platform: linux/amd64
+    environment:
+      ACCEPT_EULA: 'Y'
+      MSSQL_SA_PASSWORD: 'Dqb_Str0ng!'
+      MSSQL_PID: Developer
+      TZ: UTC
+    ports:
+      - '51433:1433'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q "SELECT 1"
+      interval: 5s
+      timeout: 5s
+      retries: 40
+    volumes:
+      - ./mssql:/profile:ro

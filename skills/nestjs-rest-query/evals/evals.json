@@ -62,6 +62,18 @@
         "Output does NOT import @nestjs/typeorm or use InjectRepository",
         "Bootstrap (main.ts) still includes query parser 'extended' and ValidationPipe with enableImplicitConversion"
       ]
+    },
+    {
+      "name": "endpoint_operator_override",
+      "input": "Create a public products endpoint where the app globally allows eq, ilike, in, between, but this endpoint only accepts eq and ilike for filters.",
+      "expected_output": "Controller uses @ApiDynamicQuery with filters for public product fields and operators: { allowed: ['eq', 'ilike'] }. The app module shows DynamicQueryBuilderModule.forRoot with a broader global operators.allowed list. The service passes @QueryRules() rules to queryBuilderService.execute(). Explanation states endpoint RulesConfig.operators overrides the global operator config only for that route.",
+      "checks": [
+        "App module uses DynamicQueryBuilderModule.forRoot with global operators.allowed broader than the endpoint",
+        "Controller uses @ApiDynamicQuery or @DynamicQuery with operators: { allowed: ['eq', 'ilike'] }",
+        "@QueryRules() is used and passed to queryBuilderService.execute()",
+        "Answer explains that endpoint RulesConfig.operators has priority over global forRoot operators",
+        "Answer does not suggest manual query parsing or bypassing the whitelist"
+      ]
     }
   ]
 }

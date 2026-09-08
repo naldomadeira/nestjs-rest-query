@@ -16,7 +16,6 @@ import {
   makeAdminUser,
   makeExternalUser,
   makeManagerUser,
-  makeUsers,
 } from './factories/user.factory';
 import { seedDataSource } from './seed.datasource';
 import { logger, parseCount, runSeed } from './utils/seed.helpers';
@@ -32,7 +31,11 @@ async function seedUsers(ds: typeof seedDataSource): Promise<void> {
 
   // 1. Upsert do admin fixo
   const adminUser = makeAdminUser();
-  await repo.upsert([adminUser], {
+  // `repo.create(...)` antes do upsert não é cerimônia: as factories devolvem
+  // objetos literais, e o listener `@BeforeInsert` que preenche as colunas
+  // dobradas só é disparado para instâncias da entidade. Sem isto o seed
+  // gravaria `*_folded` vazio e `?search=` não encontraria nada.
+  await repo.upsert([repo.create(adminUser)], {
     conflictPaths: ['ssoUserId'],
     skipUpdateIfNoValuesChanged: true,
   });
@@ -55,7 +58,7 @@ async function seedUsers(ds: typeof seedDataSource): Promise<void> {
 
   for (const user of randomUsers) {
     try {
-      await repo.upsert([user], {
+      await repo.upsert([repo.create(user)], {
         conflictPaths: ['ssoUserId'],
         skipUpdateIfNoValuesChanged: true,
       });

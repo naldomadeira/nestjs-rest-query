@@ -9,7 +9,12 @@ interface RulesConfig {
   fields?: string[]; // Columns to SELECT (also restricts sort fields)
   includes?: string[]; // Relations allowed in includes parameter
   search?: string[]; // Optional text search fields for ?search=
+  operators?: OperatorsConfig; // Endpoint-level operator whitelist
   alias?: string; // QueryBuilder alias (default: 'root')
+}
+
+interface OperatorsConfig {
+  allowed?: QueryOperator[];
 }
 ```
 
@@ -17,7 +22,7 @@ interface RulesConfig {
 
 The whitelist is **deny by default**. Any field not explicitly listed causes a **400 Bad Request**.
 
-Fields are NEVER silently ignored — this is intentional to prevent clients from assuming a filter is active when it is not.
+Unauthorized fields always produce a **400 Bad Request** — this is intentional to prevent clients from assuming a filter is active when it is not.
 
 **Field naming rule:** use TypeORM entity property names, not raw database column names. In most projects this means `camelCase` (`createdAt`, `firstName`, `overallStatus`). Only use `snake_case` when the entity property itself is declared that way.
 
@@ -100,6 +105,23 @@ Native text search across one or more whitelisted fields.
 - Search is based on entity/repository field paths, not raw database column names
 - Not every endpoint needs `search` — omit it when not useful
 
+### operators
+
+Restricts which filter operators are accepted by this endpoint.
+
+```typescript
+@ApiDynamicQuery({
+  filters: ['name', 'status', 'createdAt'],
+  operators: { allowed: ['eq', 'ilike', 'between'] },
+})
+```
+
+- Endpoint `operators.allowed` overrides global `DynamicQueryBuilderModule.forRoot({ operators })`.
+- `operators.allowed: ['eq']` accepts only `eq` for this endpoint.
+- `operators.allowed: []` accepts no filter operators for this endpoint.
+- `operators: {}` resets the endpoint to all 14 operators allowed.
+- Omit `operators` to inherit the global config.
+
 ### alias
 
 Custom alias for the query builder root entity. Default: `'root'`.
@@ -152,6 +174,25 @@ Useful when you need to reference the alias in `customize` callbacks.
 @ApiDynamicQuery({})
 // Warning: No filters, sorts, or includes allowed.
 // Only pagination works (page, perPage, paginate).
+```
+
+### Public search endpoint with narrow operators
+
+```typescript
+@ApiDynamicQuery({
+  filters: ['name', 'status'],
+  search: ['name'],
+  operators: { allowed: ['eq', 'ilike'] },
+})
+```
+
+### Admin endpoint that resets global operator restrictions
+
+```typescript
+@ApiDynamicQuery({
+  filters: ['id', 'name', 'status', 'createdAt'],
+  operators: {},
+})
 ```
 
 ## Security Recommendations

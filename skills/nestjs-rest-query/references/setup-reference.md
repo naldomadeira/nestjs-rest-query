@@ -152,6 +152,23 @@ DynamicQueryBuilderModule.forRoot({
 });
 ```
 
+This is the global default. Endpoint rules can override it:
+
+```typescript
+@ApiDynamicQuery({
+  filters: ['name', 'status'],
+  operators: { allowed: ['eq', 'ilike'] },
+})
+```
+
+Precedence:
+
+1. If `RulesConfig` has an `operators` property, the endpoint value wins.
+2. If `RulesConfig` omits `operators`, the global `forRoot({ operators })` value is used.
+3. If neither defines `allowed`, all 14 operators are allowed.
+
+Special case: `operators: {}` on an endpoint intentionally means "all operators allowed for this endpoint".
+
 ## Verification checklist
 
 After setup, verify with this request:

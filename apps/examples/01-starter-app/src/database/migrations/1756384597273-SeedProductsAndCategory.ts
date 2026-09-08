@@ -1,4 +1,15 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
+import { foldText } from 'nestjs-rest-query';
+
+/**
+ * A coluna dobrada é responsabilidade de quem escreve, não do ORM.
+ *
+ * `foldText` é o mesmo `normalize('NFC').toLowerCase()` que o núcleo aplica ao
+ * termo da busca — usar a função exportada é o que garante que gravação e
+ * consulta concordem. Numa aplicação real isto vira um listener de entidade ou
+ * uma coluna gerada pelo banco; aqui fica explícito para o exemplo mostrar de
+ * onde o valor vem.
+ */
 
 export class SeedProductsAndCategory1756384597273 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -94,12 +105,20 @@ export class SeedProductsAndCategory1756384597273 implements MigrationInterface 
     const startDate = new Date('2025-01-01T00:00:00');
     const endDate = new Date('2025-08-25T23:59:59');
 
+    // Gerador determinístico: o seed é dado de exemplo, mas também é o que o
+    // smoke E2E consulta. `Math.random` tornaria o resultado do teste
+    // dependente da execução.
+    let state = 0x2f6e2b1;
+    const random = () => {
+      state = (state * 1664525 + 1013904223) >>> 0;
+      return state / 0x1_0000_0000;
+    };
+
     const randInt = (min: number, max: number) =>
-      Math.floor(Math.random() * (max - min + 1)) + min;
+      Math.floor(random() * (max - min + 1)) + min;
 
     const randomDate = (from: Date, to: Date) => {
-      const t =
-        from.getTime() + Math.random() * (to.getTime() - from.getTime());
+      const t = from.getTime() + random() * (to.getTime() - from.getTime());
       return new Date(t);
     };
 
@@ -123,10 +142,10 @@ export class SeedProductsAndCategory1756384597273 implements MigrationInterface 
 
     for (const name of categories) {
       await queryRunner.query(
-        `INSERT INTO "category"("name") 
-         SELECT ? 
+        `INSERT INTO "category"("name","name_folded") 
+         SELECT ?, ? 
          WHERE NOT EXISTS (SELECT 1 FROM "category" WHERE "name" = ?);`,
-        [name, name],
+        [name, foldText(name), name],
       );
     }
 
@@ -145,10 +164,9 @@ export class SeedProductsAndCategory1756384597273 implements MigrationInterface 
     const insertedProductNames: string[] = [];
 
     const batchSize = 200;
-    const rowsParams: any[] = [];
+    const rowsParams: Array<string | number> = [];
     const rowsValuesSql: string[] = [];
 
-    let count = 0;
     for (let ci = 0; ci < categories.length; ci++) {
       const catId = categoryIds[ci];
 
@@ -163,13 +181,19 @@ export class SeedProductsAndCategory1756384597273 implements MigrationInterface 
         const price = randomPrice();
         insertedProductNames.push(name);
 
-        rowsValuesSql.push('(?, ?, ?, ?, ?)');
-        rowsParams.push(name, price, catId, fmtDate(created), fmtDate(updated));
-        count++;
+        rowsValuesSql.push('(?, ?, ?, ?, ?, ?)');
+        rowsParams.push(
+          name,
+          foldText(name),
+          price,
+          catId,
+          fmtDate(created),
+          fmtDate(updated),
+        );
 
         if (rowsValuesSql.length === batchSize) {
           await queryRunner.query(
-            `INSERT INTO "product"("name","price","categoryId","createdAt","updatedAt")
+            `INSERT INTO "product"("name","name_folded","price","categoryId","createdAt","updatedAt")
              VALUES ${rowsValuesSql.join(',')};`,
             rowsParams,
           );
@@ -181,7 +205,7 @@ export class SeedProductsAndCategory1756384597273 implements MigrationInterface 
 
     if (rowsValuesSql.length > 0) {
       await queryRunner.query(
-        `INSERT INTO "product"("name","price","categoryId","createdAt","updatedAt")
+        `INSERT INTO "product"("name","name_folded","price","categoryId","createdAt","updatedAt")
          VALUES ${rowsValuesSql.join(',')};`,
         rowsParams,
       );

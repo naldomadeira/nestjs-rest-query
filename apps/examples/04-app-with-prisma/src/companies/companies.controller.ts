@@ -1,20 +1,29 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import {
   ApiDynamicQuery,
   ApiPaginatedResponse,
   DynamicQueryDto,
-  QueryResult,
   QueryRules,
-  RulesConfig,
+  type CompiledQueryRules,
+  type NormalizedQueryResult,
 } from 'nestjs-rest-query';
 import { CompaniesBusiness } from './companies.business';
+import type { CompanyRow } from '../query/rows';
+import { companiesRules } from './companies.query';
 
 class CompanyDto {
-  id: string;
+  @ApiProperty()
+  id: number;
+
+  @ApiProperty()
   name: string;
-  createdAt: Date;
-  users?: Array<{ id: string; name: string }>;
+
+  @ApiProperty()
+  createdAt: string;
+
+  @ApiProperty({ required: false })
+  users?: Array<{ id: number; name: string }>;
 }
 
 @ApiTags('companies')
@@ -24,27 +33,18 @@ export class CompaniesController {
 
   @Get()
   @ApiOperation({
-    summary: 'Fetch companies with dynamic filters',
-    description:
-      'Fetch companies with support for filters, sorting, and pagination',
+    summary: 'Busca empresas com filtros dinâmicos',
+    description: 'Filtros, ordenação, paginação e a coleção de usuários',
   })
-  @ApiDynamicQuery<CompanyDto>({
-    filters: ['id', 'name', 'createdAt', 'users'],
-    sorts: ['name', 'createdAt'],
-    fields: ['id', 'name', 'createdAt'],
-    includes: ['users'],
-    search: ['name'],
-  })
-  @ApiPaginatedResponse<CompanyDto>(CompanyDto, {
+  @ApiDynamicQuery(companiesRules)
+  @ApiPaginatedResponse(CompanyDto, {
     status: 200,
-    description: 'List of companies',
+    description: 'Lista de empresas',
   })
   async findAll(
     @Query() query: DynamicQueryDto,
-    @QueryRules() rules: RulesConfig
-  ): Promise<QueryResult<CompanyDto>> {
-    return this.companiesBusiness.findAll(query, rules) as Promise<
-      QueryResult<CompanyDto>
-    >;
+    @QueryRules() rules: CompiledQueryRules
+  ): Promise<NormalizedQueryResult<CompanyRow>> {
+    return this.companiesBusiness.findAll(query, rules);
   }
 }

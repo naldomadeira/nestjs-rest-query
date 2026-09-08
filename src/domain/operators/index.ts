@@ -1,3 +1,1 @@
-export { operatorRegistry } from './operator.registry';
-export { Operator } from './operator.types';
-export type { QueryOperator } from './operator.types';
+export { ALL_OPERATORS, Operator, type QueryOperator } from './operator.types';

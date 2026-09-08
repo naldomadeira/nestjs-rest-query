@@ -1,117 +1,216 @@
 ---
 title: Customizando a Query
-description: Como usar o parâmetro customize do execute() para adicionar condições extras, e como implementar busca textual.
+description: Os dois hooks do execute() — transformPlan e customize —, o escopo deles e quando usar search em vez disso.
 ---
 
-O método `execute()` aceita um quarto parâmetro opcional: um callback que recebe o `SelectQueryBuilder` já com filtros, sorts, includes e fields aplicados, permitindo adicionar cláusulas extras antes da execução.
-
-<Callout type="info">
-  Regra prática: nos parâmetros públicos da biblioteca (`filters`, `sorts`,
-  `fields`, `includes`, `search`) use nomes de propriedades da entidade. No
-  `customize`, quando você escrever SQL manual em string, pode usar os nomes
-  físicos de coluna do banco.
-</Callout>
+O `execute()` recebe um quarto argumento opcional: um objeto de opções com dois
+hooks.
 
 ```typescript
-execute(repo, query, rules, customize?: (qb: SelectQueryBuilder<T>) => void)
-```
-
-## Quando usar
-
-| Caso de uso                                                                    | Abordagem                        |
-| ------------------------------------------------------------------------------ | -------------------------------- |
-| Condições internas não expostas ao cliente (soft delete, tenant, status ativo) | `customize`                      |
-| Busca textual fora do padrão da lib                                            | `customize`                      |
-| Filtrar pelo usuário autenticado (`userId = :id`)                              | `customize`                      |
-| JOINs manuais que a lib não cobre                                              | `customize`                      |
-| Filtros que o cliente deve controlar                                           | `@ApiDynamicQuery` com `filters` |
-| Carregamento de relações                                                       | `includes` no `RulesConfig`      |
-
-## Exemplo básico
-
-Forçar uma condição que nunca deve ser exposta como filtro público:
-
-```typescript
-@Get()
-@ApiDynamicQuery({
-  filters: ['name', 'email'],
-  sorts: ['name', 'createdAt'],
+execute(source, query, rules, {
+  transformPlan?: (plan: TypedQueryPlan) => TypedQueryPlan,
+  customize?: (native: TNative) => void,
+  customizeScope?: 'data' | 'count' | 'both',   // default 'both'
 })
-async findAll(
-  @Query() query: DynamicQueryDto,
-  @QueryRules() rules: RulesConfig,
-) {
-  return this.queryBuilderService.execute(
-    this.usersRepo,
-    query,
-    rules,
-    (qb) => {
-      qb.andWhere('root.status = :status', { status: 'active' });
-    },
-  );
-}
 ```
 
-## Busca textual (search)
+Na `2.x` o quarto argumento era o próprio callback. Agora é um objeto, porque
+são dois hooks diferentes em duas altitudes diferentes.
 
-A biblioteca agora possui `search` nativo. Basta declarar os campos pesquisáveis em `RulesConfig.search` e enviar `?search=termo`:
+## O pipeline, e onde cada hook fica
 
-```typescript
-@Get()
-@ApiDynamicQuery({
-  filters: ['name', 'createdAt'],
-  sorts: ['name', 'createdAt'],
-  search: ['name', 'email', 'company.name'],
-})
-async findAll(
-  @Query() query: DynamicQueryDto,
-  @QueryRules() rules: RulesConfig,
-) {
-  return this.queryBuilderService.execute(this.usersRepo, query, rules);
-}
+```mermaid
+flowchart LR
+  A["buildQueryPlan"] --> B["transformPlan"]
+  B --> C["congelamento"]
+  C --> D["compile"]
+  D --> E["customize"]
+  E --> F["execute"]
+  F --> G["normalização"]
 ```
 
-**Uso:** `GET /users?search=john`
+A ordem é fixa. O `transformPlan` é o último ponto em que o plano pode mudar; o
+`customize` roda depois da compilação, sobre o contexto nativo do adapter. Dados
+e contagem derivam do mesmo plano congelado, e é por isso que as duas queries
+sempre descrevem a mesma pergunta.
 
-Os campos em `search` são combinados com `OR`, usando busca textual case-insensitive. Isso também funciona para relações aninhadas como `company.name` e `items.company.cnpj` — a lib reaproveita joins de `includes` quando existirem e cria joins simples quando necessário.
+## `transformPlan` — agnóstico de adapter
 
-<Callout type="info">
-  `search` é pensado para uma caixa de busca rápida. O cliente envia apenas o
-  termo; o backend decide quais campos podem ser pesquisados.
-</Callout>
-
-### Quando ainda usar `customize` para busca
-
-Use `customize` quando a busca precisar fugir do comportamento padrão da lib, por exemplo:
-
-- pesos diferentes por campo
-- `AND` entre grupos de termos
-- busca full-text específica do banco
-- regras condicionais por tenant, role ou contexto de autenticação
-
-### Quando usar `search` em vez de `filter`
-
-Use `filter` quando o cliente precisa controlar qual campo filtrar e qual operador usar. Use `search` quando o frontend só precisa de uma caixa de busca rápida e o backend decide quais campos são pesquisáveis:
-
-|                              | `filter[name][like]=john` | `search=john`                 |
-| ---------------------------- | ------------------------- | ----------------------------- |
-| Controle do campo            | cliente                   | backend                       |
-| Whitelist da lib             | sim                       | sim, via `RulesConfig.search` |
-| Múltiplos campos simultâneos | não diretamente           | sim (OR)                      |
-| Performance                  | índice por campo          | pode requerer índice composto |
-
-## Usando `buildQuery` para controle total
-
-Prefira `buildQuery()` quando precisar de controle completo sobre a execução (ex: `getManyAndCount`, joins complexos):
+Use para política que pertence à sua aplicação e tem de valer qualquer que seja
+o ORM atrás da source: escopo de tenant expresso em termos de plano, um default
+interno, uma projeção forçada. Ele recebe e devolve um `TypedQueryPlan`.
 
 ```typescript
-const qb = this.queryBuilderService.buildQuery(repo, query, rules);
-
-qb.innerJoin('root.company', 'company').andWhere('company.id = :companyId', {
-  companyId,
+await this.queryBuilderService.execute(source, query, rules, {
+  // Hook comum a todos os adapters: tenant, soft delete, política interna.
+  // Devolva o plano, ou uma cópia modificada dele.
+  transformPlan: (plan) => plan,
 });
-
-const [data, total] = await qb.getManyAndCount();
 ```
 
-`buildQuery()` retorna o `SelectQueryBuilder` sem executar a query — todos os filtros, sorts, includes e fields já estão aplicados.
+<Callout type="warn" title="Devolva um plano novo; não mute o que você recebe">
+  O plano entregue ao `transformPlan` já está **congelado em profundidade** —
+  todo objeto, array e `Map` aninhado incluídos. Atribuir a uma propriedade dele
+  estoura `TypeError` sob o modo estrito do sistema de módulos, então monte um
+  objeto novo e devolva-o. O resultado é congelado outra vez antes da
+  compilação, e é isso que impede um hook de mutar o plano entre a query de
+  dados e a de contagem.
+</Callout>
+
+Note onde ele fica: parse, autorização e coerção já aconteceram, então o plano
+que você recebe é válido — e os termos que você acrescenta a ele **não** são
+revalidados antes da compilação. Um hook que introduz um termo que o schema não
+atende é bug seu, não requisição recusada. Prefira remodelar o que o plano já
+contém a inventar termos novos.
+
+## `customize` — específico do adapter
+
+Use para capacidades fora do contrato REST. Ele recebe o **contexto nativo**,
+uma vez por query do escopo, e o que "nativo" significa depende do adapter:
+
+| Adapter     | `TNative`                                |
+| ----------- | ---------------------------------------- |
+| **TypeORM** | o `SelectQueryBuilder<T>` tipado         |
+| **Prisma**  | `{ kind: 'data' \| 'count', args }`      |
+| **Drizzle** | `{ kind: 'data' \| 'count', statement }` |
+
+```typescript title="TypeORM"
+await this.queryBuilderService.execute(
+  typeormSource(this.userRepository),
+  query,
+  rules,
+  {
+    customize: (qb) => {
+      qb.andWhere('root.tenant_id = :tenant', { tenant });
+    },
+  }
+);
+```
+
+```typescript title="Prisma"
+await this.queryBuilderService.execute(
+  prismaSource({ client: this.prisma, model: 'user', manifest }),
+  query,
+  rules,
+  {
+    customize: (native) => {
+      native.args.where = { AND: [native.args.where ?? {}, { tenantId }] };
+    },
+  }
+);
+```
+
+```typescript title="Drizzle"
+await this.queryBuilderService.execute(
+  drizzleSource({ db, dialect: 'postgres', table, relations }),
+  query,
+  rules,
+  {
+    customize: (native) => {
+      native.statement.where = {
+        op: 'and',
+        terms: [
+          ...(native.statement.where ? [native.statement.where] : []),
+          {
+            op: 'compare',
+            ref: { alias: native.statement.alias, column: 'tenantId' },
+            comparator: '=',
+            value: tenant,
+          },
+        ],
+      };
+    },
+  }
+);
+```
+
+O alias do root no TypeORM é `root`.
+
+<Callout type="info">
+  Os parâmetros públicos da biblioteca (`filters`, `sorts`, `fields`,
+  `includes`, `search`) falam sempre em **paths de campo declarados**. Dentro do
+  `customize`, quando você escreve SQL como string, você passou dessa fronteira
+  e usa os identificadores do próprio banco.
+</Callout>
+
+## `customizeScope`
+
+O hook é invocado uma vez por query, não uma vez com as duas — e é isso que faz o
+default funcionar de verdade.
+
+| Escopo    | Atinge               | Use quando                                                              |
+| --------- | -------------------- | ----------------------------------------------------------------------- |
+| `'both'`  | dados **e** contagem | Default. Qualquer coisa que mude quais linhas qualificam.               |
+| `'data'`  | a query de dados     | Algo que não pode aparecer numa contagem — e você aceita a divergência. |
+| `'count'` | a query de contagem  | Raro; quase sempre um erro.                                             |
+
+Um único `qb.andWhere(...)` sob `'both'`, portanto, cai nas duas queries. Um
+escopo parcial deixa a contagem responder a uma pergunta diferente da dos dados —
+então a biblioteca registra um aviso estruturado quando você escolhe um:
+
+```
+customize is scoped to a single query; data and count may diverge
+```
+
+## Quando usar o quê
+
+| Necessidade                                               | Use                                           |
+| --------------------------------------------------------- | --------------------------------------------- |
+| Condições nunca expostas ao cliente (soft delete, tenant) | `customize`, ou `transformPlan`               |
+| Filtrar pelo usuário autenticado                          | `customize`, ou `transformPlan`               |
+| Busca full-text específica do banco                       | `customize`                                   |
+| Um filtro que o cliente deve controlar                    | uma regra em `filters`, no `defineQueryRules` |
+| Uma caixa de busca rápida sobre vários campos             | `search`, no `defineQueryRules`               |
+| Carregamento de relação                                   | `includes`, no `defineQueryRules`             |
+
+## Busca textual nativa
+
+O `search` é parâmetro de primeira classe, não algo a construir no `customize`.
+Declare os paths pesquisáveis nas regras e envie `?search=termo`:
+
+```typescript
+export const userRules = defineQueryRules(USER_SCHEMAS, 'user', {
+  // ...
+  search: ['name', 'email', 'company.name'],
+});
+```
+
+Os alvos são combinados com `OR`, cada um comparado pela **coluna dobrada**
+dele, contra o termo normalizado pelo mesmo `foldText`. Então nenhum `ILIKE` é
+emitido, e o resultado não depende da collation do servidor. Um alvo que
+atravessa uma relação `many` compila como `EXISTS` correlacionado, então a página
+mantém o tamanho e o `total` continua contando roots.
+
+Duas restrições vale repetir aqui: um path de `search` precisa de `foldedField`
+ou a aplicação não sobe, e a dobra **não** remove diacrítico. Veja
+[Regras de whitelist do endpoint](/pt-BR/docs/usage/endpoint-whitelist-rules).
+
+### `search` versus `filter`
+
+|                              | `filter[name][like]=john`           | `search=john`            |
+| ---------------------------- | ----------------------------------- | ------------------------ |
+| Quem escolhe o campo         | o cliente                           | o backend                |
+| Passa por whitelist          | sim, por campo + operador           | sim, via `search`        |
+| Vários campos ao mesmo tempo | não diretamente                     | sim, combinados com `OR` |
+| Sensibilidade a caixa        | `like` é literal; `ilike` é dobrado | sempre dobrado           |
+
+Ainda use `customize` quando a busca tiver de desviar disso: pesos por campo,
+`AND` entre grupos de termos, um índice full-text específico do banco, ou regras
+que dependam de tenant, papel ou contexto de autenticação.
+
+## Inspecionando o plano
+
+Não existe `buildQuery()` na v3 — nada te entrega um `SelectQueryBuilder`
+meio-montado, porque o plano é o artefato sem ORM e cada adapter o compila. O
+que existe é o `buildPlan`, que para logo depois do `transformPlan` e do
+congelamento:
+
+```typescript
+const plan = this.queryBuilderService.buildPlan(query, rules, {
+  transformPlan: (p) => p,
+});
+```
+
+É a costura sobre a qual asseverar em testes, ou a que inspecionar quando uma
+requisição não produz o SQL que você esperava. Para alcançar o builder do próprio
+ORM, use o `customize`.

@@ -4,9 +4,10 @@ import { Repository } from 'typeorm';
 import {
   DynamicQueryDto,
   QueryBuilderService,
-  QueryResult,
-  RulesConfig,
+  type CompiledQueryRules,
+  type NormalizedQueryResult,
 } from 'nestjs-rest-query';
+import { typeormSource } from 'nestjs-rest-query/typeorm';
 import { User } from './entities/user.entity';
 
 @Injectable()
@@ -17,10 +18,22 @@ export class UsersBusiness {
     private readonly queryBuilderService: QueryBuilderService,
   ) {}
 
+  /**
+   * `execute` recebe uma *source discriminada*, não o repositório solto.
+   *
+   * É o que permite o mesmo núcleo semântico atender TypeORM, Prisma e Drizzle
+   * sem que esta classe saiba qual está em uso — e o adapter entra pelo subpath
+   * `nestjs-rest-query/typeorm`, porque a raiz do pacote não carrega ORM
+   * nenhum.
+   */
   async findAll(
     query: DynamicQueryDto,
-    rules: RulesConfig,
-  ): Promise<QueryResult<User>> {
-    return this.queryBuilderService.execute(this.userRepository, query, rules);
+    rules: CompiledQueryRules,
+  ): Promise<NormalizedQueryResult<User>> {
+    return this.queryBuilderService.execute(
+      typeormSource(this.userRepository),
+      query,
+      rules,
+    );
   }
 }

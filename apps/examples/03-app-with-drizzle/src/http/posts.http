@@ -1,97 +1,62 @@
 @baseUrl = http://localhost:3002
 
-# POSTS — drizzle adapter
+# POSTS — relação `one` não nulável
 #
-# Result row shape (flat, TypeORM-compatible):
-#   { id, title, content, userId, createdAt, user: {...} | null }
+# Regras em `src/posts/posts.query.ts`. `posts.userId` é NOT NULL, então `user`
+# nunca volta `null` — e `filter[user][isNull]` seria recusado já na construção
+# das regras, porque o campo não é nulável.
+#
+# Forma da resposta:
+#   { data: [{ id, title, content, userId, createdAt, user: {...} }], page, ... }
 
-# ─────────────────────────────────────────────────────────────────────
-# BASIC
-# ─────────────────────────────────────────────────────────────────────
-
-### List all
+### Lista paginada
 GET {{baseUrl}}/posts
 
-### Pagination
-GET {{baseUrl}}/posts?page=1&perPage=5
+### Autor incluído, com projeção aninhada
+GET {{baseUrl}}/posts?includes=user&fields=id,title,user.name
 
-### No pagination
-GET {{baseUrl}}/posts?paginate=false
-
-# ─────────────────────────────────────────────────────────────────────
-# FILTERS — root columns
-# ─────────────────────────────────────────────────────────────────────
-
-### ILike
-GET {{baseUrl}}/posts?filter[title][ilike]=Hello
-
-### ILike + sort
-GET {{baseUrl}}/posts?filter[title][ilike]=intro&sort=-createdAt
-
-### Date comparison
-# @name posts_created_at_gte
-GET {{baseUrl}}/posts?filter[createdAt][gte]=2024-01-01
-
-### Between
-GET {{baseUrl}}/posts?filter[createdAt][between]=2024-01-01,2025-12-31
+### `content` está em `allowed` mas fora do `default`: só vem se for pedido
+GET {{baseUrl}}/posts?fields=id,title,content&perPage=2
 
 # ─────────────────────────────────────────────────────────────────────
-# FILTERS — relation paths (1:1: user)
+# FILTROS
 # ─────────────────────────────────────────────────────────────────────
 
-### Filter posts where user.email matches
-### Adds whereJoin → countDistinct(posts.id)
-GET {{baseUrl}}/posts?filter[user.email][ilike]=ana
+### ilike pela coluna dobrada
+GET {{baseUrl}}/posts?filter[title][ilike]=OLÁ
 
-### Filter by user name
-GET {{baseUrl}}/posts?filter[user.name][eq]=Ana
+### like literal: `%` é texto
+GET {{baseUrl}}/posts?filter[title][like]=100%25
 
-# ─────────────────────────────────────────────────────────────────────
-# SORTING
-# ─────────────────────────────────────────────────────────────────────
+### `content` é nulável e não tem coluna dobrada — aceita isNull e like
+GET {{baseUrl}}/posts?filter[content][isNull]=false
 
-GET {{baseUrl}}/posts?sort=title
+### ✗ `content` autoriza só like e isNull → 400 OPERATOR_NOT_ALLOWED
+###   (declarar `ilike` ali seria recusado na construção das regras: o operador
+###    insensível exige uma coluna dobrada, e `content` não tem)
+GET {{baseUrl}}/posts?filter[content][ilike]=postgres
 
-GET {{baseUrl}}/posts?sort=-createdAt
+### Por autor, via FK
+GET {{baseUrl}}/posts?filter[userId][eq]=0a0a0a0a-0000-4000-8000-000000000001
 
-### Sort by 1:1 relation column (allowed)
-GET {{baseUrl}}/posts?sort=-user.name
+### Por campo do autor (junção idempotente, mesmo sem includes)
+GET {{baseUrl}}/posts?filter[user.name][ilike]=ávila
 
-### Multi-field
-GET {{baseUrl}}/posts?sort=title,-createdAt
-
-# ─────────────────────────────────────────────────────────────────────
-# FIELDS
-# ─────────────────────────────────────────────────────────────────────
-
-GET {{baseUrl}}/posts?fields=id,title
-
-GET {{baseUrl}}/posts?fields=id,title,content&page=1&perPage=5
+### Janela temporal
+GET {{baseUrl}}/posts?filter[createdAt][between]=2026-01-01T00:00:00Z,2026-01-10T00:00:00Z
 
 # ─────────────────────────────────────────────────────────────────────
-# INCLUDES — 1:1 (user) — single-pass pagination
+# BUSCA E ORDEM
 # ─────────────────────────────────────────────────────────────────────
 
-### Result row: { ...postColumns, user: {...} | null }
-### No two-phase since `user` is cardinality 'one'.
-GET {{baseUrl}}/posts?includes=user
+### Busca em título e nome do autor
+GET {{baseUrl}}/posts?search=drizzle
 
-GET {{baseUrl}}/posts?includes=user&page=1&perPage=10
+### Mesma busca em caixa alta
+GET {{baseUrl}}/posts?search=DRIZZLE
 
-# ─────────────────────────────────────────────────────────────────────
-# COMBINATIONS
-# ─────────────────────────────────────────────────────────────────────
+### Ordem por campo da relação `one`
+GET {{baseUrl}}/posts?sort=user.name,-createdAt&includes=user&fields=id,title,user.name
 
-### Filter + sort + include + page
-GET {{baseUrl}}/posts?filter[title][ilike]=hello&sort=-createdAt&includes=user&page=1&perPage=5
-
-### Relation filter + sort by relation + include
-GET {{baseUrl}}/posts?filter[user.email][ilike]=acme&sort=-user.name&includes=user&page=1&perPage=10
-
-# ─────────────────────────────────────────────────────────────────────
-# REGRESSIONS
-# ─────────────────────────────────────────────────────────────────────
-
-### Regression: temporal coercion on timestamp columns
-# @name posts_regression_temporal_gte
-GET {{baseUrl}}/posts?filter[createdAt][gte]=2024-01-01
+### ✗ `content` não está em `sorts` → 400 FIELD_NOT_ALLOWED
+GET {{baseUrl}}/posts?sort=content

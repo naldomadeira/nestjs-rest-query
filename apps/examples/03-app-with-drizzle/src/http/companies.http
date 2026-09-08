@@ -1,97 +1,61 @@
 @baseUrl = http://localhost:3002
 
-# COMPANIES — drizzle adapter
+# COMPANIES — o endpoint da coleção de primeiro nível
 #
-# Result row shape (flat, TypeORM-compatible):
-#   { id, name, createdAt, users: [...] }
+# Regras em `src/companies/companies.query.ts`. É aqui que se vê a estratégia
+# de duas fases do adapter Drizzle: `users` sai do statement principal e é
+# hidratada por consulta própria, então `LIMIT` pagina empresas e `total` conta
+# empresas — nunca linhas de junção.
+#
+# Forma da resposta:
+#   { data: [{ id, name, createdAt, users: [...] }], page, perPage, total, lastPage }
 
-# ─────────────────────────────────────────────────────────────────────
-# BASIC
-# ─────────────────────────────────────────────────────────────────────
-
-### List all
+### Lista paginada
 GET {{baseUrl}}/companies
 
-### Pagination
-GET {{baseUrl}}/companies?page=1&perPage=5
-
-### No pagination
+### Sem paginar
 GET {{baseUrl}}/companies?paginate=false
 
-# ─────────────────────────────────────────────────────────────────────
-# FILTERS — root columns
-# ─────────────────────────────────────────────────────────────────────
+### Coleção incluída — `total` continua 5, não 17
+GET {{baseUrl}}/companies?includes=users
 
-### Exact
-GET {{baseUrl}}/companies?filter[name][eq]=Acme Corp
+### Coleção com projeção aninhada
+GET {{baseUrl}}/companies?includes=users&fields=id,name,users.name&perPage=1
 
-### ILike
-GET {{baseUrl}}/companies?filter[name][ilike]=tech
-
-### Date comparison
-# @name companies_created_at_gte
-GET {{baseUrl}}/companies?filter[createdAt][gte]=2024-01-01
-
-### IN
-GET {{baseUrl}}/companies?filter[name][in]=Acme Corp,Globex,Initech
+### Coleção incluída junto com paginação estreita: a coleção não é cortada
+GET {{baseUrl}}/companies?includes=users&perPage=2
 
 # ─────────────────────────────────────────────────────────────────────
-# FILTERS — relation paths (1:N: users)
+# FILTROS
 # ─────────────────────────────────────────────────────────────────────
 
-### Filter companies that have any user matching email
-### Adds whereJoin AND activates two-phase pagination
-GET {{baseUrl}}/companies?filter[users.email][ilike]=ana
+### eq
+GET {{baseUrl}}/companies?filter[name][eq]=Globex Energia
+
+### ilike pela coluna dobrada
+GET {{baseUrl}}/companies?filter[name][ilike]=ELÉTRICA
+
+### Coleção como alvo: empresas sem nenhum usuário (EXISTS negado)
+GET {{baseUrl}}/companies?filter[users][isNull]=true
+
+### Campo da coleção: EXISTS correlacionado
+GET {{baseUrl}}/companies?filter[users.name][ilike]=ávila
+
+### Ordem em datetime
+GET {{baseUrl}}/companies?filter[createdAt][gte]=2026-01-03T00:00:00Z
 
 # ─────────────────────────────────────────────────────────────────────
-# SORTING
+# BUSCA E ORDEM
 # ─────────────────────────────────────────────────────────────────────
 
+### Busca dobrada
+GET {{baseUrl}}/companies?search=elétrica
+
+### Mesma busca, outra caixa, mesmo total
+GET {{baseUrl}}/companies?search=ELÉTRICA
+
+### Ordem por nome (collation de code point no perfil do DDL)
 GET {{baseUrl}}/companies?sort=name
 
-GET {{baseUrl}}/companies?sort=-createdAt
-
-### ✗ Sort by 'many' relation column (users) → 400
-GET {{baseUrl}}/companies?sort=-users.name
-
-# ─────────────────────────────────────────────────────────────────────
-# SEARCH (declared on name)
-# ─────────────────────────────────────────────────────────────────────
-
-GET {{baseUrl}}/companies?search=acme
-
-# ─────────────────────────────────────────────────────────────────────
-# FIELDS
-# ─────────────────────────────────────────────────────────────────────
-
-GET {{baseUrl}}/companies?fields=id,name
-
-# ─────────────────────────────────────────────────────────────────────
-# INCLUDES — 1:N (users)
-# ─────────────────────────────────────────────────────────────────────
-
-### Two-phase pagination kicks in because `users` is cardinality 'many'
-### Result row: { ...companyColumns, users: [...] }
-GET {{baseUrl}}/companies?includes=users&page=1&perPage=2
-
-# ─────────────────────────────────────────────────────────────────────
-# COMBINATIONS
-# ─────────────────────────────────────────────────────────────────────
-
-### Filter + 1:N include + pagination
-GET {{baseUrl}}/companies?filter[name][ilike]=acme&includes=users&page=1&perPage=5
-
-### Relation filter + include
-GET {{baseUrl}}/companies?filter[users.email][ilike]=acme&includes=users&page=1&perPage=3
-
-# ─────────────────────────────────────────────────────────────────────
-# REGRESSIONS
-# ─────────────────────────────────────────────────────────────────────
-
-### Regression: temporal coercion on timestamp columns
-# @name companies_regression_temporal_gte
-GET {{baseUrl}}/companies?filter[createdAt][gte]=2024-01-01
-
-### Regression: 1:N include + root sort stays valid under two-phase pagination
-# @name companies_regression_two_phase_root_sort
-GET {{baseUrl}}/companies?includes=users&sort=-createdAt&page=1&perPage=5
+### ✗ Ordem através da coleção não está na whitelist → 400
+GET {{baseUrl}}/companies?sort=users.name
