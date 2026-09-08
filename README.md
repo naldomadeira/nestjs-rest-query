@@ -40,7 +40,7 @@ NestJS has controllers. TypeORM has a query builder. The boilerplate between the
 
 | nestjs-rest-query  | NestJS | TypeORM               | Drizzle               | Prisma                | Node   |
 | ------------------ | ------ | --------------------- | --------------------- | --------------------- | ------ |
-| `3.x` (prerelease) | `11.x` | `^0.3.26 \|\| ^1.0.0` | `>=1.0.0-rc.4 <1.0.0` | `^6.19.0 \|\| ^7.0.0` | `>=20` |
+| `3.x` (prerelease) | `11.x` | `^0.3.26 \|\| ^1.0.0` | `>=1.0.0-rc.4 <1.0.0` | `^6.19.0 \|\| ^7.0.0` | `>=22` |
 | `2.1.x`            | `11.x` | `0.3.x`               | `0.45.x`              | `5.x \| 6.x \| 7.x`   | `>=20` |
 | `2.0.x`            | `11.x` | `0.3.x`               | `0.45.x`              | —                     | `>=20` |
 | `1.x`              | `11.x` | `0.3.x`               | —                     | —                     | `>=20` |
@@ -55,7 +55,7 @@ you are on `2.1.x`, the upgrade path is
 
 | ORM     | Status    | Import path                 |
 | ------- | --------- | --------------------------- |
-| TypeORM | ✅ Stable | `nestjs-rest-query`         |
+| TypeORM | ✅ Stable | `nestjs-rest-query/typeorm` |
 | Drizzle | ✅ Stable | `nestjs-rest-query/drizzle` |
 | Prisma  | ✅ Stable | `nestjs-rest-query/prisma`  |
 
@@ -63,19 +63,27 @@ you are on `2.1.x`, the upgrade path is
 > corpus against PostgreSQL, MySQL and SQL Server — nine cells, no skips. The
 > adapter is chosen by the **source** you pass to `execute()`, not by `forRoot`.
 >
-> `3.x` is still a prerelease: stable `3.0.0` waits on external validation of the
-> alpha, and `drizzle-orm` 1.x is pinned to the RC line because MSSQL support
-> lives there. Per-cell state and declared gaps:
+> `3.x` is still a prerelease: `3.0.0-alpha.0` is on npm under the `alpha` tag,
+> and stable `3.0.0` waits on external validation of that alpha and on a
+> security scan dated over v3 code. The `drizzle-orm` peer is
+> closed on the release candidates the matrix measured, so the `1.0.0` GA cannot
+> satisfy it until a release of ours re-runs the nine cells — that is a
+> deliberate refusal, not a missing feature
+> ([ADR-001](./docs/superpowers/specs/2026-09-04-v3-adr-001-matriz-e-escopo-da-3.0.0.md),
+> amendment 1). Per-cell state and declared gaps:
 > [`docs/v3/status.md`](./docs/v3/status.md).
 
 Want a different ORM? [Open a discussion](https://github.com/naldomadeira/nestjs-rest-query/discussions).
 
 ## Install
 
+`3.x` is a prerelease, published under the `alpha` tag. The `latest` tag still
+points at `2.1.0`, so the tag is required to get the API this README documents:
+
 ```bash
-pnpm add nestjs-rest-query
+pnpm add nestjs-rest-query@alpha
 # or
-npm install nestjs-rest-query
+npm install nestjs-rest-query@alpha
 ```
 
 Peer dependencies: `@nestjs/common`, `@nestjs/core`, `reflect-metadata`. Optionally `typeorm` (for TypeORM), `drizzle-orm` (for Drizzle), or `@prisma/client` (for Prisma). Add `@nestjs/swagger` for OpenAPI integration (optional).

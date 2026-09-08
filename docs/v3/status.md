@@ -1,12 +1,17 @@
 # Estado da v3
 
-**Versão-alvo:** `3.0.0` · **Última verificação:** 2026-09-04 (Node v24.15.0)
+**Versão-alvo:** `3.0.0` · **Última medição:** 2026-09-04 (Node v24.15.0) ·
+**Stack em `main` desde:** 2026-09-05 · **Prerelease no npm:**
+`3.0.0-alpha.0`, tag `alpha`, 2026-09-08
 
 > A `3.0.0` estável está a **dois gates** de sair, e nenhum dos dois é
-> trabalho: a matriz de paridade fechou verde nas nove células com 74 casos
-> cada, a fase 7 terminou, e o que resta — varredura de segurança sobre código
-> v3 e validação por um consumidor de fora — só existe depois que o stack
-> aterrissar em `main` e o `3.0.0-alpha.1` for publicado. A lista está no fim.
+> trabalho nosso: a matriz de paridade fechou verde nas nove células com 74
+> casos cada, a fase 7 terminou, o stack da v3 aterrissou em `main` e o
+> `3.0.0-alpha.0` **está publicado** sob a tag `alpha` — a `latest` segue na
+> `2.1.0` de propósito. O que resta é (1) a varredura de segurança correr
+> contra `main` e ser datada aqui, agora que `main` tem código v3, e (2) a
+> validação do alpha por um consumidor de fora, que só quem está fora pode
+> fazer. A lista está no fim.
 
 Esta página descreve o que existe e o que falta. O
 [design aprovado](../superpowers/specs/2026-09-03-v3-paridade-orm-bancos-design.md)
@@ -129,20 +134,20 @@ novos do corpus medem isso **sem** exceção declarada.
 
 ## Gates da `3.0.0` (§23)
 
-| Gate                                            | Estado                                                                                      |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Nove combinações reais verdes, sem skips        | **sim** — 74 casos por célula, `assert-no-skips` em todas, medido em 2026-09-04             |
-| Peer do Drizzle fechado nos RCs medidos         | sim — `>=1.0.0-rc.4 <1.0.0`                                                                 |
-| Nenhum cast no uso público documentado          | sim — provado pelos quatro exemplos em `strict`, que foi o que o achou                      |
-| Nenhum peer opcional carregado pelo core        | sim — provado por consumer fixture                                                          |
-| Exemplos compilam e passam smoke E2E            | **sim** — 61 testes E2E, job `examples` na CI                                               |
-| Códigos de erro e JSON canônico idênticos       | sim — mesmo runner e mesmas expectativas nas nove células                                   |
-| Cobertura de branches críticos acima de 95%     | **sim** — três adapters em 100%, com piso por área no `jest.config.ts`                      |
-| Nenhum achado de segurança alto ou crítico      | **não datável ainda** — CodeQL e Scorecard rodam contra `main`, que não tem uma linha da v3 |
-| Benchmarks dentro do orçamento                  | **sim, datado** — ver abaixo                                                                |
-| Migration guide validado num consumidor v2 real | **sim** — três consumidores, 32 furos achados e corrigidos                                  |
-| Matriz pública de versões coincide com a CI     | sim — `versions.md`, comparada ao workflow por teste                                        |
-| Profiles de banco passam nos checks             | sim — collector em `src/`, incluindo o fuso do cliente por sonda                            |
+| Gate                                            | Estado                                                                                                                   |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Nove combinações reais verdes, sem skips        | **sim** — 74 casos por célula, `assert-no-skips` em todas, medido em 2026-09-04                                          |
+| Peer do Drizzle fechado nos RCs medidos         | sim — `>=1.0.0-rc.4 <1.0.0`                                                                                              |
+| Nenhum cast no uso público documentado          | sim — provado pelos quatro exemplos em `strict`, que foi o que o achou                                                   |
+| Nenhum peer opcional carregado pelo core        | sim — provado por consumer fixture                                                                                       |
+| Exemplos compilam e passam smoke E2E            | **sim** — 61 testes E2E, job `examples` na CI                                                                            |
+| Códigos de erro e JSON canônico idênticos       | sim — mesmo runner e mesmas expectativas nas nove células                                                                |
+| Cobertura de branches críticos acima de 95%     | **sim** — três adapters em 100%, com piso por área no `jest.config.ts`                                                   |
+| Nenhum achado de segurança alto ou crítico      | **datável agora, ainda não datado** — a v3 está em `main` desde 2026-09-05, então CodeQL e Scorecard já varrem código v3 |
+| Benchmarks dentro do orçamento                  | **sim, datado** — ver abaixo                                                                                             |
+| Migration guide validado num consumidor v2 real | **sim** — três consumidores, 32 furos achados e corrigidos                                                               |
+| Matriz pública de versões coincide com a CI     | sim — `versions.md`, comparada ao workflow por teste                                                                     |
+| Profiles de banco passam nos checks             | sim — collector em `src/`, incluindo o fuso do cliente por sonda                                                         |
 
 ### Benchmark (§18.4), datado
 
@@ -195,13 +200,19 @@ nada.
 O que sobrou depois do PR5 — e os dois primeiros são os únicos que impedem a
 `3.0.0` de sair.
 
-1. **Publicar `3.0.0-alpha.1`.** Dois gates da §23 — build em consumidor
-   isolado e guia de migração validado num projeto v2 de terceiro — só podem ser
-   provados por alguém de fora. Pular o alpha significa descobri-los num rc.
-2. **O gate de segurança não é datável a partir daqui.** CodeQL e Scorecard
-   rodam contra `main`, e `main` não tem uma linha da v3: datar a varredura
-   atual seria pendurar num gate da `3.0.0` o resultado de uma varredura de
-   código v2. Fecha quando o stack aterrissar.
+1. **Validar o `3.0.0-alpha.0` num consumidor de fora.** O alpha saiu em
+   2026-09-08 sob a tag `alpha` (release `6adf0ac`), então o que bloqueava —
+   não haver nada publicado para instalar — deixou de existir. Os dois gates da
+   §23 que sobram aqui, build em consumidor isolado e guia de migração validado
+   num projeto v2 de terceiro, só podem ser provados por alguém de fora; é isso
+   que o alpha existe para provocar antes de um rc. A `latest` continua na
+   `2.1.0`, então quem instalar sem a tag não recebe a v3.
+2. **O gate de segurança está desbloqueado, mas não datado.** Era ele que
+   dependia do stack aterrissar: até 2026-09-04, CodeQL e Scorecard varriam um
+   `main` sem uma linha da v3, e datar aquela varredura seria pendurar num gate
+   da `3.0.0` o resultado de uma varredura de código v2. Desde 2026-09-05 a v3
+   está em `main`, então a próxima varredura já mede o código certo — falta
+   correr e datar o resultado aqui.
 3. **Coleção aninhada sob outra relação no Drizzle** falha fechado.
 4. **`decimal(38,6)` não passa como parâmetro vinculado no tedious.** O
    `Decimal` do tedious 20 faz `parseFloat` na validação e `writeUInt64LE`

@@ -15,6 +15,11 @@ export type Dictionary = {
     github: string;
   };
   home: {
+    notice: {
+      title: string;
+      body: string;
+      linkLabel: string;
+    };
     hero: {
       eyebrow: string;
       title: string;
