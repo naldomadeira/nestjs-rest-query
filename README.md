@@ -46,9 +46,9 @@ NestJS has controllers. TypeORM has a query builder. The boilerplate between the
 | `1.x`              | `11.x` | `0.3.x`               | —                     | —                     | `>=20` |
 
 The `3.x` row is what the prerelease requires, not a suggestion: Drizzle
-`0.45.x` is **not** accepted by v3. This README documents the released `2.1.x`
-API; v3 changed the public API surface — see
-[MIGRATION.md, "2.x → 3.x"](./MIGRATION.md#2x--3x). The full v3 matrix lives in
+`0.45.x` is **not** accepted by v3. **This README documents the `3.x` API.** If
+you are on `2.1.x`, the upgrade path is
+[MIGRATION.md, "2.x → 3.x"](./MIGRATION.md#2x--3x); the full v3 matrix lives in
 [`docs/v3/versions.md`](./docs/v3/versions.md).
 
 ## Adapters
@@ -59,13 +59,14 @@ API; v3 changed the public API surface — see
 | Drizzle | ✅ Stable | `nestjs-rest-query/drizzle` |
 | Prisma  | ✅ Stable | `nestjs-rest-query/prisma`  |
 
-> Development note: v3 is a prerelease effort with a different public API — the
-> three adapters share one semantic core, and the adapter is chosen by the
-> source rather than by `forRoot`. Stable `3.0.0` remains blocked on the full
-> ORM × database matrix, Drizzle 1.x GA/MSSQL support, a generated Prisma
-> manifest, and package-consumer smoke tests. State per cell:
-> [`docs/v3/status.md`](./docs/v3/status.md). Upgrade path:
-> [MIGRATION.md](./MIGRATION.md#2x--3x).
+> The three adapters share one semantic core and answer the same 74-case parity
+> corpus against PostgreSQL, MySQL and SQL Server — nine cells, no skips. The
+> adapter is chosen by the **source** you pass to `execute()`, not by `forRoot`.
+>
+> `3.x` is still a prerelease: stable `3.0.0` waits on external validation of the
+> alpha, and `drizzle-orm` 1.x is pinned to the RC line because MSSQL support
+> lives there. Per-cell state and declared gaps:
+> [`docs/v3/status.md`](./docs/v3/status.md).
 
 Want a different ORM? [Open a discussion](https://github.com/naldomadeira/nestjs-rest-query/discussions).
 
@@ -81,41 +82,18 @@ Peer dependencies: `@nestjs/common`, `@nestjs/core`, `reflect-metadata`. Optiona
 
 ### Choose your ORM
 
-In `2.x`, the adapter is a `forRoot` option:
+`forRoot` configures common policy only. There is no `adapter` option and no
+implicit default — the adapter is decided per call, by the **source** you hand
+to `execute()`:
 
 ```typescript
-// TypeORM (default)
-import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
-
-DynamicQueryBuilderModule.forRoot({});
-
-// Drizzle
-import { DrizzleAdapter } from 'nestjs-rest-query/drizzle';
-
-DynamicQueryBuilderModule.forRoot({
-  adapter: new DrizzleAdapter(),
-});
-
-// Prisma
-import { PrismaAdapter } from 'nestjs-rest-query/prisma';
-
-DynamicQueryBuilderModule.forRoot({
-  adapter: new PrismaAdapter(),
-});
-```
-
-In `3.x` this call is **rejected at startup**: `forRoot` no longer accepts
-`adapter`, and the root package exports no adapter classes. The adapter is
-decided per call, by the source you hand to `execute()`:
-
-```typescript
-// 3.x — forRoot only configures common policy
 DynamicQueryBuilderModule.forRoot({
   pagination: { defaultPerPage: 10, maxPerPage: 100 },
   textProfile: 'portable-strict',
 });
 
-// ...and the adapter comes from the source
+// The adapter comes from the source, imported from its own subpath.
+// The root package loads no ORM peer at all.
 import { typeormSource } from 'nestjs-rest-query/typeorm';
 // or: drizzleSource from 'nestjs-rest-query/drizzle'
 // or: prismaSource  from 'nestjs-rest-query/prisma'
@@ -123,14 +101,16 @@ import { typeormSource } from 'nestjs-rest-query/typeorm';
 await this.qb.execute(typeormSource(this.users), query, rules);
 ```
 
-See [Adapters](/docs/adapters) for more.
+Coming from `2.x`, where the adapter was a `forRoot` option? Passing `adapter`
+or `operators` is now **rejected at startup** with
+`SOURCE_CONFIGURATION_INVALID`. See
+[MIGRATION.md](./MIGRATION.md#2x--3x).
 
 ## Quick start
 
-> This walkthrough is the `2.x` API. On `3.x`, rules are built with
-> `defineQuerySchema` + `defineQueryRules` and `execute()` takes a source —
-> see [MIGRATION.md](./MIGRATION.md#2x--3x) and the migrated apps under
-> [`apps/examples/`](./apps/examples/).
+> Four runnable versions of this walkthrough — TypeORM, Postgres, Drizzle and
+> Prisma — live under [`apps/examples/`](./apps/examples/). They compile in
+> `strict` and are smoke-tested in CI against real databases.
 
 ### 1. Register the module
 
@@ -151,6 +131,72 @@ export class AppModule {}
 
 ### 2. Declare rules and use the decorator
 
+There are two declarations, and the split is the point: the **schema** says
+what the model _is_; the **rules** say what _this endpoint_ authorizes. The same
+schema serves endpoints with different authorizations.
+
+```typescript
+// users.query.ts
+import {
+  defineQuerySchema,
+  defineQueryRules,
+  type SchemaRegistry,
+} from 'nestjs-rest-query';
+
+const userSchema = defineQuerySchema({
+  model: 'user',
+  primaryKey: ['id'],
+  fields: [
+    { path: 'id', kind: 'integer', nullable: false, primaryKey: true },
+    // `foldedField` is what makes `ilike` and `search` portable — see below.
+    {
+      path: 'name',
+      kind: 'string',
+      nullable: false,
+      primaryKey: false,
+      foldedField: 'name_folded',
+    },
+    {
+      path: 'name_folded',
+      kind: 'string',
+      nullable: false,
+      primaryKey: false,
+      internal: true,
+    },
+    { path: 'email', kind: 'string', nullable: false, primaryKey: false },
+    { path: 'createdAt', kind: 'datetime', nullable: false, primaryKey: false },
+  ],
+  relations: [
+    { path: 'company', target: 'company', cardinality: 'one', nullable: true },
+  ],
+});
+
+// The registry must hold every model reachable from the root — `company` is
+// declared the same way, in its own `defineQuerySchema` call.
+const SCHEMAS: SchemaRegistry = new Map([
+  ['user', userSchema],
+  ['company', companySchema],
+]);
+
+// Compiled and validated here, at startup — not on the first request.
+export const userRules = defineQueryRules(SCHEMAS, 'user', {
+  filters: [
+    { path: 'email', operators: ['eq', 'ilike'] },
+    { path: 'createdAt', operators: ['gte', 'lte', 'between'] },
+    { path: 'company.name', operators: ['eq'] },
+  ],
+  sorts: ['name', 'createdAt'],
+  fields: {
+    root: { allowed: ['id', 'name', 'email'], default: ['id', 'name'] },
+    relations: {
+      company: { allowed: ['id', 'name'], default: ['id', 'name'] },
+    },
+  },
+  includes: ['company'],
+  search: ['name'],
+});
+```
+
 ```typescript
 // users.controller.ts
 import { Controller, Get, Query } from '@nestjs/common';
@@ -160,19 +206,13 @@ import {
   ApiDynamicQuery,
   QueryRules,
   QueryBuilderService,
-  RulesConfig,
-  QueryInput,
+  DynamicQueryDto,
+  type CompiledQueryRules,
+  type NormalizedQueryResult,
 } from 'nestjs-rest-query';
+import { typeormSource } from 'nestjs-rest-query/typeorm';
 import { User } from './user.entity';
-
-const rules: RulesConfig = {
-  alias: 'user',
-  filters: ['email', 'name', 'createdAt', 'status'],
-  sorts: ['name', 'createdAt'],
-  fields: ['id', 'name', 'email'],
-  includes: ['company'],
-  search: ['name', 'email'],
-};
+import { userRules } from './users.query';
 
 @Controller('users')
 export class UsersController {
@@ -182,19 +222,26 @@ export class UsersController {
   ) {}
 
   @Get()
-  @ApiDynamicQuery(rules)
-  list(@Query() query: QueryInput, @QueryRules() endpointRules = rules) {
-    return this.qb.execute(this.users, query, endpointRules);
+  @ApiDynamicQuery(userRules)
+  list(
+    @Query() query: DynamicQueryDto,
+    @QueryRules() rules: CompiledQueryRules
+  ): Promise<NormalizedQueryResult<User>> {
+    return this.qb.execute(typeormSource(this.users), query, rules);
   }
 }
 ```
+
+A bad path, a default outside `allowed`, an operator the field type cannot
+support, or an ambiguous sort fails while `defineQueryRules` runs — so the
+application refuses to boot instead of returning a wrong page later.
 
 ### 3. Send a request
 
 ```http
 GET /users
-  ?filter[email][ilike]=%@acme.com
-  &filter[createdAt][gte]=2025-01-01
+  ?filter[email][ilike]=acme.com
+  &filter[createdAt][gte]=2025-01-01T00:00:00Z
   &sort=-createdAt,name
   &includes=company
   &fields=id,name,email
@@ -202,6 +249,15 @@ GET /users
   &page=1
   &perPage=20
 ```
+
+Two things that differ from `2.x` and bite quietly:
+
+- **`%` and `_` are literal.** `ilike=acme.com` already means "contains"; writing
+  `%@acme.com` would search for a name containing a percent sign.
+- **The grammar is those eight parameters and nothing else.** A ninth key —
+  `?utm_source=`, a cache-buster, a `?lang=` your middleware appends — is
+  `400 QUERY_SYNTAX_UNKNOWN_PARAM`, not silently dropped. Pass the subset, which
+  is what `@Query() query: DynamicQueryDto` already hands you.
 
 ### 4. Get a typed response
 
@@ -228,31 +284,56 @@ That's the whole loop.
 
 All operators target a whitelisted column and use the `filter[<column>][<operator>]=<value>` syntax.
 
-| Operator     | Example                                            | SQL equivalent                  |
-| ------------ | -------------------------------------------------- | ------------------------------- |
-| `eq`         | `filter[status][eq]=active`                        | `status = 'active'`             |
-| `ne`         | `filter[status][ne]=archived`                      | `status <> 'archived'`          |
-| `gt` / `gte` | `filter[age][gte]=18`                              | `age >= 18`                     |
-| `lt` / `lte` | `filter[price][lt]=100`                            | `price < 100`                   |
-| `like`       | `filter[name][like]=%souza%`                       | `name LIKE '%souza%'`           |
-| `ilike`      | `filter[email][ilike]=%@acme.com`                  | `email ILIKE '%@acme.com'`      |
-| `notLike`    | `filter[name][notLike]=%spam%`                     | `name NOT LIKE '%spam%'`        |
-| `notIlike`   | `filter[email][notIlike]=%@spam.io`                | `email NOT ILIKE '%@spam.io'`   |
-| `in`         | `filter[role][in]=admin,editor`                    | `role IN ('admin','editor')`    |
-| `notIn`      | `filter[role][notIn]=guest`                        | `role NOT IN ('guest')`         |
-| `between`    | `filter[createdAt][between]=2025-01-01,2025-12-31` | `createdAt BETWEEN ... AND ...` |
-| `isNull`     | `filter[deletedAt][isNull]=true`                   | `deletedAt IS NULL`             |
+| Operator     | Example                                            | Meaning                                    |
+| ------------ | -------------------------------------------------- | ------------------------------------------ |
+| `eq`         | `filter[status][eq]=active`                        | `status = 'active'`                        |
+| `ne`         | `filter[status][ne]=archived`                      | `status <> 'archived'`                     |
+| `gt` / `gte` | `filter[age][gte]=18`                              | `age >= 18`                                |
+| `lt` / `lte` | `filter[price][lt]=100`                            | `price < 100`                              |
+| `like`       | `filter[name][like]=souza`                         | contains the literal text `souza`          |
+| `notLike`    | `filter[name][notLike]=spam`                       | does not contain `spam`                    |
+| `ilike`      | `filter[email][ilike]=acme.com`                    | contains, case-insensitive (folded column) |
+| `notIlike`   | `filter[email][notIlike]=spam.io`                  | does not contain, case-insensitive         |
+| `in`         | `filter[role][in]=admin,editor`                    | `role IN ('admin','editor')`               |
+| `notIn`      | `filter[role][notIn]=guest`                        | `role NOT IN ('guest')`                    |
+| `between`    | `filter[createdAt][between]=2025-01-01,2025-12-31` | inclusive range; exactly two values        |
+| `isNull`     | `filter[deletedAt][isNull]=true`                   | `deletedAt IS NULL`                        |
 
-Restrict the available operators globally via `forRoot({ operators: { allowed: ['eq', 'in', 'gte'] } })`, or per endpoint with `RulesConfig.operators`.
+**Patterns are literal.** `%`, `_` and `\` match themselves; the library picks
+and escapes the escape character per dialect. `in=[]` compiles to an
+always-false condition (zero rows), and `notIn=[]` to an always-true one.
+
+**Operators are declared per field**, in the endpoint rules — there is no global
+list:
 
 ```typescript
-const rules: RulesConfig = {
-  filters: ['name', 'status'],
-  operators: { allowed: ['eq', 'ilike'] },
-};
+defineQueryRules(SCHEMAS, 'user', {
+  filters: [
+    { path: 'name', operators: ['eq', 'ilike'] },
+    { path: 'status', operators: ['eq', 'in'] },
+  ],
+  // ...
+});
 ```
 
-Endpoint rules take precedence over the global `forRoot` setting. Use `operators: {}` on a route to reset that route to all operators allowed.
+An operator the field's type cannot support is refused when the rules are
+compiled, not when a request arrives.
+
+### Case-insensitive search is portable, and costs a column
+
+Under the default `portable-strict` profile, `ilike`, `notIlike` and `search`
+query a hidden **folded column** declared as `foldedField`, compared literally.
+No `ILIKE`, no `mode: 'insensitive'`, no dependence on server collation — which
+is what lets Prisma on MySQL and SQL Server return the same rows as TypeORM on
+PostgreSQL.
+
+Your application fills that column on write, with the exported helper:
+
+```typescript
+import { foldText } from 'nestjs-rest-query';
+
+user.name_folded = foldText(user.name); // value.normalize('NFC').toLowerCase()
+```
 
 ## Sorting, fields, includes, search, pagination
 
@@ -264,7 +345,13 @@ Endpoint rules take precedence over the global `forRoot` setting. Use `operators
 ?page=2&perPage=50              # offset/limit
 ```
 
-Anything not declared in `RulesConfig` is rejected with `400 Bad Request` for filters, sorts, and includes — clients can't sort by `password_hash` even if they try. Field selection stays restricted to the declared `fields` list.
+Anything not declared in the compiled rules is rejected with `400 Bad Request`
+for filters, sorts and includes — clients can't sort by `password_hash` even if
+they try, and field selection stays inside the declared `fields` list.
+
+**Paths are exact.** Authorizing `company` does _not_ authorize `company.name`;
+declare each one. If you are migrating from `2.x`, review every whitelist — the
+old prefix matching may have been exposing more than you intended.
 
 ## Swagger / OpenAPI
 
@@ -290,24 +377,28 @@ DynamicQueryBuilderModule.forRoot({
     defaultPerPage: 10,
     maxPerPage: 100,
   },
-  operators: {
-    allowed: ['eq', 'ne', 'in', 'notIn', 'gte', 'lte', 'ilike'],
-  },
+  textProfile: 'portable-strict',
+  consistency: 'eventual',
   logging: {
     enabled: true,
     level: 'info',
-    format: 'json', // or 'console'
+    redactValues: true,
   },
 });
 ```
 
-All fields are optional. Sane defaults apply.
+All fields are optional; the values above are the defaults, except `logging`,
+which is off. `maxPerPage` is an upper bound, not a silent clamp: a larger
+`perPage` is a `400`.
+
+`adapter` and `operators` are **refused at startup** — the first is decided by
+the source, the second by the endpoint rules.
 
 ## Security model
 
 Whitelist-first is the primary defense. Consumers should still:
 
-- Keep `RulesConfig` minimal — least privilege.
+- Keep the endpoint rules minimal — least privilege, and paths are exact.
 - Never expose internal columns (`password_hash`, internal flags) in `fields` or `sorts`.
 - Layer auth/authz (NestJS guards) above the query.
 - Enforce tenant scoping in the controller before calling `execute()`.
@@ -316,14 +407,34 @@ See [SECURITY.md](./SECURITY.md) for vulnerability reporting.
 
 ## API surface
 
-| Export                                        | Purpose                                              |
-| --------------------------------------------- | ---------------------------------------------------- |
-| `DynamicQueryBuilderModule`                   | The dynamic module — call `.forRoot(config)`.        |
-| `QueryBuilderService`                         | `buildQuery(repo, query, rules)` and `execute(...)`. |
-| `@DynamicQuery(rules)`                        | Stores rules in metadata.                            |
-| `@ApiDynamicQuery(rules)`                     | Same + Swagger decorators.                           |
-| `@QueryRules()`                               | Parameter decorator — injects rules at runtime.      |
-| `RulesConfig`, `QueryInput`, `QueryResult<T>` | Public types.                                        |
+| Export                                                    | Purpose                                                  |
+| --------------------------------------------------------- | -------------------------------------------------------- |
+| `DynamicQueryBuilderModule`                               | The dynamic module — call `.forRoot(config)`.            |
+| `QueryBuilderService`                                     | `execute(source, query, rules, options?)`.               |
+| `defineQuerySchema`                                       | Declares what a model is; returns a `QuerySchema`.       |
+| `defineQueryRules`                                        | Compiles and validates an endpoint whitelist at startup. |
+| `foldText`                                                | Fills folded columns on write: `NFC` + lowercase.        |
+| `@DynamicQuery(rules)` / `@ApiDynamicQuery(rules)`        | Store rules in metadata; the second adds Swagger.        |
+| `@QueryRules()`                                           | Parameter decorator — injects the compiled rules.        |
+| `RestQueryError`, `RestQueryErrorCode`, `toHttpException` | The error envelope and its stable codes.                 |
+| `DynamicQueryDto`                                         | The eight-parameter grammar, as a DTO.                   |
+| `CompiledQueryRules`, `NormalizedQueryResult<T>`          | Public types.                                            |
+
+Adapters live in their own subpaths and are the only exports that load an ORM
+peer: `typeormSource` and `buildSchemaRegistry` from `nestjs-rest-query/typeorm`,
+`prismaSource` from `/prisma`, `drizzleSource` and `drizzleDatabase` from
+`/drizzle`.
+
+Errors carry a machine-readable `code` — branch on that, never on the message:
+
+```jsonc
+{
+  "statusCode": 400,
+  "code": "FIELD_NOT_ALLOWED",
+  "message": "filter path is not allowed: secret",
+  "details": { "path": "secret" },
+}
+```
 
 ## Try a PR before it ships
 
