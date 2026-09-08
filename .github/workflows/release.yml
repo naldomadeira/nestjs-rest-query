@@ -33,6 +33,18 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # O token que abre a PR de release decide se ela nasce testável.
+      #
+      # Com o `GITHUB_TOKEN`, a PR é criada pelo `github-actions[bot]` e os
+      # workflows dela ficam em `action_required` esperando aprovação manual.
+      # Como `test (22)`, `test (24)` e `pack-check` são checks obrigatórios em
+      # `main`, a PR fica `BLOCKED` até alguém entrar no Actions e aprovar —
+      # em toda release, e sem nada na interface dizendo por quê.
+      #
+      # Um PAT em `RELEASE_PAT` (escopos `repo` e `workflow`) evita isso: a PR
+      # nasce como o usuário e dispara CI sozinha. O `||` mantém o workflow
+      # funcionando sem o secret, que é como ele está hoje — sem PAT o
+      # comportamento é o atual, incluindo a aprovação manual.
       - uses: changesets/action@v1
         with:
           publish: pnpm run release
@@ -40,4 +52,4 @@ jobs:
           commit: 'chore: release'
           title: 'chore: release'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
