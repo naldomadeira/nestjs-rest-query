@@ -64,8 +64,8 @@ you are on `2.1.x`, the upgrade path is
 > adapter is chosen by the **source** you pass to `execute()`, not by `forRoot`.
 >
 > `3.x` is still a prerelease: `3.0.0-alpha.0` is on npm under the `alpha` tag,
-> and stable `3.0.0` waits on external validation of that alpha and on a
-> security scan dated over v3 code. The `drizzle-orm` peer is
+> and stable `3.0.0` waits on one thing only — external validation of that alpha
+> by a consumer outside this repo. The `drizzle-orm` peer is
 > closed on the release candidates the matrix measured, so the `1.0.0` GA cannot
 > satisfy it until a release of ours re-runs the nine cells — that is a
 > deliberate refusal, not a missing feature

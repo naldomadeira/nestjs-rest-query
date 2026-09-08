@@ -1,17 +1,16 @@
 # Estado da v3
 
 **Versão-alvo:** `3.0.0` · **Última medição:** 2026-09-04 (Node v24.15.0) ·
-**Stack em `main` desde:** 2026-09-05 · **Prerelease no npm:**
+**Stack em `main` desde:** 2026-09-08 · **Prerelease no npm:**
 `3.0.0-alpha.0`, tag `alpha`, 2026-09-08
 
-> A `3.0.0` estável está a **dois gates** de sair, e nenhum dos dois é
-> trabalho nosso: a matriz de paridade fechou verde nas nove células com 74
-> casos cada, a fase 7 terminou, o stack da v3 aterrissou em `main` e o
-> `3.0.0-alpha.0` **está publicado** sob a tag `alpha` — a `latest` segue na
-> `2.1.0` de propósito. O que resta é (1) a varredura de segurança correr
-> contra `main` e ser datada aqui, agora que `main` tem código v3, e (2) a
-> validação do alpha por um consumidor de fora, que só quem está fora pode
-> fazer. A lista está no fim.
+> A `3.0.0` estável está a **um gate** de sair, e ele não é trabalho nosso: a
+> matriz de paridade fechou verde nas nove células com 74 casos cada, a fase 7
+> terminou, o stack da v3 aterrissou em `main`, a varredura de segurança correu
+> sobre código v3 e passou, e o `3.0.0-alpha.0` **está publicado** sob a tag
+> `alpha` — a `latest` segue na `2.1.0` de propósito. O que resta é a validação
+> do alpha por um consumidor de fora, que só quem está fora pode fazer. A lista
+> está no fim.
 
 Esta página descreve o que existe e o que falta. O
 [design aprovado](../superpowers/specs/2026-09-03-v3-paridade-orm-bancos-design.md)
@@ -134,20 +133,20 @@ novos do corpus medem isso **sem** exceção declarada.
 
 ## Gates da `3.0.0` (§23)
 
-| Gate                                            | Estado                                                                                                                   |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Nove combinações reais verdes, sem skips        | **sim** — 74 casos por célula, `assert-no-skips` em todas, medido em 2026-09-04                                          |
-| Peer do Drizzle fechado nos RCs medidos         | sim — `>=1.0.0-rc.4 <1.0.0`                                                                                              |
-| Nenhum cast no uso público documentado          | sim — provado pelos quatro exemplos em `strict`, que foi o que o achou                                                   |
-| Nenhum peer opcional carregado pelo core        | sim — provado por consumer fixture                                                                                       |
-| Exemplos compilam e passam smoke E2E            | **sim** — 61 testes E2E, job `examples` na CI                                                                            |
-| Códigos de erro e JSON canônico idênticos       | sim — mesmo runner e mesmas expectativas nas nove células                                                                |
-| Cobertura de branches críticos acima de 95%     | **sim** — três adapters em 100%, com piso por área no `jest.config.ts`                                                   |
-| Nenhum achado de segurança alto ou crítico      | **datável agora, ainda não datado** — a v3 está em `main` desde 2026-09-05, então CodeQL e Scorecard já varrem código v3 |
-| Benchmarks dentro do orçamento                  | **sim, datado** — ver abaixo                                                                                             |
-| Migration guide validado num consumidor v2 real | **sim** — três consumidores, 32 furos achados e corrigidos                                                               |
-| Matriz pública de versões coincide com a CI     | sim — `versions.md`, comparada ao workflow por teste                                                                     |
-| Profiles de banco passam nos checks             | sim — collector em `src/`, incluindo o fuso do cliente por sonda                                                         |
+| Gate                                            | Estado                                                                                        |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Nove combinações reais verdes, sem skips        | **sim** — 74 casos por célula, `assert-no-skips` em todas, medido em 2026-09-04               |
+| Peer do Drizzle fechado nos RCs medidos         | sim — `>=1.0.0-rc.4 <1.0.0`                                                                   |
+| Nenhum cast no uso público documentado          | sim — provado pelos quatro exemplos em `strict`, que foi o que o achou                        |
+| Nenhum peer opcional carregado pelo core        | sim — provado por consumer fixture                                                            |
+| Exemplos compilam e passam smoke E2E            | **sim** — 61 testes E2E, job `examples` na CI                                                 |
+| Códigos de erro e JSON canônico idênticos       | sim — mesmo runner e mesmas expectativas nas nove células                                     |
+| Cobertura de branches críticos acima de 95%     | **sim** — três adapters em 100%, com piso por área no `jest.config.ts`                        |
+| Nenhum achado de segurança alto ou crítico      | **sim, datado** — CodeQL e Scorecard verdes sobre código v3 em `main` (`a46d211`), 2026-09-08 |
+| Benchmarks dentro do orçamento                  | **sim, datado** — ver abaixo                                                                  |
+| Migration guide validado num consumidor v2 real | **sim** — três consumidores, 32 furos achados e corrigidos                                    |
+| Matriz pública de versões coincide com a CI     | sim — `versions.md`, comparada ao workflow por teste                                          |
+| Profiles de banco passam nos checks             | sim — collector em `src/`, incluindo o fuso do cliente por sonda                              |
 
 ### Benchmark (§18.4), datado
 
@@ -197,8 +196,7 @@ nada.
 
 ## Bloqueadores e pendências nomeadas
 
-O que sobrou depois do PR5 — e os dois primeiros são os únicos que impedem a
-`3.0.0` de sair.
+O que sobrou depois do PR5 — e só o primeiro impede a `3.0.0` de sair.
 
 1. **Validar o `3.0.0-alpha.0` num consumidor de fora.** O alpha saiu em
    2026-09-08 sob a tag `alpha` (release `6adf0ac`), então o que bloqueava —
@@ -207,34 +205,28 @@ O que sobrou depois do PR5 — e os dois primeiros são os únicos que impedem a
    num projeto v2 de terceiro, só podem ser provados por alguém de fora; é isso
    que o alpha existe para provocar antes de um rc. A `latest` continua na
    `2.1.0`, então quem instalar sem a tag não recebe a v3.
-2. **O gate de segurança está desbloqueado, mas não datado.** Era ele que
-   dependia do stack aterrissar: até 2026-09-04, CodeQL e Scorecard varriam um
-   `main` sem uma linha da v3, e datar aquela varredura seria pendurar num gate
-   da `3.0.0` o resultado de uma varredura de código v2. Desde 2026-09-05 a v3
-   está em `main`, então a próxima varredura já mede o código certo — falta
-   correr e datar o resultado aqui.
-3. **Coleção aninhada sob outra relação no Drizzle** falha fechado.
-4. **`decimal(38,6)` não passa como parâmetro vinculado no tedious.** O
+2. **Coleção aninhada sob outra relação no Drizzle** falha fechado.
+3. **`decimal(38,6)` não passa como parâmetro vinculado no tedious.** O
    `Decimal` do tedious 20 faz `parseFloat` na validação e `writeUInt64LE`
    depois, então os 8 bytes altos da forma de 16 saem zerados. O seed contorna
    com literal SQL; um consumidor que grave decimal de alta precisão em SQL
    Server pelo TypeORM encontra o mesmo teto.
-5. **Operadores de padrão do Prisma em SQLite e SQL Server** são recusados. É
+4. **Operadores de padrão do Prisma em SQLite e SQL Server** são recusados. É
    decisão declarada (ADR-001, emenda 2), não pendência.
-6. **Citação de identificadores é inconsistente no adapter TypeORM.** Só os da
+5. **Citação de identificadores é inconsistente no adapter TypeORM.** Só os da
    tabela de junção passam pelo `escape` do driver, porque a naming strategy os
    gera em camelCase e sem aspas o PostgreSQL os dobraria. O resto do
    compilador emite identificador cru. Funciona hoje porque os demais nomes vêm
    do consumidor, que os escolhe compatíveis; uniformizar é decisão maior que a
    emenda que criou o caso.
-7. **`reorderByKeys` é rede, não mecanismo.** A ordem da paginação em duas fases
+6. **`reorderByKeys` é rede, não mecanismo.** A ordem da paginação em duas fases
    é imposta pelo `ORDER BY` que o clone de hidratação herda do plano; a
    reordenação em memória só casa chave crua com chave hidratada quando as duas
    representações coincidem, o que não acontece para PK `datetime` ou binária
    (`getRawMany` devolve o valor do driver, `getMany` devolve `Date`). Hoje é
    benigno e `composite-pagination.spec.ts` trava a ordem observável; deixa de
    ser no dia em que algo puder remover o `ORDER BY` da hidratação.
-8. **`dynamic-query-builder.module.ts` não é medido por cobertura.** O
+7. **`dynamic-query-builder.module.ts` não é medido por cobertura.** O
    `coveragePathIgnorePatterns` exclui `.module.ts$`, e as duas guardas novas do
    `forRoot` — as que recusam `database-native` e `transactional` — são testadas
    sem serem medidas. É o mesmo "parece medido" que `src/contracts` tinha, e a
