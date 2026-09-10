@@ -36,7 +36,7 @@ jobs:
         dialect: ${{ github.event_name == 'pull_request' && fromJSON('["postgres"]') || fromJSON('["postgres","mysql","mssql"]') }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v6
 
