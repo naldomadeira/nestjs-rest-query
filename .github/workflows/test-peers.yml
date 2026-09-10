@@ -19,7 +19,7 @@ jobs:
         typeorm: ['0.3.26', '0.3.27', 'latest']
         # 1.x entra quando a linha estabilizar (spec §6.1).
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -39,7 +39,7 @@ jobs:
         # quando tiver suíte própria, como manda o spec §6.1.
         nestjs: ['11.0.0', '11.x']
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
