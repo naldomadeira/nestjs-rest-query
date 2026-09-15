@@ -31,16 +31,36 @@ Serve como guia operacional para criar endpoints dinâmicos com filtros, ordena�
 
 ## Instalação da skill
 
-Baixe o `.zip` em https://naldomadeira.github.io/nestjs-rest-query/skills ou clone o diretório direto do GitHub:
+O GitHub não oferece download de subdiretório pela interface, então a pasta
+`skills/nestjs-rest-query` não tem um botão de "baixar" na página do repo.
+Use um dos três caminhos abaixo.
+
+**Direto do repositório, sem clonar** (extrai só esta pasta do tarball do
+branch):
 
 ```bash
-# Para Claude Code (escopo global)
-mkdir -p ~/.claude/skills
-cp -r skills/nestjs-rest-query ~/.claude/skills/
+mkdir -p ~/.claude/skills && \
+  curl -fsSL https://github.com/naldomadeira/nestjs-rest-query/archive/refs/heads/main.tar.gz | \
+  tar -xz --strip-components=2 -C ~/.claude/skills \
+  nestjs-rest-query-main/skills/nestjs-rest-query
+```
 
-# Para Claude Code (escopo do projeto)
-mkdir -p .claude/skills
-cp -r skills/nestjs-rest-query .claude/skills/
+Troque `~/.claude/skills` por `.claude/skills` para instalar no escopo do
+projeto.
+
+**Pelo `.zip` publicado**, na release mais recente ou na página de skills:
+
+- https://github.com/naldomadeira/nestjs-rest-query/releases/latest/download/nestjs-rest-query-skill.zip
+- https://naldomadeira.github.io/nestjs-rest-query/skills
+
+**Se você já tem o repo clonado**, é só copiar a pasta:
+
+```bash
+# escopo global
+mkdir -p ~/.claude/skills && cp -r skills/nestjs-rest-query ~/.claude/skills/
+
+# escopo do projeto
+mkdir -p .claude/skills && cp -r skills/nestjs-rest-query .claude/skills/
 ```
 
 A frontmatter de `SKILL.md` define automaticamente quando o agente deve ativá-la.

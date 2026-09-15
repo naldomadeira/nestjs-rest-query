@@ -32,6 +32,9 @@ const MANIFEST_OUT = join(DOCS_ROOT, 'lib', 'skills-manifest.generated.json');
 
 const GITHUB_REPO = 'naldomadeira/nestjs-rest-query';
 const GITHUB_BRANCH = 'main';
+// O tarball do GitHub desempacota como `<repo>-<ref>/`, e o comando de
+// instalacao depende dessa raiz para acertar o `--strip-components`.
+const REPO_NAME = GITHUB_REPO.split('/')[1];
 
 function parseFrontmatter(content) {
   if (!content.startsWith('---\n')) return {};
@@ -118,6 +121,14 @@ function buildSkill({ id, path }) {
     author: registry.author ?? null,
     downloadUrl: `/skills/${zipName}`,
     githubUrl: `https://github.com/${GITHUB_REPO}/tree/${GITHUB_BRANCH}/skills/${id}`,
+    // O GitHub nao deixa baixar um subdiretorio pela UI, entao o caminho
+    // "direto do repo" e extrair so essa pasta do tarball do branch.
+    installCommand: [
+      'mkdir -p ~/.claude/skills && \\',
+      `  curl -fsSL https://github.com/${GITHUB_REPO}/archive/refs/heads/${GITHUB_BRANCH}.tar.gz | \\`,
+      `  tar -xz --strip-components=2 -C ~/.claude/skills \\`,
+      `  ${REPO_NAME}-${GITHUB_BRANCH}/skills/${id}`,
+    ].join('\n'),
   };
 }
 

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Download, ExternalLink, Sparkles } from 'lucide-react';
 
+import { resolveDocsAssetPath } from '@/lib/asset-path';
 import { getDictionary, type Locale } from '@/lib/i18n';
 import { skills } from '@/lib/skills';
 
@@ -74,7 +75,7 @@ export const SkillsPageContent = ({ locale }: SkillsPageContentProps) => {
 
               <div className="mt-auto flex flex-wrap gap-2 pt-2">
                 <a
-                  href={skill.downloadUrl}
+                  href={resolveDocsAssetPath(skill.downloadUrl)}
                   download
                   className="inline-flex items-center gap-1.5 rounded-md bg-fd-primary px-3 py-1.5 text-sm font-medium text-fd-primary-foreground transition-opacity hover:opacity-90"
                 >
@@ -90,6 +91,15 @@ export const SkillsPageContent = ({ locale }: SkillsPageContentProps) => {
                   <ExternalLink className="size-4" />
                   {t.skills.viewOnGitHub}
                 </Link>
+              </div>
+
+              <div className="min-w-0">
+                <p className="mb-1.5 text-xs font-medium text-fd-muted-foreground">
+                  {t.skills.installFromTerminal}
+                </p>
+                <pre className="overflow-x-auto rounded-md border border-fd-border bg-fd-muted/40 p-3 text-[13.5px] leading-relaxed">
+                  <code>{skill.installCommand}</code>
+                </pre>
               </div>
             </li>
           ))}

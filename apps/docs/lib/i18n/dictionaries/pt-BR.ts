@@ -153,6 +153,7 @@ export class AppModule {}`,
     empty: 'Nenhuma skill disponível ainda.',
     download: 'Baixar .zip',
     viewOnGitHub: 'Ver no GitHub',
+    installFromTerminal: 'Ou instale direto do repositório:',
     howToUseTitle: 'Como usar uma skill',
     howToUseSteps: [
       'Baixe o .zip da skill desejada.',

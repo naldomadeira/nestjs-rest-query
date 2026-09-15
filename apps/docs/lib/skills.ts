@@ -10,6 +10,7 @@ export type Skill = {
   readonly author: string | null;
   readonly downloadUrl: string;
   readonly githubUrl: string;
+  readonly installCommand: string;
 };
 
 type SkillsManifest = {

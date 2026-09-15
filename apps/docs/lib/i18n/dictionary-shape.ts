@@ -63,6 +63,7 @@ export type Dictionary = {
     empty: string;
     download: string;
     viewOnGitHub: string;
+    installFromTerminal: string;
     howToUseTitle: string;
     howToUseSteps: readonly [string, string, string];
   };

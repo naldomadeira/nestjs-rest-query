@@ -55,7 +55,8 @@ jobs:
       # workflow. Se um PAT for mesmo criado, fine-grained neste repo com
       # `Contents: write` e `Pull requests: write` basta — `workflow` não, porque
       # a PR de release só toca `package.json`, `CHANGELOG.md` e `.changeset/`.
-      - uses: changesets/action@v1
+      - id: changesets
+        uses: changesets/action@v1
         with:
           publish: pnpm run release
           version: pnpm run version
@@ -63,3 +64,26 @@ jobs:
           title: 'chore: release'
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
+
+      # `skills/` e uma pasta do repo, e o GitHub nao oferece download de
+      # subdiretorio pela interface — a pagina `/tree/main/skills/...` nao tem
+      # botao nenhum. Anexar o zip a release da um link estavel
+      # (`/releases/latest/download/nestjs-rest-query-skill.zip`) que nao
+      # depende do site de docs estar no ar.
+      #
+      # O zip e empacotado a partir de `skills/` para que ele extraia como
+      # `nestjs-rest-query/...`, que e exatamente o formato que
+      # `~/.claude/skills/` espera. O conteudo e o da skill no commit que
+      # gerou a release; o escopo de versao da biblioteca (2.x vs 3.x) esta
+      # declarado no proprio `SKILL.md`, nao no nome do asset.
+      - name: Attach the agent skill to the release
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISHED_PACKAGES: ${{ steps.changesets.outputs.publishedPackages }}
+        run: |
+          set -euo pipefail
+          tag="$(jq -r '.[0] | "\(.name)@\(.version)"' <<<"$PUBLISHED_PACKAGES")"
+          zip_path="$RUNNER_TEMP/nestjs-rest-query-skill.zip"
+          (cd skills && zip -rq "$zip_path" nestjs-rest-query)
+          gh release upload "$tag" "$zip_path" --clobber
