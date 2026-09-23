@@ -1,15 +1,18 @@
 # Estado da v3
 
-**Versão-alvo:** `3.0.0` · **Última medição:** 2026-09-04 (Node v24.15.0) ·
+**Versão-alvo:** `3.0.0` · **Última medição:** 2026-09-23 (Node v24.15.0) ·
 **Stack em `main` desde:** 2026-09-08 · **Prerelease no npm:**
 `3.0.0-alpha.0`, tag `alpha`, 2026-09-08
 
-> A `3.0.0` estável está a **um gate** de sair, e ele não é trabalho nosso: a
-> matriz de paridade fechou verde nas nove células com 74 casos cada, a fase 7
-> terminou, o stack da v3 aterrissou em `main`, a varredura de segurança correu
-> sobre código v3 e passou, e o `3.0.0-alpha.0` **está publicado** sob a tag
-> `alpha` — a `latest` segue na `2.1.0` de propósito. O que resta é a validação
-> do alpha por um consumidor de fora, que só quem está fora pode fazer. A lista
+> A `3.0.0` estável **não** está pronta. O `3.0.0-alpha.0` está publicado sob a
+> tag `alpha` (a `latest` segue na `2.1.0` de propósito) e foi validado por um
+> consumidor de fora em 2026-09-23 — NestJS 11 + `@nestjs/typeorm` 11 + TypeORM
+> 0.3 + PostgreSQL + `ValidationPipe({ whitelist: true })` + Swagger UI. A
+> validação achou sete defeitos; quatro estão corrigidos para o próximo
+> prerelease, três seguem abertos, e um deles (#4) bloqueia a `3.0.0`. Ver
+> [o que a validação externa encontrou](#o-que-a-validação-externa-encontrou).
+> A matriz de paridade segue verde nas nove células, agora com 84 casos de
+> corpus por célula. A lista
 > está no fim.
 
 Esta página descreve o que existe e o que falta. O
@@ -47,16 +50,16 @@ qualquer par delas é a forma mais fácil de superestimar o estado:
 | 3    | TypeORM de referência | **completa** | corpus verde em SQLite e nas três células reais; branches em 100%                                |
 | 4    | Prisma                | **completa** | idem, com client gerado por dialeto e manifesto validado contra os 4 `schema.prisma`             |
 | 5    | Drizzle               | **completa** | idem, via `postgres-js`, `mysql2` e `node-mssql`                                                 |
-| 6    | Paridade completa     | **completa** | nove células verdes com 74 casos cada, `assert-no-skips` em todas                                |
+| 6    | Paridade completa     | **completa** | nove células verdes com 84 casos de corpus cada, `assert-no-skips` em todas                      |
 | 7    | Hardening e release   | **completa** | exemplos, guias, cobertura e bench fechados; falta publicar alpha/rc e datar segurança em `main` |
 
 ## Estado por adapter
 
 |                                 | TypeORM            | Prisma                                          | Drizzle                            |
 | ------------------------------- | ------------------ | ----------------------------------------------- | ---------------------------------- |
-| Corpus no dialeto de referência | 74/74              | 74/74 (7 com recusa declarada)                  | 74/74                              |
+| Corpus no dialeto de referência | 84/84              | 84/84 (8 com recusa declarada)                  | 84/84                              |
 | Usa o ORM de verdade            | sim                | sim, client gerado por dialeto                  | sim                                |
-| PostgreSQL / MySQL / SQL Server | **74/74 nas três** | **74/74 nas três**                              | **74/74 nas três**                 |
+| PostgreSQL / MySQL / SQL Server | **94/94 nas três** | **87/87 nas três**                              | **87/87 nas três**                 |
 | Branches                        | **100%**           | **100%**                                        | **100%**                           |
 | Divergências declaradas         | nenhuma            | 5 operadores de padrão em SQLite e MSSQL        | nenhuma                            |
 | Lacuna própria                  | —                  | generator a partir de `schema.prisma` (`3.1.0`) | coleção aninhada sob outra relação |
@@ -78,11 +81,13 @@ a **tabela errada**, porque a guarda testava `joinColumns.length === 0` e numa
 m2m o lado dono tem join columns — as da junção. Resultado válido e errado, em
 silêncio.
 
-Os identificadores da junção são citados pelo `escape` do driver, e são os
-únicos do SQL emitido que recebem esse tratamento: a naming strategy do TypeORM
-os gera em camelCase (`articlesId`), e sem aspas o PostgreSQL os dobraria para
-minúsculas. Uniformizar a citação no resto do compilador é dívida declarada no
-plano de entrega.
+Todo identificador da subconsulta existencial — tabela com schema, alias e
+coluna — sai citado pelo `escape` do driver, e a coluna da folha é a **física**,
+resolvida pela metadata da última entidade da cadeia. Até o `3.0.0-alpha.0` só
+os da tabela de junção eram citados, e a folha era o nome da propriedade: o bug
+#2 da validação externa. Fora do `EXISTS` o query builder do TypeORM já traduz
+`alias.propriedade` para a coluna citada, porque os aliases estão no
+`expressionMap`.
 
 ### Prisma
 
@@ -135,7 +140,7 @@ novos do corpus medem isso **sem** exceção declarada.
 
 | Gate                                            | Estado                                                                                        |
 | ----------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Nove combinações reais verdes, sem skips        | **sim** — 74 casos por célula, `assert-no-skips` em todas, medido em 2026-09-04               |
+| Nove combinações reais verdes, sem skips        | **sim** — 84 casos de corpus por célula, `assert-no-skips` em todas, medido em 2026-09-23     |
 | Peer do Drizzle fechado nos RCs medidos         | sim — `>=1.0.0-rc.4 <1.0.0`                                                                   |
 | Nenhum cast no uso público documentado          | sim — provado pelos quatro exemplos em `strict`, que foi o que o achou                        |
 | Nenhum peer opcional carregado pelo core        | sim — provado por consumer fixture                                                            |
@@ -163,23 +168,26 @@ Benchmark com I/O mediria a latência do banco, não da biblioteca.
 
 ### Cobertura
 
-Medida na última execução completa de `pnpm test:cov` (52 suites, **912
-testes**, zero skip):
+Medida na última execução completa de `pnpm test:cov` (53 suites, **991
+testes**, zero skip), em 2026-09-23:
 
 | Área                       | Statements | Branches   | Piso no `jest.config.ts` |
 | -------------------------- | ---------- | ---------- | ------------------------ |
-| Total                      | 97.45%     | 92.98%     | —                        |
+| Total                      | 98.2%      | 95.44%     | —                        |
 | `infra/adapters/typeorm`   | **100%**   | **100%**   | 100% (catraca)           |
 | `infra/adapters/prisma`    | **100%**   | **100%**   | 100% (catraca)           |
 | `infra/adapters/drizzle`   | **100%**   | **100%**   | 100% (catraca)           |
-| `core`                     | 95.87%     | 91.52%     | 95 / 91                  |
-| `api` (superfície Swagger) | 90.44%     | **62.50%** | 90 / 62                  |
+| `core`                     | 96.2%      | 92.65%     | 95 / 91                  |
+| `api` (superfície Swagger) | 98.77%     | **78.79%** | 90 / 62                  |
 
 Os pisos são o valor medido arredondado para baixo, não metas. Os adapters
 entram em 100% de propósito: é por eles que passa a promessa de paridade, e
-catraca é o único regime que impede erosão silenciosa. `api` a 62% de branches é
-o número honesto — não é caminho crítico do gate, e está declarado aqui e no
-piso justamente para não piorar sem ninguém notar.
+catraca é o único regime que impede erosão silenciosa. `api` subiu de 62% para
+79% de branches porque o `dqbSwaggerRequestInterceptor` saiu da medição: o
+texto dele vai ao browser por `toString()`, e a instrumentação de cobertura
+injetaria contadores que o browser não tem (ver o JSDoc da função). Ele é
+coberto pelos testes que avaliam o texto serializado, não pela contagem. O piso
+ficou em 62 de propósito, até uma medição sem essa mudança de denominador.
 
 `src/contracts` **não aparece nesta tabela porque não há o que medir**: os 9
 arquivos são type-only, o que `tests/v3/contracts/type-only.spec.ts` prova
@@ -213,12 +221,12 @@ O que sobrou depois do PR5 — e só o primeiro impede a `3.0.0` de sair.
    Server pelo TypeORM encontra o mesmo teto.
 4. **Operadores de padrão do Prisma em SQLite e SQL Server** são recusados. É
    decisão declarada (ADR-001, emenda 2), não pendência.
-5. **Citação de identificadores é inconsistente no adapter TypeORM.** Só os da
-   tabela de junção passam pelo `escape` do driver, porque a naming strategy os
-   gera em camelCase e sem aspas o PostgreSQL os dobraria. O resto do
-   compilador emite identificador cru. Funciona hoje porque os demais nomes vêm
-   do consumidor, que os escolhe compatíveis; uniformizar é decisão maior que a
-   emenda que criou o caso.
+5. ~~**Citação de identificadores é inconsistente no adapter TypeORM.**~~
+   Resolvida. A subconsulta existencial cita todo identificador e resolve
+   coluna e tabela físicas pela metadata. A premissa que a sustentava — "os
+   demais nomes vêm do consumidor, que os escolhe compatíveis" — caiu na
+   primeira validação externa: um consumidor snake_case (`@Column({ name })`)
+   num schema próprio recebia 500 em todo filtro por coleção.
 6. **`reorderByKeys` é rede, não mecanismo.** A ordem da paginação em duas fases
    é imposta pelo `ORDER BY` que o clone de hidratação herda do plano; a
    reordenação em memória só casa chave crua com chave hidratada quando as duas
@@ -232,6 +240,30 @@ O que sobrou depois do PR5 — e só o primeiro impede a `3.0.0` de sair.
    sem serem medidas. É o mesmo "parece medido" que `src/contracts` tinha, e a
    mesma decisão está aberta: estreitar o pattern ou provar que não há o que
    medir.
+
+## O que a validação externa encontrou
+
+Primeira validação do `3.0.0-alpha.0` por um consumidor de fora, em
+2026-09-23: um boilerplate NestJS 11 CJS com `@nestjs/typeorm` 11, TypeORM
+0.3.31, `pg` e PostgreSQL 17, com o endpoint montado do jeito que a
+documentação ensina. Nenhum dos defeitos abaixo aparecia na suíte da
+biblioteca, e a razão é a mesma nos dois primeiros: a suíte importava tudo de
+`src/`, e o consumidor importa o pacote publicado.
+
+| #   | Defeito                                                                                                                                                                                                                                                                                                                                                                                                          | Estado                                                                                                                                                                                                                                                                                      |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Filtro em `decimal` era 500 (`invalid input syntax for type numeric: ""29.90""`). Cada subpath publicado é um bundle com **a sua cópia** de `DecimalValue`/`CivilDate`/`RestQueryError`; o `instanceof` do adapter não reconhecia o valor do núcleo, o objeto chegava ao driver e o `pg` o serializava com `JSON.stringify`. `date` quebrava nos três adapters; erros 400 lançados pelo adapter viravam 500 cru. | **corrigido** — identidade por `Symbol.for` + `Symbol.hasInstance`. O corpus inteiro passou a rodar com o núcleo numa cópia separada da do adapter (`tests/v3/fixtures/published-layout.ts`), e o consumer fixture do `verify:package` exercita o tarball real.                             |
+| 2   | Filtro/`search` por relação `many` no TypeORM usava o nome da propriedade, sem aspas e sem schema, dentro do `EXISTS`.                                                                                                                                                                                                                                                                                           | **corrigido** — coluna física, tabela com schema e citação uniforme. O modelo canônico ganhou `post.isPinned` sobre a coluna `is_pinned`, medido nos três adapters.                                                                                                                         |
+| 3   | `dqbSwaggerRequestInterceptor(document)` devolvia uma closure; o `@nestjs/swagger` a serializa com `toString()` e todo "Try it out" falhava com `ReferenceError`.                                                                                                                                                                                                                                                | **corrigido** — função autocontida, testada no texto serializado pelo próprio `buildJSInitOptions` do `@nestjs/swagger`, avaliado num contexto `vm` vazio.                                                                                                                                  |
+| 4   | `@Query() query: DynamicQueryDto` + `ValidationPipe({ whitelist: true })` esvazia a DTO em silêncio: 200 com a listagem default.                                                                                                                                                                                                                                                                                 | **aberto — bloqueia a `3.0.0`.** Fora do escopo desta correção.                                                                                                                                                                                                                             |
+| 5   | `forRoot({ portability: { enforce: true } })` é descartado pela configuração congelada.                                                                                                                                                                                                                                                                                                                          | **aberto.**                                                                                                                                                                                                                                                                                 |
+| 6   | `paginate=false` devolvia a tabela inteira, sem teto e sem como recusar.                                                                                                                                                                                                                                                                                                                                         | **corrigido** — teto global `pagination.maxUnpaginatedRows` (default: o `maxPerPage` efetivo), `allowUnpaginated`, e as duas por endpoint em `defineQueryRules`. Acima do teto é 400, nunca lista truncada. Ver [migration-from-v2 §7.1](./migration-from-v2.md#71-paginatefalse-tem-teto). |
+| 7   | Cache de schema inócuo com source por request, detalhe de erro de configuração no 500, envelope sem `error`, Swagger com união de operadores.                                                                                                                                                                                                                                                                    | **aberto.** A correção do #1 torna o #7 um pouco mais visível: erro de configuração lançado **pelo adapter** passa a sair como `InternalServerErrorException` com `details`, como já saía o lançado pelo núcleo.                                                                            |
+
+Os casos `regression/*` do corpus e `tests/v3/integration/consumer-regressions.spec.ts`
+reproduzem cada condição original e foram vistos falhar contra o código do
+`3.0.0-alpha.0` antes da correção — inclusive a mensagem literal do relato, com
+TypeORM 0.3.26 sobre PostgreSQL.
 
 ## O que o PR5 encontrou
 

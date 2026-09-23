@@ -30,11 +30,11 @@ que não funciona e o que bloqueia a `3.0.0`.
 ## Estado dos adapters, em uma linha
 
 Os três passam o corpus de paridade nas **nove células reais** — TypeORM,
-Prisma e Drizzle × PostgreSQL, MySQL e SQL Server — com 74 casos por célula,
+Prisma e Drizzle × PostgreSQL, MySQL e SQL Server — com 84 casos por célula,
 sem skip, e 100% de branches nos três adapters. O SQLite continua sendo o
 dialeto de referência, não célula. O que falta para a `3.0.0` estável não é
-adapter: o `3.0.0-alpha.0` já está no npm sob a tag `alpha`, a varredura de
-segurança correu sobre código v3 em `main` e passou, e o que resta é ver o alpha
-validado por um consumidor de fora.
+adapter: o `3.0.0-alpha.0` já está no npm sob a tag `alpha` e foi validado por
+um consumidor de fora, que achou defeitos — os corrigidos e o que ainda bloqueia
+estão em [`status.md`](./status.md#o-que-a-validação-externa-encontrou).
 Detalhes, ressalvas e as divergências declaradas do Prisma em
 [`status.md`](./status.md).

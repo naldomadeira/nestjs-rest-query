@@ -178,14 +178,19 @@ implicit default adapter: the adapter is decided by the **source** you pass to
 
 ### `pagination`
 
-| Option           | Type     | Default | Description                                                     |
-| ---------------- | -------- | ------- | --------------------------------------------------------------- |
-| `defaultPerPage` | `number` | `10`    | Items per page when the request carries no `perPage`.           |
-| `maxPerPage`     | `number` | `100`   | Upper bound. A larger `perPage` is a `400`, not a silent clamp. |
+| Option               | Type      | Default      | Description                                                                       |
+| -------------------- | --------- | ------------ | --------------------------------------------------------------------------------- |
+| `defaultPerPage`     | `number`  | `10`         | Items per page when the request carries no `perPage`.                             |
+| `maxPerPage`         | `number`  | `100`        | Upper bound. A larger `perPage` is a `400`, not a silent clamp.                   |
+| `allowUnpaginated`   | `boolean` | `true`       | `false` refuses `?paginate=false` with a `400` on every endpoint.                 |
+| `maxUnpaginatedRows` | `number`  | `maxPerPage` | Row cap of a `paginate=false` response; above it the request is a `400`, not cut. |
 
-Both are validated at startup: `defaultPerPage` below `1`, or a `maxPerPage`
-smaller than `defaultPerPage`, throws `SOURCE_CONFIGURATION_INVALID` while the
-module loads.
+All are validated at startup: `defaultPerPage` below `1`, a `maxPerPage`
+smaller than `defaultPerPage`, a non-boolean `allowUnpaginated` or a
+`maxUnpaginatedRows` that is not a positive integer throws
+`SOURCE_CONFIGURATION_INVALID` while the module loads. An endpoint can replace
+the two unpaginated keys in its rules — see
+[Pagination](/docs/usage/endpoint-whitelist-rules#pagination).
 
 ### `logging`
 

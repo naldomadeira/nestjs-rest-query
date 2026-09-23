@@ -121,7 +121,7 @@ in v3.
 | ---------- | ----------------------------------- | --------------------------------------------------------------- |
 | `page`     | always                              | —                                                               |
 | `perPage`  | always                              | —                                                               |
-| `paginate` | always                              | —                                                               |
+| `paginate` | unless the rules forbid it          | the unpaginated row cap                                         |
 | `sort`     | when `sorts` is non-empty           | every sortable path, plus an ascending and a descending example |
 | `fields`   | always (`fields.root` is mandatory) | root `allowed` plus each relation's `allowed`, as dotted paths  |
 | `includes` | when `includes` is non-empty        | every includable relation path                                  |
@@ -175,6 +175,19 @@ Express's extended query parser — can expand into a nested object.
 Without it, filters reach the controller malformed and are ignored. For Postman,
 a frontend, or any client that builds the URL itself, the interceptor is not
 needed.
+
+The form field accepts one expression (`[name][eq]=Ada` or
+`filter[name][eq]=Ada`) or several joined by `&`
+(`[name][eq]=Ada&[score][gt]=10`).
+
+`@nestjs/swagger` does not call the interceptor on the server: it writes it into
+`swagger-ui-init.js` with `fn.toString()`, and the browser runs that text with
+none of this package in scope. That is why the function
+`dqbSwaggerRequestInterceptor(document)` returns is fully self-contained — the
+marked routes travel inside its source as a literal. In `3.0.0-alpha.0` it was
+a closure over module helpers, and every "Try it out" failed with
+`ReferenceError: interceptSwaggerRequest is not defined`; upgrade instead of
+copying a workaround into your app.
 
 ---
 

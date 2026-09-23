@@ -84,7 +84,12 @@ export interface RestQueryAdapterV3<
 export interface AdapterResult<TRow> {
   /** Rows already hydrated in nested form, internal columns still present. */
   readonly rows: readonly TRow[];
-  /** Absent when the plan asked for paginate=false. */
+  /**
+   * Absent when the plan asked for paginate=false. In that case fetch at most
+   * `plan.pagination.maxRows + 1` roots: the service refuses a result above
+   * `maxRows` with a 400, and the extra row is how it tells "at the cap" from
+   * "over it" without a COUNT.
+   */
   readonly total?: number;
   /** How many queries were emitted; used by the budget tests. */
   readonly queryCount?: number;

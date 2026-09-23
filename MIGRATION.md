@@ -32,6 +32,24 @@ source of truth for every before/after pair below — `01-starter-app` and
 > the supported version matrix is in
 > [`docs/v3/versions.md`](./docs/v3/versions.md).
 
+### If you already run `3.0.0-alpha.0`
+
+An external consumer validated the first alpha on NestJS 11 + `@nestjs/typeorm`
+11 + TypeORM 0.3 + PostgreSQL and found defects that the next prerelease fixes.
+Four of them change what you observe:
+
+| Area                                                 | `3.0.0-alpha.0`                                                                                                                                                                                                                                                                                                                                                                | Next prerelease                                                                                                                                                              |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `decimal` / `date` filters                           | filters on these kinds failed (TypeORM: `decimal` and `date`; Prisma and Drizzle: `date`): the value crossed from the root bundle to the adapter subpath as an object the adapter did not recognise, and `pg` sent it as `'"29.90"'` — a `500` on `eq`/`gte`/`lte`/`between`. Adapter-thrown `400`s (e.g. `CAPABILITY_UNAVAILABLE`) surfaced as raw `500`s for the same reason | bound as text, in all three adapters                                                                                                                                         |
+| TypeORM filter or `search` through a `many` relation | `EXISTS` used the **property** name, unquoted, and the table without its schema — any `@Column({ name })`, snake_case naming strategy or non-default schema was a `500`                                                                                                                                                                                                        | physical column and table path from the entity metadata, every identifier quoted by the driver                                                                               |
+| `dqbSwaggerRequestInterceptor(document)`             | every Swagger UI "Try it out" failed with `ReferenceError`                                                                                                                                                                                                                                                                                                                     | self-contained; also expands several `&`-joined filter expressions typed in the form                                                                                         |
+| `paginate=false`                                     | the whole table, no `LIMIT`, no way to forbid it                                                                                                                                                                                                                                                                                                                               | **capped** — see [Step 8](#step-8--behaviour-that-changed-on-the-wire). An endpoint listing more than `maxPerPage` rows unpaginated now gets a `400` until you raise the cap |
+
+Only the last one can need a code change: if an endpoint legitimately returns
+more than `100` rows with `paginate=false`, declare
+`pagination: { maxUnpaginatedRows: <n> }` in its rules (or globally in
+`forRoot`).
+
 ### The real name map
 
 The `1.0.0` section of this guide used to announce a `RestQuery*` rename for a
@@ -102,6 +120,11 @@ Operator restriction moved from a global list to a **per-field** declaration in
 the endpoint rules. Pagination defaults are unchanged: `defaultPerPage` is still
 `10` and `maxPerPage` is still `100`, so page sizes you never configured keep
 the size they had.
+
+`pagination` gained two keys, `allowUnpaginated` (default `true`) and
+`maxUnpaginatedRows` (default: the effective `maxPerPage`). v2 had no cap on
+`paginate=false`; v3 does — see
+[Step 8](#step-8--behaviour-that-changed-on-the-wire).
 
 ### Step 3 — logical schema and endpoint rules
 
@@ -474,16 +497,34 @@ below — **it does not apply to v3.**
 
 At minimum these change what your clients receive:
 
-| Behaviour               | v2                                        | v3                                                                 |
-| ----------------------- | ----------------------------------------- | ------------------------------------------------------------------ |
-| Whitelist path matching | prefix — `company` allowed `company.name` | exact                                                              |
-| Value coercion          | by text shape (`"00430123"` → `430123`)   | by declared field kind; bad input is `400 FILTER_VALUE_INVALID`    |
-| `in=[]`                 | filter ignored, returns everything        | always-false condition, returns zero rows (`notIn=[]` always true) |
-| Duplicate `sort`        | last/first/both, depending on adapter     | deduplicated; conflicting directions are `400 SORT_CONFLICT`       |
-| `%` and `_` in patterns | wildcards                                 | literal characters (see the divergence section)                    |
-| Primary key in the JSON | always injected                           | removed when not part of the visible projection                    |
-| Error body              | `{ statusCode, message: "<prose>" }`      | stable envelope with a machine-readable `code`                     |
-| Swagger decorator       | `@ApiDynamicQuery<T>(whitelists)`         | `@ApiDynamicQuery(compiledRules)`                                  |
+| Behaviour               | v2                                        | v3                                                                                                        |
+| ----------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Whitelist path matching | prefix — `company` allowed `company.name` | exact                                                                                                     |
+| Value coercion          | by text shape (`"00430123"` → `430123`)   | by declared field kind; bad input is `400 FILTER_VALUE_INVALID`                                           |
+| `in=[]`                 | filter ignored, returns everything        | always-false condition, returns zero rows (`notIn=[]` always true)                                        |
+| Duplicate `sort`        | last/first/both, depending on adapter     | deduplicated; conflicting directions are `400 SORT_CONFLICT`                                              |
+| `%` and `_` in patterns | wildcards                                 | literal characters (see the divergence section)                                                           |
+| Primary key in the JSON | always injected                           | removed when not part of the visible projection                                                           |
+| Error body              | `{ statusCode, message: "<prose>" }`      | stable envelope with a machine-readable `code`                                                            |
+| Swagger decorator       | `@ApiDynamicQuery<T>(whitelists)`         | `@ApiDynamicQuery(compiledRules)`                                                                         |
+| `paginate=false`        | every matching row, no `LIMIT`            | at most `maxUnpaginatedRows` (default `maxPerPage`); above it, `400 PAGINATION_INVALID` — never truncated |
+
+`paginate=false` semantics, in full:
+
+- **Global cap.** `forRoot({ pagination: { maxUnpaginatedRows } })`, default
+  the effective `maxPerPage` (`100`). The adapter fetches at most
+  `maxUnpaginatedRows + 1` roots; one more than the cap means the request is
+  refused with `400 PAGINATION_INVALID` and `details: { param: 'paginate',
+maxRows }`. With a `many` include the cap counts roots, not join rows.
+- **Global switch.** `forRoot({ pagination: { allowUnpaginated: false } })`
+  refuses every `paginate=false` with `400 PAGINATION_INVALID` before any
+  query runs.
+- **Per endpoint.** `defineQueryRules(..., { pagination: { allowUnpaginated,
+maxUnpaginatedRows } })`. Each key the endpoint declares **replaces** the
+  global one for that endpoint — raise the cap for a dropdown that lists every
+  brand, forbid `paginate=false` on a large table. Keys it omits inherit.
+- `maxPerPage` still bounds `perPage` only; the unpaginated cap follows it
+  until you set `maxUnpaginatedRows` explicitly.
 
 Error bodies are now:
 
@@ -535,6 +576,14 @@ corpus). What you do:
 2. Folded and portable-order companion properties named by the `_folded` /
    `_order` convention over the property path.
 3. Explicit `entities` / `migrations` lists (ESM).
+
+Rules and schemas speak **property** names; the adapter resolves physical
+column names, table paths and schemas from the entity metadata, including
+inside the `EXISTS` that a filter or `search` through a `many` relation
+compiles to. `@Column({ name: 'is_accessory' }) isAccessory`, a snake_case
+naming strategy and `DataSource({ schema })` / `@Entity({ schema })` all work
+there. (`3.0.0-alpha.0` got this wrong — see
+[the alpha table](#if-you-already-run-300-alpha0).)
 
 `buildSchemaRegistry(repository)` from the same subpath derives the whole
 registry from the entity metadata, including transitively reachable relations,

@@ -59,13 +59,14 @@ you are on `2.1.x`, the upgrade path is
 | Drizzle | ✅ Stable | `nestjs-rest-query/drizzle` |
 | Prisma  | ✅ Stable | `nestjs-rest-query/prisma`  |
 
-> The three adapters share one semantic core and answer the same 74-case parity
+> The three adapters share one semantic core and answer the same 84-case parity
 > corpus against PostgreSQL, MySQL and SQL Server — nine cells, no skips. The
 > adapter is chosen by the **source** you pass to `execute()`, not by `forRoot`.
 >
-> `3.x` is still a prerelease: `3.0.0-alpha.0` is on npm under the `alpha` tag,
-> and stable `3.0.0` waits on one thing only — external validation of that alpha
-> by a consumer outside this repo. The `drizzle-orm` peer is
+> `3.x` is still a prerelease: `3.0.0-alpha.0` is on npm under the `alpha` tag.
+> Its first external validation found defects; the ones fixed since, and the one
+> that still blocks stable `3.0.0`, are listed in
+> [`docs/v3/status.md`](./docs/v3/status.md). The `drizzle-orm` peer is
 > closed on the release candidates the matrix measured, so the `1.0.0` GA cannot
 > satisfy it until a release of ours re-runs the nine cells — that is a
 > deliberate refusal, not a missing feature
@@ -351,6 +352,26 @@ user.name_folded = foldText(user.name); // value.normalize('NFC').toLowerCase()
 ?includes=company,company.owner # LEFT JOIN company; LEFT JOIN owner
 ?search=keyword                 # against rules.search columns
 ?page=2&perPage=50              # offset/limit
+?paginate=false                 # { data } only — still capped, see below
+```
+
+**`paginate=false` is capped, never unbounded.** An unpaginated response may
+hold at most `pagination.maxUnpaginatedRows` rows (default: the effective
+`maxPerPage`, so `100` out of the box). The adapter fetches at most one row past
+the cap; if the result is larger, the request is a `400 PAGINATION_INVALID` —
+the list is never silently truncated. An endpoint can declare its own policy in
+the rules, which replaces the global one for that endpoint:
+
+```typescript
+defineQueryRules(registry, 'brand', {
+  // ...
+  pagination: { maxUnpaginatedRows: 500 }, // e.g. a dropdown of every brand
+});
+
+defineQueryRules(registry, 'product', {
+  // ...
+  pagination: { allowUnpaginated: false }, // paginate=false is a 400 here
+});
 ```
 
 Anything not declared in the compiled rules is rejected with `400 Bad Request`
@@ -375,7 +396,12 @@ SwaggerModule.setup('docs', app, document, {
 });
 ```
 
-The interceptor lets users type filters in the Swagger UI form and forwards them in the wire format the parser expects.
+The interceptor lets users type filters in the Swagger UI form — one
+`[field][op]=value` expression, or several joined by `&` — and forwards them in
+the wire format the parser expects. `@nestjs/swagger` ships the function to the
+browser as source text (`fn.toString()`), so the returned interceptor is fully
+self-contained; up to `3.0.0-alpha.0` it was a closure and every "Try it out"
+failed with a `ReferenceError`.
 
 ## Configuration
 
@@ -384,6 +410,8 @@ DynamicQueryBuilderModule.forRoot({
   pagination: {
     defaultPerPage: 10,
     maxPerPage: 100,
+    allowUnpaginated: true, // `false` refuses ?paginate=false everywhere
+    maxUnpaginatedRows: 100, // defaults to the effective maxPerPage
   },
   textProfile: 'portable-strict',
   consistency: 'eventual',
@@ -397,7 +425,9 @@ DynamicQueryBuilderModule.forRoot({
 
 All fields are optional; the values above are the defaults, except `logging`,
 which is off. `maxPerPage` is an upper bound, not a silent clamp: a larger
-`perPage` is a `400`.
+`perPage` is a `400`. The same goes for `maxUnpaginatedRows`: an unpaginated
+result above it is a `400`, not a truncated list. Endpoint rules may replace
+`allowUnpaginated` and `maxUnpaginatedRows` for that endpoint.
 
 `adapter` and `operators` are **refused at startup** — the first is decided by
 the source, the second by the endpoint rules.
