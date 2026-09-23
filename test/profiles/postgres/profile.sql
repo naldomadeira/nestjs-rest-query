@@ -35,7 +35,10 @@ CREATE TABLE posts (
   id_order     text COLLATE "C" NOT NULL,
   title        text COLLATE "C" NOT NULL,
   title_folded text COLLATE "C" NOT NULL,
-  user_id      integer NOT NULL REFERENCES users (id)
+  user_id      integer NOT NULL REFERENCES users (id),
+  -- Nome físico diferente da propriedade (`isPinned`): mede o mapeamento de
+  -- coluna dentro do EXISTS de relação many (bug #2 do relato de consumidor).
+  is_pinned    boolean NOT NULL
 );
 
 CREATE TABLE tags (

@@ -1,10 +1,12 @@
 export type {
   FieldProjectionInput,
   FilterRuleInput,
+  PaginationRulesInput,
   QueryRulesInput,
 } from './rules-input';
 export type {
   CompiledFieldProjection,
+  CompiledPaginationRules,
   CompiledQueryRules,
   CompiledSearchTarget,
 } from './compiled-rules';

@@ -31,6 +31,7 @@ export {
   type CompiledQueryRules,
   type FieldProjectionInput,
   type FilterRuleInput,
+  type PaginationRulesInput,
   type QueryRulesInput,
 } from './core/authorization';
 export { foldText } from './core/text-profile';

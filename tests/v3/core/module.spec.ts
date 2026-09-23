@@ -12,7 +12,12 @@ describe('DynamicQueryBuilderModule.forRoot', () => {
   it('aplica os defaults, com paginação pela Emenda 4 da ADR-001', () => {
     DynamicQueryBuilderModule.forRoot({});
     expect(DynamicQueryBuilderModule.config).toEqual({
-      pagination: { defaultPerPage: 10, maxPerPage: 100 },
+      pagination: {
+        defaultPerPage: 10,
+        maxPerPage: 100,
+        allowUnpaginated: true,
+        maxUnpaginatedRows: 100,
+      },
       textProfile: 'portable-strict',
       consistency: 'eventual',
       logging: { enabled: false, level: 'info', redactValues: true },
@@ -70,7 +75,47 @@ describe('DynamicQueryBuilderModule.forRoot', () => {
     expect(DynamicQueryBuilderModule.config.pagination).toEqual({
       defaultPerPage: 10,
       maxPerPage: 50,
+      allowUnpaginated: true,
+      // Sem valor próprio, o teto sem paginação acompanha o `maxPerPage`.
+      maxUnpaginatedRows: 50,
     });
+  });
+});
+
+describe('regression: unpaginated global cap (consumer report #6) — forRoot', () => {
+  it('aceita a política global de paginate=false', () => {
+    DynamicQueryBuilderModule.forRoot({
+      pagination: { allowUnpaginated: false, maxUnpaginatedRows: 1000 },
+    });
+    expect(DynamicQueryBuilderModule.config.pagination).toEqual({
+      defaultPerPage: 10,
+      maxPerPage: 100,
+      allowUnpaginated: false,
+      maxUnpaginatedRows: 1000,
+    });
+  });
+
+  it.each([0, -1, 1.5, Number.NaN])(
+    'recusa maxUnpaginatedRows=%p na inicialização',
+    (maxUnpaginatedRows) => {
+      expect(() =>
+        DynamicQueryBuilderModule.forRoot({
+          pagination: { maxUnpaginatedRows },
+        })
+      ).toThrow(
+        expect.objectContaining({ code: 'SOURCE_CONFIGURATION_INVALID' })
+      );
+    }
+  );
+
+  it('recusa allowUnpaginated que não seja booleano', () => {
+    expect(() =>
+      DynamicQueryBuilderModule.forRoot({
+        pagination: { allowUnpaginated: 'no' as never },
+      })
+    ).toThrow(
+      expect.objectContaining({ code: 'SOURCE_CONFIGURATION_INVALID' })
+    );
   });
 });
 

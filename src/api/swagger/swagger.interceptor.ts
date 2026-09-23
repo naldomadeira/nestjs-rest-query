@@ -11,12 +11,33 @@ type OpenApiDocumentLike = {
 };
 
 /**
- * Interceptor para o Swagger UI que converte o formato de filtros
- * digitado pelo usuário (`[campo][op]=valor` ou `filter[campo][op]=valor`)
- * para o formato que o qs/Express interpreta corretamente.
+ * Interceptor para o Swagger UI que converte o formato de filtros digitado
+ * pelo usuário (`[campo][op]=valor` ou `filter[campo][op]=valor`, vários
+ * separados por `&`) para os pares `filter[campo][op]=valor` que o parser
+ * espera.
  *
- * Quando recebe o documento OpenAPI, limita a interceptacao apenas aos
- * endpoints GET marcados pela lib.
+ * Quando recebe o documento OpenAPI, devolve um interceptor que só reescreve
+ * os endpoints GET marcados pela lib. Recebendo a própria requisição, reescreve
+ * qualquer GET.
+ *
+ * **Tudo aqui é autocontido, e isso é contrato, não estilo.** O
+ * `@nestjs/swagger` grava `swaggerOptions` no `swagger-ui-init.js` com
+ * `fn.toString()`, então a função roda **no browser**, sem nenhum escopo deste
+ * módulo. Até a `3.0.0-alpha.0` o interceptor devolvido era uma closure sobre
+ * helpers do módulo (`interceptSwaggerRequest`, os matchers): no browser eles
+ * não existiam, e todo "Try it out" do Swagger UI falhava com `ReferenceError`
+ * (relato de consumidor externo, bug #3). Por isso:
+ *
+ * - o corpo desta função não referencia nada de fora dela — nem constante do
+ *   módulo, nem import, nem helper;
+ * - a forma com documento devolve uma função criada por `new Function`, cujo
+ *   texto embute os padrões de rota como literal JSON. É a única forma de um
+ *   dado calculado no servidor sobreviver ao `toString()`.
+ *
+ * `swagger-interceptor.spec.ts` avalia o texto serializado num contexto `vm`
+ * vazio, que é o que o browser recebe. O `istanbul ignore` abaixo existe pelo
+ * mesmo motivo: a instrumentação de cobertura injetaria contadores globais no
+ * corpo e tornaria o texto serializado dependente do processo de teste.
  *
  * @example
  * ```ts
@@ -33,134 +54,132 @@ export function dqbSwaggerRequestInterceptor(
 export function dqbSwaggerRequestInterceptor(
   req: SwaggerRequest
 ): SwaggerRequest;
+/* istanbul ignore next -- ver o JSDoc: o texto desta função vai ao browser */
 export function dqbSwaggerRequestInterceptor(
   arg: OpenApiDocumentLike | SwaggerRequest
 ): ((req: SwaggerRequest) => SwaggerRequest) | SwaggerRequest {
-  if (isOpenApiDocumentLike(arg)) {
-    const dqbGetRouteMatchers = collectDqbGetRouteMatchers(arg);
-    return (req: SwaggerRequest) =>
-      interceptSwaggerRequest(req, dqbGetRouteMatchers);
+  function intercept(
+    req: SwaggerRequest,
+    routePatterns: readonly string[] | null
+  ): SwaggerRequest {
+    function decode(value: string): string {
+      try {
+        return decodeURIComponent(value.replace(/\+/g, ' '));
+      } catch {
+        return value;
+      }
+    }
+
+    function encodePair(expression: string): string {
+      const separator = expression.indexOf('=');
+      if (separator === -1) return encodeURIComponent(expression);
+      return (
+        encodeURIComponent(expression.slice(0, separator)) +
+        '=' +
+        encodeURIComponent(expression.slice(separator + 1))
+      );
+    }
+
+    /** `filter=<expressões>` -> pares `filter[...]`; o resto passa intacto. */
+    function expand(pair: string): string[] {
+      const separator = pair.indexOf('=');
+      const rawKey = separator === -1 ? pair : pair.slice(0, separator);
+      if (decode(rawKey) !== 'filter' || separator === -1) return [pair];
+
+      const value = decode(pair.slice(separator + 1)).trim();
+      if (!value) return [rawKey];
+
+      const expressions = value.split('&').filter(Boolean);
+      const expanded: string[] = [];
+      for (const expression of expressions) {
+        const full =
+          expression.charAt(0) === '[' ? 'filter' + expression : expression;
+        if (full.slice(0, 7) !== 'filter[' || full.indexOf('=') === -1) {
+          // Não é a forma que o formulário produz: manda como veio.
+          return [pair];
+        }
+        expanded.push(encodePair(full));
+      }
+      return expanded;
+    }
+
+    try {
+      if (!Array.isArray(req.curlOptions)) req.curlOptions = [];
+      if (!req.url) return req;
+      if ((req.method || 'GET').toUpperCase() !== 'GET') return req;
+
+      const url = req.url;
+      const hashStart = url.indexOf('#');
+      const beforeHash = hashStart === -1 ? url : url.slice(0, hashStart);
+      const hash = hashStart === -1 ? '' : url.slice(hashStart);
+      const queryStart = beforeHash.indexOf('?');
+      if (queryStart === -1) return req;
+
+      const base = beforeHash.slice(0, queryStart);
+      const rawQuery = beforeHash.slice(queryStart + 1);
+      if (!rawQuery) return req;
+
+      if (routePatterns) {
+        const pathname = base.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]*/i, '');
+        let marked = false;
+        for (const pattern of routePatterns) {
+          if (new RegExp(pattern).test(pathname || '/')) {
+            marked = true;
+            break;
+          }
+        }
+        if (!marked) return req;
+      }
+
+      const parts: string[] = [];
+      for (const pair of rawQuery.split('&')) {
+        if (!pair) continue;
+        for (const part of expand(pair)) parts.push(part);
+      }
+
+      req.url = base + (parts.length ? '?' + parts.join('&') : '') + hash;
+    } catch (error) {
+      // Nunca derruba a requisição do Swagger UI: na dúvida, vai como veio.
+      console.error('[nestjs-rest-query] swagger request interceptor:', error);
+    }
+    return req;
   }
 
-  return interceptSwaggerRequest(arg);
-}
+  const isDocument =
+    typeof arg === 'object' &&
+    arg !== null &&
+    'paths' in arg &&
+    !('url' in arg);
+  if (!isDocument) return intercept(arg as SwaggerRequest, null);
 
-function isOpenApiDocumentLike(
-  value: OpenApiDocumentLike | SwaggerRequest
-): value is OpenApiDocumentLike {
-  return typeof value === 'object' && value !== null && 'paths' in value;
-}
-
-function collectDqbGetRouteMatchers(document: OpenApiDocumentLike): RegExp[] {
-  const paths = document.paths ?? {};
-
-  return Object.entries(paths).flatMap(([path, pathItem]) => {
-    const getOperation =
-      pathItem?.get && typeof pathItem.get === 'object'
-        ? (pathItem.get as Record<string, unknown>)
-        : undefined;
-
-    if (!getOperation?.[DQB_SWAGGER_EXTENSION_KEY]) {
-      return [];
-    }
-
-    return [createPathMatcher(path)];
-  });
-}
-
-function createPathMatcher(path: string): RegExp {
-  const escapedPath = path
-    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    .replace(/\\\{[^/]+\\\}/g, '[^/]+');
-
-  return new RegExp(`^${escapedPath}$`);
-}
-
-function interceptSwaggerRequest(
-  req: SwaggerRequest,
-  dqbGetRouteMatchers?: RegExp[]
-): SwaggerRequest {
-  try {
-    if (!Array.isArray(req.curlOptions)) req.curlOptions = [];
-    if (!req.url) return req;
-
-    if ((req.method ?? 'GET').toUpperCase() !== 'GET') {
-      return req;
-    }
-
-    const url = new URL(req.url, 'http://swagger.local');
+  const patterns: string[] = [];
+  const paths = (arg as OpenApiDocumentLike).paths || {};
+  for (const path of Object.keys(paths)) {
+    const get = paths[path] && paths[path]!.get;
     if (
-      dqbGetRouteMatchers &&
-      !dqbGetRouteMatchers.some((matcher) => matcher.test(url.pathname))
+      !get ||
+      typeof get !== 'object' ||
+      !(get as Record<string, unknown>)['x-dqb-dynamic-query']
     ) {
-      return req;
+      continue;
     }
-
-    const rawQuery = url.search.slice(1);
-    if (!rawQuery) return req;
-
-    const parts = rawQuery
-      .split('&')
-      .filter(Boolean)
-      .map((pair) => normalizeSwaggerQueryParam(pair));
-
-    const nextQuery = parts.join('&');
-    const normalizedUrl = `${url.pathname}${nextQuery ? `?${nextQuery}` : ''}`;
-    req.url = hasAbsoluteUrl(req.url)
-      ? `${url.origin}${normalizedUrl}`
-      : normalizedUrl;
-  } catch (err) {
-    console.error('[DQB] erro no interceptor:', err);
-  }
-  return req;
-}
-
-function normalizeSwaggerQueryParam(pair: string): string {
-  const eqIdx = pair.indexOf('=');
-  const rawKey = eqIdx === -1 ? pair : pair.slice(0, eqIdx);
-  const rawValue = eqIdx === -1 ? '' : pair.slice(eqIdx + 1);
-
-  if (safeDecode(rawKey) !== 'filter') {
-    return rawValue ? `${rawKey}=${rawValue}` : rawKey;
+    patterns.push(
+      '^' +
+        path
+          .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          .replace(/\\\{[^/]+?\\\}/g, '[^/]+') +
+        '$'
+    );
   }
 
-  const decodedValue = safeDecode(rawValue).trim();
-  if (!decodedValue) return rawKey;
-
-  if (decodedValue.charAt(0) === '[' && decodedValue.indexOf('=') !== -1) {
-    return encodeNormalizedFilterParam(`filter${decodedValue}`);
-  }
-
-  if (
-    decodedValue.substring(0, 7) === 'filter[' &&
-    decodedValue.indexOf('=') !== -1
-  ) {
-    return encodeNormalizedFilterParam(decodedValue);
-  }
-
-  return rawValue ? `${rawKey}=${rawValue}` : rawKey;
-}
-
-function safeDecode(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
-
-function hasAbsoluteUrl(value: string): boolean {
-  return /^https?:\/\//i.test(value);
-}
-
-function encodeNormalizedFilterParam(value: string): string {
-  const eqIdx = value.indexOf('=');
-  if (eqIdx === -1) {
-    return encodeURIComponent(value);
-  }
-
-  const key = value.slice(0, eqIdx);
-  const paramValue = value.slice(eqIdx + 1);
-
-  return `${encodeURIComponent(key)}=${encodeURIComponent(paramValue)}`;
+  // `new Function` e não uma closure: o texto desta função é o que o
+  // `@nestjs/swagger` serializa, e só assim os padrões viajam junto.
+  return new Function(
+    'req',
+    'return (' +
+      intercept.toString() +
+      ')(req, ' +
+      JSON.stringify(patterns) +
+      ');'
+  ) as (req: SwaggerRequest) => SwaggerRequest;
 }

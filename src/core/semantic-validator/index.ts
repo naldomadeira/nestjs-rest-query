@@ -15,6 +15,7 @@ export { validateFilterTerm } from './validate-filter';
 export { validateSort, type ValidatedSort } from './validate-sort';
 export { validateSearch } from './validate-search';
 export {
+  assertWithinUnpaginatedCap,
   validatePagination,
   type PaginationLimits,
   type PlanPagination,

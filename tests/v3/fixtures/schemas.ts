@@ -130,6 +130,16 @@ const postFields = (portableOrder: boolean) => [
     nullable: false,
     primaryKey: false,
   },
+  // Propriedade camelCase sobre coluna física `is_pinned`: é o único campo do
+  // modelo canônico cujo nome lógico difere do físico, e é por ele que o bug
+  // #2 do relato de consumidor externo — o EXISTS do TypeORM emitia o nome da
+  // propriedade — passa a ser medido nos três adapters.
+  {
+    path: 'isPinned',
+    kind: 'boolean' as const,
+    nullable: false,
+    primaryKey: false,
+  },
 ];
 
 const postRelations = [

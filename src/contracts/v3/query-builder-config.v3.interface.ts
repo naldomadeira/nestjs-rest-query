@@ -2,10 +2,29 @@ import type { ConsistencyMode, TextProfile } from '../../core/query-plan';
 import type { LoggerLike } from '../query-builder-config.interface';
 
 export interface PaginationConfigV3 {
-  /** @default 20 */
+  /** @default 10 */
   defaultPerPage?: number;
-  /** @default 100 */
+  /**
+   * Maior `perPage` que um cliente pode pedir; acima disso, 400
+   * `PAGINATION_INVALID`.
+   * @default 100
+   */
   maxPerPage?: number;
+  /**
+   * Se `?paginate=false` é aceito. `false` recusa a requisição com 400
+   * `PAGINATION_INVALID` antes de qualquer query. Um endpoint pode decidir
+   * diferente em `defineQueryRules({ pagination })`.
+   * @default true
+   */
+  allowUnpaginated?: boolean;
+  /**
+   * Teto de linhas de uma resposta sem paginação. O adapter busca no máximo
+   * `maxUnpaginatedRows + 1` linhas; se o resultado passa do teto, a resposta
+   * é 400 `PAGINATION_INVALID` — nunca uma lista truncada em silêncio. Um
+   * endpoint pode declarar o seu em `defineQueryRules({ pagination })`.
+   * @default o valor efetivo de `maxPerPage`
+   */
+  maxUnpaginatedRows?: number;
 }
 
 export interface LoggingConfigV3 {

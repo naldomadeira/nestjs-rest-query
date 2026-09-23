@@ -80,12 +80,14 @@ export class DrizzleAdapter<
       joins: planner.all(),
       ...(where ? { where } : {}),
       orderBy,
+      // Sem paginação ainda há teto: uma linha além de `maxRows`, para o
+      // serviço recusar o resultado que passou dele (`PlanPagination.maxRows`).
       ...(plan.pagination.paginate
         ? {
             limit: plan.pagination.perPage,
             offset: (plan.pagination.page - 1) * plan.pagination.perPage,
           }
-        : {}),
+        : { limit: plan.pagination.maxRows + 1 }),
       countOnly: false,
       rootKey: plan.schema.primaryKey,
       manyProjections: projection.many,

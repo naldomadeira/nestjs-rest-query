@@ -44,6 +44,7 @@ export interface CorpusPostRow {
   title: string;
   title_folded: string;
   user_id: number;
+  isPinned: boolean;
 }
 
 export interface CorpusTagRow {
@@ -75,12 +76,18 @@ const company = (
   owner_id: number | null
 ): CorpusCompanyRow => ({ id, name, name_folded: fold(name), owner_id });
 
-const post = (id: string, title: string, user_id: number): CorpusPostRow => ({
+const post = (
+  id: string,
+  title: string,
+  user_id: number,
+  isPinned = false
+): CorpusPostRow => ({
   id,
   id_order: id,
   title,
   title_folded: fold(title),
   user_id,
+  isPinned,
 });
 
 const companies: CorpusCompanyRow[] = [
@@ -237,11 +244,16 @@ const users: CorpusUserRow[] = [
 
 const posts: CorpusPostRow[] = [
   post('11111111-1111-4111-8111-111111111111', 'Notes on the Engine', 1),
-  post('22222222-2222-4222-8222-222222222222', 'Analytical Machine', 1),
+  post('22222222-2222-4222-8222-222222222222', 'Analytical Machine', 1, true),
   post('33333333-3333-4333-8333-333333333333', 'Bernoulli Numbers', 1),
   post('44444444-4444-4444-8444-444444444444', 'COBOL', 2),
   post('55555555-5555-4555-8555-555555555555', 'The Compiler', 2),
-  post('66666666-6666-4666-8666-666666666666', 'On Computable Numbers', 3),
+  post(
+    '66666666-6666-4666-8666-666666666666',
+    'On Computable Numbers',
+    3,
+    true
+  ),
 ];
 
 const tag = (post_id: string, label: string): CorpusTagRow => ({

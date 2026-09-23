@@ -15,6 +15,10 @@ export interface SwaggerRulesView {
   readonly includes: readonly string[];
   readonly search: readonly string[];
   readonly operators: readonly QueryOperator[];
+  /** `false` quando o endpoint recusa `?paginate=false`. */
+  readonly allowUnpaginated: boolean;
+  /** Teto declarado pelo endpoint; ausente, vale o global. */
+  readonly maxUnpaginatedRows?: number;
 }
 
 export function toSwaggerRulesView(
@@ -40,5 +44,9 @@ export function toSwaggerRulesView(
     includes: [...rules.includes],
     search: rules.search.map((target) => target.path),
     operators: [...operators],
+    allowUnpaginated: rules.pagination?.allowUnpaginated !== false,
+    ...(rules.pagination?.maxUnpaginatedRows !== undefined
+      ? { maxUnpaginatedRows: rules.pagination.maxUnpaginatedRows }
+      : {}),
   };
 }

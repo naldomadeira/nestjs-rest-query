@@ -158,6 +158,8 @@ export function buildCorpusEntities(dialect: TestDialect): CorpusEntities {
       title: c({ logical: 'string' }),
       title_folded: c({ logical: 'string' }),
       user_id: c({ logical: 'integer' }),
+      // Nome físico diferente da propriedade, como `@Column({ name })`.
+      isPinned: { ...c({ logical: 'boolean' }), name: 'is_pinned' },
     },
     relations: {
       author: {

@@ -39,6 +39,7 @@ CREATE TABLE posts (
   title        VARCHAR(255) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
   title_folded VARCHAR(255) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
   user_id      INT NOT NULL,
+  is_pinned    BIT NOT NULL,
   CONSTRAINT posts_user_id_fkey FOREIGN KEY (user_id) REFERENCES users (id)
 );
 

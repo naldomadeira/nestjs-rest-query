@@ -20,18 +20,27 @@ describe('ApiPaginatedResponse', () => {
   });
 
   describe('no-op path (swagger unavailable)', () => {
-    it('returns the descriptor unchanged when swagger is not installed', () => {
-      // Simulate swagger unavailable by calling the fallback branch directly
-      const noopDecorator = (
-        _target: object,
-        _key: string | symbol,
-        descriptor: PropertyDescriptor
-      ) => descriptor;
+    afterEach(() => jest.dontMock('@nestjs/swagger'));
 
-      const fn = jest.fn();
-      const descriptor = { value: fn };
-      const result = noopDecorator({}, 'method', descriptor);
-      expect(result).toBe(descriptor);
+    it('returns the descriptor unchanged when swagger is not installed', () => {
+      // Carrega o decorator num registro próprio em que `@nestjs/swagger` não
+      // resolve — o caminho real de quem não instalou o peer opcional.
+      jest.isolateModules(() => {
+        jest.doMock('@nestjs/swagger', () => {
+          throw new Error("Cannot find module '@nestjs/swagger'");
+        });
+        const isolated =
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          require('@src/api/decorators/api-paginated-response.decorator') as typeof import('@src/api/decorators/api-paginated-response.decorator');
+
+        const descriptor = { value: jest.fn() };
+        const result = isolated.ApiPaginatedResponse(UserModel)(
+          {},
+          'method',
+          descriptor
+        );
+        expect(result).toBe(descriptor);
+      });
     });
   });
 });

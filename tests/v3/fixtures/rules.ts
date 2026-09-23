@@ -49,7 +49,9 @@ const userFilters = [
   { path: 'document', operators: ['eq', 'in'] },
   { path: 'code', operators: ['eq', 'in'] },
   { path: 'score', operators: ['eq', 'gt', 'gte', 'lt', 'lte', 'between'] },
-  { path: 'balance', operators: ['eq', 'gt', 'lt'] },
+  // `gte`/`lte`/`between` em decimal: o bug #1 do relato de consumidor externo
+  // (`'"29.90"'` no PostgreSQL) atingia exatamente estes operadores.
+  { path: 'balance', operators: ['eq', 'gt', 'gte', 'lt', 'lte', 'between'] },
   { path: 'active', operators: ['eq'] },
   { path: 'born_on', operators: ['eq', 'gt', 'lt', 'between'] },
   { path: 'created_at', operators: ['eq', 'gt', 'lt'] },
@@ -106,6 +108,8 @@ const userDeep = defineQueryRules(CORPUS_SCHEMAS, 'user', {
     // porque nada no corpus o alcançava.
     { path: 'posts.author.name', operators: ['eq'] },
     { path: 'posts.tags.label', operators: ['eq', 'in'] },
+    // Folha `many` cujo nome físico difere da propriedade (bug #2).
+    { path: 'posts.isPinned', operators: ['eq'] },
   ],
   sorts: ['id', 'name', 'code'],
   fields: {
@@ -154,6 +158,22 @@ const tagDefault = defineQueryRules(CORPUS_SCHEMAS, 'tag', {
   },
 });
 
+/**
+ * Política de `paginate=false` por endpoint (bug #6 do relato de consumidor
+ * externo). O seed tem 11 users: um teto de 5 é ultrapassado, um de 11 é
+ * exatamente atingido.
+ */
+const userUnpaginated = (pagination: {
+  allowUnpaginated?: boolean;
+  maxUnpaginatedRows?: number;
+}) =>
+  defineQueryRules(CORPUS_SCHEMAS, 'user', {
+    filters: [{ path: 'id', operators: ['eq', 'lte'] }],
+    sorts: ['id'],
+    fields: { root: userRootFields },
+    pagination,
+  });
+
 export const RULES_PRESETS: Readonly<Record<string, CompiledQueryRules>> = {
   'user.default': userDefault,
   'user.company-root-only': userCompanyRootOnly,
@@ -161,4 +181,7 @@ export const RULES_PRESETS: Readonly<Record<string, CompiledQueryRules>> = {
   'user.no-search': userNoSearch,
   'post.portable-order': postPortableOrder,
   'tag.default': tagDefault,
+  'user.unpaginated-capped': userUnpaginated({ maxUnpaginatedRows: 5 }),
+  'user.unpaginated-at-cap': userUnpaginated({ maxUnpaginatedRows: 11 }),
+  'user.unpaginated-forbidden': userUnpaginated({ allowUnpaginated: false }),
 };

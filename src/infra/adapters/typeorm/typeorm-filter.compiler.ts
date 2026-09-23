@@ -3,7 +3,7 @@ import {
   type SelectQueryBuilder,
   type WhereExpressionBuilder,
 } from 'typeorm';
-import type { ObjectLiteral } from 'typeorm';
+import type { EntityMetadata, ObjectLiteral } from 'typeorm';
 import { configurationError } from '@core/errors';
 import { CivilDate, DecimalValue } from '@core/coercion';
 import type { PlanFilter } from '@core/semantic-validator';
@@ -70,8 +70,8 @@ export function compileFilters<T extends ObjectLiteral>(
 
           where.orWhere(
             target.existential
-              ? existsThroughMany(qb, target.relationPath, (alias) =>
-                  like(`${alias}.${leafColumn(target.column)}`)
+              ? existsThroughMany(qb, target.relationPath, (leaf) =>
+                  like(leaf(target.column))
                 )
               : like(columnRef(target.column, context))
           );
@@ -196,13 +196,8 @@ function existentialCondition<T extends ObjectLiteral>(
     // Alvo é a própria relação: a condição é só a correlação, sem folha.
     filter.target === 'relation'
       ? null
-      : (alias) =>
-          existentialLeafCondition(
-            `${alias}.${leafColumn(filter.column)}`,
-            filter,
-            context,
-            bag
-          )
+      : (leaf) =>
+          existentialLeafCondition(leaf(filter.column), filter, context, bag)
   );
 
   // `isNull=true` numa relação many significa coleção vazia.
@@ -217,8 +212,9 @@ function existentialCondition<T extends ObjectLiteral>(
  *
  * É a mesma maquinaria para filtro e para busca — inclusive a correlação por
  * FK composta —, porque a semântica é a mesma: "algum item corresponde". O
- * chamador só fornece a condição da folha, já qualificada pelo alias da
- * subquery, ou `null` quando a pergunta é sobre a própria coleção.
+ * chamador só fornece a condição da folha, montada a partir de um resolvedor
+ * que devolve a coluna já qualificada pelo alias da subquery e citada pelo
+ * nome físico, ou `null` quando a pergunta é sobre a própria coleção.
  *
  * A correlação com o root acontece **uma só vez**, no primeiro salto; os
  * saltos seguintes são `INNER JOIN` dentro da subquery. Correlacionar cada
@@ -228,14 +224,15 @@ function existentialCondition<T extends ObjectLiteral>(
 function existsThroughMany<T extends ObjectLiteral>(
   qb: SelectQueryBuilder<T>,
   relationPath: readonly string[],
-  leaf: ((subAlias: string) => string) | null
+  leaf: ((column: (path: string) => string) => string) | null
 ): string {
-  const [head, ...tail] = existentialChain(
+  const chain = existentialChain(
     qb.expressionMap.mainAlias!.metadata,
     relationPath
   );
+  const [head, ...tail] = chain.steps;
 
-  const correlation = linkCondition(head, ROOT_ALIAS);
+  const correlation = linkCondition(head, chain.quote(ROOT_ALIAS));
 
   // Cada passo se liga ao alias imediatamente anterior — inclusive a tabela de
   // junção de uma many-to-many, que é um passo como os outros.
@@ -250,10 +247,38 @@ function existsThroughMany<T extends ObjectLiteral>(
 
   const conditions = [correlation];
   // A folha é sempre qualificada pelo último alias da cadeia: é lá que a
-  // coluna do filtro (ou da busca) mora.
-  if (leaf) conditions.push(leaf(parentAlias));
+  // coluna do filtro (ou da busca) mora — e pelo nome **físico** dela, que só
+  // a metadata da última entidade conhece.
+  if (leaf) {
+    conditions.push(
+      leaf(
+        (path) =>
+          `${parentAlias}.${chain.quote(physicalColumn(chain.target, path))}`
+      )
+    );
+  }
 
   return `EXISTS (SELECT 1 FROM ${head.table} ${head.alias}${joins.join('')} WHERE ${conditions.join(' AND ')})`;
+}
+
+/**
+ * Nome físico da coluna da folha de um path lógico (`posts.isPinned` ->
+ * `is_pinned`).
+ *
+ * `@Column({ name })` e a naming strategy do TypeORM podem dar à coluna um
+ * nome diferente da propriedade; o schema lógico fala em propriedades.
+ */
+function physicalColumn(target: EntityMetadata, path: string): string {
+  const property = path.slice(path.lastIndexOf('.') + 1);
+  const column = target.findColumnWithPropertyPath(property);
+  if (!column) {
+    throw configurationError(
+      'ADAPTER_CONTRACT_VIOLATION',
+      `Entity ${target.name} has no column for property ${property}`,
+      { path }
+    );
+  }
+  return column.databaseName;
 }
 
 /** Igualdade entre as colunas de um passo e as do alias anterior. */
@@ -306,11 +331,6 @@ function existentialLeafCondition(
       return `${column} ${SQL_COMPARISON[filter.operator]} :${key}`;
     }
   }
-}
-
-/** Última parte de um path pontuado: a coluna física da folha. */
-function leafColumn(column: string): string {
-  return column.slice(column.lastIndexOf('.') + 1);
 }
 
 /** Referência SQL de uma coluna lógica, resolvendo o alias do join. */

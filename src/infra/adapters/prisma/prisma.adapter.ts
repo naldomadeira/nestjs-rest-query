@@ -108,12 +108,14 @@ export class PrismaAdapter<
       ...(where ? { where } : {}),
       select: compileSelect(plan),
       orderBy: compileOrderBy(plan),
+      // Sem paginação ainda há teto: uma linha além de `maxRows`, para o
+      // serviço recusar o resultado que passou dele (`PlanPagination.maxRows`).
       ...(plan.pagination.paginate
         ? {
             skip: (plan.pagination.page - 1) * plan.pagination.perPage,
             take: plan.pagination.perPage,
           }
-        : {}),
+        : { take: plan.pagination.maxRows + 1 }),
     };
 
     return {

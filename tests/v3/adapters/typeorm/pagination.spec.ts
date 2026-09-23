@@ -1,5 +1,5 @@
 import type { ObjectLiteral } from 'typeorm';
-import { buildQueryPlan } from '@core/query-plan';
+import { buildQueryPlan, type BuildPlanOptions } from '@core/query-plan';
 import {
   compilePlan,
   executeCompiled,
@@ -25,14 +25,15 @@ afterAll(closeSqlite);
 
 async function run(
   query: Record<string, unknown>,
-  preset = 'user.default'
+  preset = 'user.default',
+  options: BuildPlanOptions = {}
 ): Promise<{
   queryCount: number;
   total?: number;
   lastPage?: number;
   data: Record<string, unknown>[];
 }> {
-  const plan = buildQueryPlan(query, RULES_PRESETS[preset]);
+  const plan = buildQueryPlan(query, RULES_PRESETS[preset], options);
   const compiled = compilePlan(plan, repositoryFor(preset), ESCAPE_CHARACTER);
   const result = await executeCompiled(compiled);
   const normalized = normalizeResult<ObjectLiteral>(
@@ -173,5 +174,42 @@ describe('paginação TypeORM', () => {
     expect(first.data).toHaveLength(2);
     expect(second.data).toHaveLength(1);
     expect(first.total).toBe(3);
+  });
+});
+
+/**
+ * Bug #6 do relato de consumidor externo: `paginate=false` emitia `ORDER BY`
+ * sem `LIMIT` e trazia a tabela inteira para a memória do processo.
+ */
+describe('regression: unpaginated global cap (consumer report #6) — TypeORM', () => {
+  const capped: BuildPlanOptions = { pagination: { maxUnpaginatedRows: 3 } };
+
+  it('busca no máximo o teto + 1 roots, numa query só', async () => {
+    const result = await run({ paginate: 'false' }, 'user.default', capped);
+    expect(result.queryCount).toBe(1);
+    expect(result.data.map((row) => row.id)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('com relação many, o teto conta roots e não linhas de join', async () => {
+    // O user 1 tem três posts: um LIMIT direto sobre o join cortaria a
+    // coleção dele no meio. A janela escolhe roots primeiro, como a página.
+    const result = await run(
+      { paginate: 'false', includes: 'posts' },
+      'user.deep',
+      capped
+    );
+    expect(result.queryCount).toBe(2);
+    expect(result.data.map((row) => row.id)).toEqual([1, 2, 3, 4]);
+    expect(result.data[0].posts).toHaveLength(3);
+  });
+
+  it('com relação many e nenhum root, não hidrata', async () => {
+    const result = await run(
+      { paginate: 'false', includes: 'posts', filter: { id: { eq: '999' } } },
+      'user.deep',
+      capped
+    );
+    expect(result.queryCount).toBe(2);
+    expect(result.data).toEqual([]);
   });
 });

@@ -35,4 +35,14 @@ export interface CompiledQueryRules {
   };
   readonly includes: ReadonlySet<string>;
   readonly search: readonly CompiledSearchTarget[];
+  /**
+   * Só as chaves que o endpoint declarou: a ausente herda a política global
+   * de `forRoot` na construção do plano.
+   */
+  readonly pagination?: CompiledPaginationRules;
+}
+
+export interface CompiledPaginationRules {
+  readonly allowUnpaginated?: boolean;
+  readonly maxUnpaginatedRows?: number;
 }

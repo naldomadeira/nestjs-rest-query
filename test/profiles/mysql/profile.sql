@@ -36,6 +36,7 @@ CREATE TABLE posts (
   title        VARCHAR(255) COLLATE utf8mb4_bin NOT NULL,
   title_folded VARCHAR(255) COLLATE utf8mb4_bin NOT NULL,
   user_id      INT NOT NULL,
+  is_pinned    BOOLEAN NOT NULL,
   CONSTRAINT posts_user_id_fkey FOREIGN KEY (user_id) REFERENCES users (id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin;
 

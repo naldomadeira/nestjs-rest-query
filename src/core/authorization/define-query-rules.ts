@@ -10,6 +10,7 @@ import { assertOperatorSupported } from '../semantic-validator/operator-matrix';
 import type { QueryOperator } from '../../domain/operators/operator.types';
 import type {
   CompiledFieldProjection,
+  CompiledPaginationRules,
   CompiledQueryRules,
   CompiledSearchTarget,
 } from './compiled-rules';
@@ -60,6 +61,7 @@ export function defineQueryRules(
   const sorts = compileSorts(registry, model, input.sorts ?? []);
   const fields = compileFields(registry, model, input, includes);
   const search = compileSearch(registry, model, input.search ?? []);
+  const pagination = compilePagination(input.pagination);
 
   return Object.freeze({
     registry,
@@ -69,6 +71,34 @@ export function defineQueryRules(
     fields,
     includes,
     search,
+    ...(pagination ? { pagination } : {}),
+  });
+}
+
+/** Valida a política de paginação do endpoint na construção, não na request. */
+function compilePagination(
+  input: QueryRulesInput['pagination']
+): CompiledPaginationRules | undefined {
+  if (input === undefined) return undefined;
+
+  const { allowUnpaginated, maxUnpaginatedRows } = input;
+  if (allowUnpaginated !== undefined && typeof allowUnpaginated !== 'boolean') {
+    invalid('pagination.allowUnpaginated must be a boolean', {
+      allowUnpaginated,
+    });
+  }
+  if (
+    maxUnpaginatedRows !== undefined &&
+    (!Number.isSafeInteger(maxUnpaginatedRows) || maxUnpaginatedRows < 1)
+  ) {
+    invalid('pagination.maxUnpaginatedRows must be a positive integer', {
+      maxUnpaginatedRows,
+    });
+  }
+
+  return Object.freeze({
+    ...(allowUnpaginated !== undefined ? { allowUnpaginated } : {}),
+    ...(maxUnpaginatedRows !== undefined ? { maxUnpaginatedRows } : {}),
   });
 }
 
