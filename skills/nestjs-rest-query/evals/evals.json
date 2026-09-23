@@ -3,7 +3,7 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Estou criando um projeto NestJS do zero com TypeORM e PostgreSQL. Preciso instalar e configurar o nestjs-rest-query pra usar filtros dinâmicos nos meus endpoints. Me ajuda a fazer o setup completo — main.ts, app.module.ts — tudo que precisa pra funcionar.",
+      "prompt": "[package.json: \"nestjs-rest-query\": \"^2.1.0\"] Estou criando um projeto NestJS do zero com TypeORM e PostgreSQL. Preciso instalar e configurar o nestjs-rest-query pra usar filtros dinâmicos nos meus endpoints. Me ajuda a fazer o setup completo — main.ts, app.module.ts — tudo que precisa pra funcionar.",
       "expected_output": "Complete setup with: pnpm/npm install command for nestjs-rest-query, main.ts with extended query parser + ValidationPipe with enableImplicitConversion, app.module.ts with DynamicQueryBuilderModule.forRoot(). All bootstrap steps present and correct. NO references to a private registry or @multitechbr scope.",
       "files": [],
       "expectations": [
@@ -14,12 +14,14 @@
         "Output includes DynamicQueryBuilderModule.forRoot() in app.module.ts imports",
         "Output imports from 'nestjs-rest-query' (NOT '@multitechbr/nestjs-dynamic-query-builder')",
         "Output does NOT skip any of the mandatory bootstrap steps",
-        "Code examples are syntactically valid TypeScript"
-      ]
+        "Code examples are syntactically valid TypeScript",
+        "Answer uses the 2.x API (forRoot adapter, RulesConfig) and does not mix in 3.x names (defineQueryRules, typeormSource)"
+      ],
+      "version": "2.x"
     },
     {
       "id": 2,
-      "prompt": "Tenho uma entidade Product com campos: id, name, price, category, createdAt, deletedAt. Preciso criar um endpoint GET /products que suporte filtrar por name (case-insensitive), price (range), category (múltiplos valores), ordenar por name e price, paginar, e excluir soft-deleted automaticamente. Usa o nestjs-rest-query.",
+      "prompt": "[package.json: \"nestjs-rest-query\": \"^2.1.0\"] Tenho uma entidade Product com campos: id, name, price, category, createdAt, deletedAt. Preciso criar um endpoint GET /products que suporte filtrar por name (case-insensitive), price (range), category (múltiplos valores), ordenar por name e price, paginar, e excluir soft-deleted automaticamente. Usa o nestjs-rest-query.",
       "expected_output": "Controller with @ApiDynamicQuery having filters for name/price/category, sorts for name/price, and a service using queryBuilderService.execute() with customize callback for soft delete (deletedAt IS NULL). Uses ilike for name, between for price range, in for category.",
       "files": [],
       "expectations": [
@@ -30,12 +32,14 @@
         "Customize callback adds andWhere for deletedAt IS NULL (soft delete filtering)",
         "Does NOT expose deletedAt in filters whitelist (security)",
         "Code mentions ilike for case-insensitive name search or documents operator usage",
-        "Imports come from 'nestjs-rest-query' (NOT the old @multitechbr scope)"
-      ]
+        "Imports come from 'nestjs-rest-query' (NOT the old @multitechbr scope)",
+        "Answer uses the 2.x API (forRoot adapter, RulesConfig) and does not mix in 3.x names (defineQueryRules, typeormSource)"
+      ],
+      "version": "2.x"
     },
     {
       "id": 3,
-      "prompt": "Tenho entidades Order (id, status, total, createdAt) com ManyToOne para Customer (id, name, email) e OneToMany para OrderItem (id, quantity, unitPrice) que tem ManyToOne para Product (id, name). Preciso de um endpoint GET /orders que permita filtrar por status, customer.name (case-insensitive), incluir customer e items com items.product, e ordenar por createdAt e total. Também preciso de field selection e que a resposta seja paginada.",
+      "prompt": "[package.json: \"nestjs-rest-query\": \"^2.1.0\"] Tenho entidades Order (id, status, total, createdAt) com ManyToOne para Customer (id, name, email) e OneToMany para OrderItem (id, quantity, unitPrice) que tem ManyToOne para Product (id, name). Preciso de um endpoint GET /orders que permita filtrar por status, customer.name (case-insensitive), incluir customer e items com items.product, e ordenar por createdAt e total. Também preciso de field selection e que a resposta seja paginada.",
       "expected_output": "Controller with @ApiDynamicQuery having nested filters (customer.name), includes for customer/items/items.product, fields selection, sorts. Service using execute(). Correct dot-notation for nested filtering with parent relation in includes.",
       "files": [],
       "expectations": [
@@ -45,12 +49,14 @@
         "Sorts array has 'createdAt' and 'total' and both are also present in fields array",
         "Uses @ApiDynamicQuery or @DynamicQuery decorator (not manual query building)",
         "@QueryRules() is used to inject rules into the handler method",
-        "Service delegates to queryBuilderService.execute() with all parameters"
-      ]
+        "Service delegates to queryBuilderService.execute() with all parameters",
+        "Answer uses the 2.x API (forRoot adapter, RulesConfig) and does not mix in 3.x names (defineQueryRules, typeormSource)"
+      ],
+      "version": "2.x"
     },
     {
       "id": 4,
-      "prompt": "Quero usar nestjs-rest-query num projeto que já está rodando com Drizzle ORM e Postgres (não tenho TypeORM). Como faço o setup pra que execute() trabalhe com a minha tabela users (com relação ManyToOne para companies)? Mostra desde forRoot até o serviço.",
+      "prompt": "[package.json: \"nestjs-rest-query\": \"^2.1.0\"] Quero usar nestjs-rest-query num projeto que já está rodando com Drizzle ORM e Postgres (não tenho TypeORM). Como faço o setup pra que execute() trabalhe com a minha tabela users (com relação ManyToOne para companies)? Mostra desde forRoot até o serviço.",
       "expected_output": "AppModule registers DynamicQueryBuilderModule.forRoot({ adapter: new DrizzleAdapter() }) imported from 'nestjs-rest-query/drizzle'. Service builds a DrizzleSource with db, table, and relations, and passes it to queryBuilderService.execute(source, query, rules). No TypeORM Repository involved.",
       "files": [],
       "expectations": [
@@ -60,19 +66,88 @@
         "relations declares 'company' with type: 'one' and an on: { localKey, foreignKey } shape",
         "queryBuilderService.execute() receives the DrizzleSource (not a TypeORM Repository)",
         "Output does NOT import @nestjs/typeorm or use InjectRepository",
-        "Bootstrap (main.ts) still includes query parser 'extended' and ValidationPipe with enableImplicitConversion"
-      ]
+        "Bootstrap (main.ts) still includes query parser 'extended' and ValidationPipe with enableImplicitConversion",
+        "Answer uses the 2.x API (forRoot adapter, RulesConfig) and does not mix in 3.x names (defineQueryRules, typeormSource)"
+      ],
+      "version": "2.x"
     },
     {
       "name": "endpoint_operator_override",
-      "input": "Create a public products endpoint where the app globally allows eq, ilike, in, between, but this endpoint only accepts eq and ilike for filters.",
+      "input": "[package.json: \"nestjs-rest-query\": \"^2.1.0\"] Create a public products endpoint where the app globally allows eq, ilike, in, between, but this endpoint only accepts eq and ilike for filters.",
       "expected_output": "Controller uses @ApiDynamicQuery with filters for public product fields and operators: { allowed: ['eq', 'ilike'] }. The app module shows DynamicQueryBuilderModule.forRoot with a broader global operators.allowed list. The service passes @QueryRules() rules to queryBuilderService.execute(). Explanation states endpoint RulesConfig.operators overrides the global operator config only for that route.",
       "checks": [
         "App module uses DynamicQueryBuilderModule.forRoot with global operators.allowed broader than the endpoint",
         "Controller uses @ApiDynamicQuery or @DynamicQuery with operators: { allowed: ['eq', 'ilike'] }",
         "@QueryRules() is used and passed to queryBuilderService.execute()",
         "Answer explains that endpoint RulesConfig.operators has priority over global forRoot operators",
-        "Answer does not suggest manual query parsing or bypassing the whitelist"
+        "Answer does not suggest manual query parsing or bypassing the whitelist",
+        "Answer uses the 2.x API (forRoot adapter, RulesConfig) and does not mix in 3.x names (defineQueryRules, typeormSource)"
+      ],
+      "version": "2.x"
+    },
+    {
+      "id": 6,
+      "version": "detection",
+      "prompt": "Tenho um projeto NestJS que usa nestjs-rest-query mas não sei a versão. No app.module tem DynamicQueryBuilderModule.forRoot({ pagination: { defaultPerPage: 20 } }) e o service chama this.queryBuilder.execute(typeormSource(this.repo), query, rules). Como adiciono um filtro por price entre dois valores?",
+      "expected_output": "Identifies 3.x from typeormSource/execute(source), checks package.json for the exact version, and adds { path: 'price', operators: ['between'] } (or gte/lte) to defineQueryRules with a decimal field in the schema. Warns that 3.0.0-alpha.0 returns 500 on decimal filters and recommends upgrading if that is the installed version.",
+      "expectations": [
+        "Identifies the project as 3.x from the typeormSource / execute(source) import style",
+        "Asks for or reads the exact installed version before concluding",
+        "Adds price to defineQueryRules filters with between (or gte/lte), not to a RulesConfig",
+        "Declares or confirms price as kind 'decimal' in defineQuerySchema",
+        "Mentions that 3.0.0-alpha.0 has a decimal-filter 500 fixed in later alphas"
+      ]
+    },
+    {
+      "id": 7,
+      "version": "3.x",
+      "prompt": "[package.json: \"nestjs-rest-query\": \"3.0.0-alpha.1\", typeorm 0.3, @nestjs/typeorm 11] Crie o endpoint GET /v1/products com filtro por name (case-insensitive), price (range), brand.name, ordenação por name e price, include de brand e busca por name. A PK é uuid.",
+      "expected_output": "defineQuerySchema for product (uuid PK with portableOrderField id_order, name with foldedField name_folded, internal companions, decimal price, relation brand one) and brand; defineQueryRules with per-field operators (ilike on name, between/gte/lte on price, eq on brand.name), sorts, fields.root, includes ['brand'], search ['name']; service builds typeormSource(repo) once and calls execute(source, query, rules); controller uses @ApiDynamicQuery(rules) and @QueryRules(); mentions the migrations for name_folded and id_order.",
+      "expectations": [
+        "Uses defineQuerySchema + defineQueryRules, no RulesConfig",
+        "uuid primary key declares portableOrderField and an internal order column",
+        "ilike/search target name has a foldedField and the answer mentions the folded column migration",
+        "typeormSource imported from 'nestjs-rest-query/typeorm' and created once per service",
+        "forRoot has no adapter or operators key",
+        "@ApiDynamicQuery(rules) without a type parameter"
+      ]
+    },
+    {
+      "id": 8,
+      "version": "3.x",
+      "prompt": "[nestjs-rest-query 3.0.0-alpha.1] Minha rota GET /brands?paginate=false começou a responder 400 PAGINATION_INVALID. Antes devolvia todas as 350 marcas. O que houve e como resolvo sem liberar a tabela de produtos inteira?",
+      "expected_output": "Explains paginate=false is capped at maxUnpaginatedRows (default maxPerPage = 100) and a larger result is a 400 rather than truncation; fix: pagination: { maxUnpaginatedRows: 500 } in the brands endpoint rules (endpoint key replaces the global), optionally allowUnpaginated: false on products.",
+      "expectations": [
+        "Explains the unpaginated cap and that its default is the effective maxPerPage",
+        "States the result is refused, not truncated",
+        "Raises maxUnpaginatedRows in the brands defineQueryRules, not globally",
+        "Suggests allowUnpaginated: false (or keeping the default cap) for products"
+      ]
+    },
+    {
+      "id": 9,
+      "version": "3.x",
+      "prompt": "[nestjs-rest-query 3.0.0-alpha.0] Com ValidationPipe({ whitelist: true }) global, meus filtros e sort são ignorados: sempre volta a primeira página. O controller usa @Query() query: DynamicQueryDto.",
+      "expected_output": "Identifies the open defect: DynamicQueryDto has no class-validator decorators, whitelist strips every key. Workaround: custom param decorator returning request.query (global pipes skip custom decorators) typed as QueryInput; keep the library's own validation.",
+      "expectations": [
+        "Names whitelist: true stripping DynamicQueryDto as the cause",
+        "Proposes a createParamDecorator reading request.query",
+        "Does not suggest disabling whitelist globally as the only fix",
+        "Notes endpoint-specific params must be removed before execute() (QUERY_SYNTAX_UNKNOWN_PARAM)"
+      ]
+    },
+    {
+      "id": 10,
+      "version": "migration",
+      "prompt": "[package.json: \"nestjs-rest-query\": \"^2.1.0\"] Quero migrar para a 3.x. Tenho forRoot({ adapter: new DrizzleAdapter(), operators: { allowed: ['eq','ilike'] } }) e controllers com @ApiDynamicQuery<User>({ filters: ['name'], sorts: ['name'] }).",
+      "expected_output": "Points to MIGRATION.md 2.x → 3.x and walks it in order: Drizzle peer >=1.0.0-rc.4, remove adapter/operators from forRoot, schema + rules per endpoint with per-field operators, drizzleSource with createDrizzleTable, folded columns for ilike, @ApiDynamicQuery(rules), client-facing changes (sort not sorts, unknown params 400).",
+      "expectations": [
+        "References MIGRATION.md section 2.x → 3.x",
+        "Removes adapter and operators from forRoot",
+        "Moves operators into per-field defineQueryRules filters",
+        "Upgrades drizzle-orm to the 1.0.0 release candidates",
+        "Mentions the folded column required by ilike",
+        "Lists wire changes for clients (sort vs sorts, unknown param 400)"
       ]
     }
   ]

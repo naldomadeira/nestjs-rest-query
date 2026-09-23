@@ -1,7 +1,7 @@
 {
   "name": "nestjs-rest-query",
-  "version": "2.0.0",
-  "description": "Guia para instalar, configurar e usar a biblioteca nestjs-rest-query 2.x em projetos NestJS com TypeORM, Drizzle ou Prisma, cobrindo filtros, ordenacao, paginacao, includes, busca textual e troubleshooting. Cobre a API 2.x publicada no npm; a 3.x tem outra superficie publica e ainda nao tem edicao desta skill.",
+  "version": "3.0.0",
+  "description": "Guia para instalar, configurar, usar, migrar e depurar a biblioteca nestjs-rest-query em projetos NestJS com TypeORM, Prisma ou Drizzle. Detecta a versao instalada (2.x ou 3.x) e orienta cada linha: RulesConfig e forRoot({ adapter }) na 2.x; defineQuerySchema, defineQueryRules e typeormSource/prismaSource/drizzleSource na 3.x; migracao 2.x -> 3.x via MIGRATION.md.",
   "tags": [
     "nestjs",
     "typeorm",
@@ -12,11 +12,12 @@
     "backend",
     "rest-query",
     "pagination",
-    "filter"
+    "filter",
+    "migration"
   ],
   "author": "Naldo Madeira",
   "category": "backend",
-  "content": "# nestjs-rest-query (2.x)\n\nSkill para orientar setup, uso e troubleshooting da biblioteca `nestjs-rest-query` em APIs NestJS com TypeORM, Drizzle ou Prisma. Cobre a API `2.x`; nao se aplica a `3.x`.",
+  "content": "# nestjs-rest-query (2.x e 3.x)\n\nSkill para orientar setup, uso, migracao e troubleshooting da biblioteca `nestjs-rest-query` em APIs NestJS com TypeORM, Prisma ou Drizzle. Comeca detectando a versao instalada e segue o guia da linha correspondente.",
   "url": "https://github.com/naldomadeira/nestjs-rest-query/tree/main/skills/nestjs-rest-query",
   "extension": "directory",
   "packageType": "directory",

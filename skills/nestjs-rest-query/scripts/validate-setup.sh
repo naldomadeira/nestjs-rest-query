@@ -38,7 +38,40 @@ else
     "Are you running this from the project root?"
 fi
 
-# 2. Detect which ORM is in use (TypeORM is the default; Drizzle is opt-in)
+# 1b. Detect the API line: 2.x and 3.x need different setups.
+LINE="unknown"
+if [ -f "$PROJECT_ROOT/package.json" ]; then
+  RANGE=$(grep -o '"nestjs-rest-query"[[:space:]]*:[[:space:]]*"[^"]*"' "$PROJECT_ROOT/package.json" | sed 's/.*:[[:space:]]*"\(.*\)"/\1/' || true)
+  INSTALLED=""
+  if [ -f "$PROJECT_ROOT/node_modules/nestjs-rest-query/package.json" ]; then
+    INSTALLED=$(grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$PROJECT_ROOT/node_modules/nestjs-rest-query/package.json" | head -1 | sed 's/.*:[[:space:]]*"\(.*\)"/\1/')
+  fi
+  VERSION="${INSTALLED:-$RANGE}"
+  case "$VERSION" in
+    *3.*|alpha|*alpha*) LINE="3.x" ;;
+    *2.*|latest) LINE="2.x" ;;
+  esac
+  SRC_DIR="$PROJECT_ROOT/src"
+  if [ -d "$SRC_DIR" ]; then
+    if grep -rqE "typeormSource|prismaSource|drizzleSource|defineQueryRules" "$SRC_DIR" 2>/dev/null; then
+      CODE_LINE="3.x"
+    elif grep -rqE "RulesConfig|forRoot\(\{[^}]*adapter" "$SRC_DIR" 2>/dev/null; then
+      CODE_LINE="2.x"
+    else
+      CODE_LINE=""
+    fi
+    if [ -n "$CODE_LINE" ] && [ "$LINE" != "unknown" ] && [ "$CODE_LINE" != "$LINE" ]; then
+      warn "package.json says $LINE but the code uses the $CODE_LINE API — migration in progress? See MIGRATION.md \"2.x → 3.x\""
+    fi
+    [ "$LINE" = "unknown" ] && [ -n "$CODE_LINE" ] && LINE="$CODE_LINE"
+  fi
+  echo "Detected API line: $LINE (version: ${VERSION:-none})"
+  if [ "$VERSION" = "3.0.0-alpha.0" ]; then
+    warn "3.0.0-alpha.0 has known defects fixed in later alphas (decimal/date filters, TypeORM many-relation filters, Swagger interceptor, uncapped paginate=false) — upgrade: pnpm add nestjs-rest-query@alpha"
+  fi
+fi
+
+# 2. Detect which ORM is in use
 HAS_TYPEORM=0
 HAS_DRIZZLE=0
 if [ -f "$PROJECT_ROOT/package.json" ]; then
@@ -46,12 +79,16 @@ if [ -f "$PROJECT_ROOT/package.json" ]; then
   if grep -q '"drizzle-orm"' "$PROJECT_ROOT/package.json"; then HAS_DRIZZLE=1; fi
 fi
 
-if [ $HAS_TYPEORM -eq 0 ] && [ $HAS_DRIZZLE -eq 0 ]; then
-  fail "Neither typeorm nor drizzle-orm is installed" \
-    "Install one peer ORM: pnpm add typeorm @nestjs/typeorm  OR  pnpm add drizzle-orm"
+HAS_PRISMA=0
+if [ -f "$PROJECT_ROOT/package.json" ] && grep -q '"@prisma/client"' "$PROJECT_ROOT/package.json"; then HAS_PRISMA=1; fi
+
+if [ $HAS_TYPEORM -eq 0 ] && [ $HAS_DRIZZLE -eq 0 ] && [ $HAS_PRISMA -eq 0 ]; then
+  fail "No supported ORM (typeorm, drizzle-orm, @prisma/client) is installed" \
+    "Install one peer ORM: pnpm add typeorm @nestjs/typeorm  OR  drizzle-orm  OR  @prisma/client"
 else
   [ $HAS_TYPEORM -eq 1 ] && pass "TypeORM detected in package.json"
   [ $HAS_DRIZZLE -eq 1 ] && pass "Drizzle ORM detected in package.json"
+  [ $HAS_PRISMA -eq 1 ] && pass "Prisma Client detected in package.json"
 fi
 
 # 3. Check main.ts for query parser
@@ -61,21 +98,27 @@ for f in "$PROJECT_ROOT/src/main.ts" "$PROJECT_ROOT/main.ts"; do
 done
 
 if [ -n "$MAIN_FILE" ]; then
-  if grep -q "query parser" "$MAIN_FILE" && grep -q "extended" "$MAIN_FILE"; then
-    pass "Extended query parser found in $(basename "$MAIN_FILE")"
+  if grep -rqE "query parser['\"][[:space:]]*,[[:space:]]*['\"]extended" "$PROJECT_ROOT/src" 2>/dev/null; then
+    pass "Extended query parser configured (searched src/)"
   else
     fail "Missing extended query parser in $(basename "$MAIN_FILE")" \
       "Add: app.set('query parser', 'extended');"
   fi
 
-  if grep -q "enableImplicitConversion" "$MAIN_FILE"; then
+  if [ "$LINE" = "3.x" ]; then
+    if grep -q "whitelist:[[:space:]]*true" "$MAIN_FILE"; then
+      warn "ValidationPipe({ whitelist: true }) strips DynamicQueryDto in 3.x — read the query with a custom param decorator (see references/v3/setup.md)"
+    fi
+  elif grep -q "enableImplicitConversion" "$MAIN_FILE"; then
     pass "enableImplicitConversion found in $(basename "$MAIN_FILE")"
   else
     fail "Missing enableImplicitConversion in $(basename "$MAIN_FILE")" \
       "Add ValidationPipe with: transformOptions: { enableImplicitConversion: true }"
   fi
 
-  if grep -q "ValidationPipe" "$MAIN_FILE"; then
+  if [ "$LINE" = "3.x" ]; then
+    : # 3.x validates the query itself; a global ValidationPipe is optional.
+  elif grep -q "ValidationPipe" "$MAIN_FILE"; then
     pass "ValidationPipe found in $(basename "$MAIN_FILE")"
   else
     fail "Missing ValidationPipe in $(basename "$MAIN_FILE")" \
@@ -99,8 +142,13 @@ if [ -n "$APP_MODULE" ]; then
       "Add: DynamicQueryBuilderModule.forRoot() to AppModule imports"
   fi
 
-  # If Drizzle is installed, expect the adapter to be configured.
-  if [ $HAS_DRIZZLE -eq 1 ] && [ $HAS_TYPEORM -eq 0 ]; then
+  if [ "$LINE" = "3.x" ] && grep -qE "forRoot\(\{[^)]*(adapter|operators)" "$APP_MODULE"; then
+    fail "forRoot receives adapter/operators, which 3.x refuses at startup" \
+      "Remove them: the adapter comes from typeormSource/prismaSource/drizzleSource, operators from defineQueryRules"
+  fi
+
+  # 2.x only: with Drizzle installed, expect the adapter to be configured.
+  if [ "$LINE" != "3.x" ] && [ $HAS_DRIZZLE -eq 1 ] && [ $HAS_TYPEORM -eq 0 ]; then
     if grep -q "DrizzleAdapter" "$APP_MODULE"; then
       pass "DrizzleAdapter configured in $(basename "$APP_MODULE")"
     else
