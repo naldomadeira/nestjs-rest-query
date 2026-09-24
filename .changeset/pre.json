@@ -16,6 +16,10 @@
     "parity-g1-drizzle-search-escape",
     "parity-g2-prisma-empty-in",
     "parity-g7-error-messages",
+    "v3-alpha-decimal-binding",
+    "v3-alpha-swagger-interceptor",
+    "v3-alpha-typeorm-exists-columns",
+    "v3-alpha-unpaginated-cap",
     "v3-semantic-core"
   ]
 }

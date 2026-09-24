@@ -1,5 +1,42 @@
 # Changelog
 
+## 3.0.0-alpha.1
+
+### Minor Changes
+
+- [#67](https://github.com/naldomadeira/nestjs-rest-query/pull/67) [`a1b395d`](https://github.com/naldomadeira/nestjs-rest-query/commit/a1b395d5d0bd9c6627d4eb92fbecb5f70e8487b0) Thanks [@naldomadeira](https://github.com/naldomadeira)! - feat(v3)!: cap `paginate=false` and let endpoints forbid it (consumer report [#6](https://github.com/naldomadeira/nestjs-rest-query/issues/6))
+
+  `?paginate=false` used to return every matching row (`ORDER BY` without `LIMIT`), ignoring `maxPerPage`, and no endpoint could refuse it.
+  - New `forRoot({ pagination: { maxUnpaginatedRows, allowUnpaginated } })`. `maxUnpaginatedRows` defaults to the effective `maxPerPage` (`500`); `allowUnpaginated` defaults to `true`.
+  - New `defineQueryRules(..., { pagination: { maxUnpaginatedRows, allowUnpaginated } })`. Each key an endpoint declares replaces the global one for that endpoint.
+  - Adapters fetch at most `maxUnpaginatedRows + 1` roots. A larger result is `400 PAGINATION_INVALID` with `details: { param: 'paginate', maxRows }` — never a truncated list. A forbidden `paginate=false` is the same `400` before any query runs. With a `many` include the cap counts roots.
+  - `PlanPagination` gains `maxRows`; a third-party adapter should fetch at most `maxRows + 1` rows when `paginate` is `false` (the service re-checks either way).
+  - Swagger documents the cap, and omits `paginate` on endpoints that forbid it.
+
+  **Behaviour change:** an endpoint that returned more than 500 rows with `paginate=false` now gets a `400`. Raise `maxUnpaginatedRows` globally or on that endpoint. See MIGRATION.md, "2.x → 3.x".
+
+  **Default change:** `pagination.maxPerPage` now defaults to `500` (it was `100` in 2.x and in `3.0.0-alpha.0`). `defaultPerPage` stays `10`. Set `maxPerPage: 100` in `forRoot` to keep the old ceiling.
+
+### Patch Changes
+
+- [#67](https://github.com/naldomadeira/nestjs-rest-query/pull/67) [`a1b395d`](https://github.com/naldomadeira/nestjs-rest-query/commit/a1b395d5d0bd9c6627d4eb92fbecb5f70e8487b0) Thanks [@naldomadeira](https://github.com/naldomadeira)! - fix(v3): bind `decimal` and `date` filter values as text across bundles (consumer report [#1](https://github.com/naldomadeira/nestjs-rest-query/issues/1))
+
+  Every public subpath is its own bundle, so `nestjs-rest-query` and `nestjs-rest-query/typeorm` (and `/prisma`, `/drizzle`) each carried their own copy of `DecimalValue`, `CivilDate` and `RestQueryError`. The plan is built by the root bundle and compiled by the adapter bundle, so the adapter's `instanceof` never matched: the value object reached the driver, and `pg` serialised it with `JSON.stringify` — `filter[price][eq]=29.90` was a `500` (`invalid input syntax for type numeric: ""29.90""`) on TypeORM + PostgreSQL. `date` filters broke the same way in all three adapters, and `400`s thrown by an adapter (e.g. `CAPABILITY_UNAVAILABLE`) surfaced as raw `500`s.
+
+  The three classes now carry a `Symbol.for` brand and a static `Symbol.hasInstance`, so identity holds across bundles and across the CJS/ESM builds. No consumer change required.
+
+- [#67](https://github.com/naldomadeira/nestjs-rest-query/pull/67) [`a1b395d`](https://github.com/naldomadeira/nestjs-rest-query/commit/a1b395d5d0bd9c6627d4eb92fbecb5f70e8487b0) Thanks [@naldomadeira](https://github.com/naldomadeira)! - fix(swagger): make `dqbSwaggerRequestInterceptor` self-contained (consumer report [#3](https://github.com/naldomadeira/nestjs-rest-query/issues/3))
+
+  `@nestjs/swagger` writes `swaggerOptions.requestInterceptor` into `swagger-ui-init.js` with `fn.toString()`, and the browser runs that text with none of this package in scope. The interceptor returned by `dqbSwaggerRequestInterceptor(document)` was a closure over module helpers, so every Swagger UI "Try it out" failed with `ReferenceError: interceptSwaggerRequest is not defined`.
+
+  Both forms — `dqbSwaggerRequestInterceptor(document)` and passing `dqbSwaggerRequestInterceptor` directly — are now self-contained; the marked routes travel inside the function source as a literal. The form field also accepts several filter expressions joined by `&`. No consumer change required; drop any local replacement you added as a workaround.
+
+- [#67](https://github.com/naldomadeira/nestjs-rest-query/pull/67) [`a1b395d`](https://github.com/naldomadeira/nestjs-rest-query/commit/a1b395d5d0bd9c6627d4eb92fbecb5f70e8487b0) Thanks [@naldomadeira](https://github.com/naldomadeira)! - fix(typeorm): use physical, quoted, schema-qualified identifiers inside `EXISTS` (consumer report [#2](https://github.com/naldomadeira/nestjs-rest-query/issues/2))
+
+  A filter or `search` through a `many` relation compiles to a correlated `EXISTS`, which TypeORM treats as raw SQL. That subquery used the **property** name for the leaf column (`dqb_ex_products.isAccessory` for `@Column({ name: 'is_accessory' })`), left identifiers unquoted (PostgreSQL folded them to lower case) and dropped the table's schema. Any snake_case naming strategy, `@Column({ name })` or non-default schema was a `500`.
+
+  The column now comes from the target entity's metadata, the table from its `tablePath` (schema included), and every identifier — table, alias and column — is quoted by the driver.
+
 ## 3.0.0-alpha.0
 
 ### Major Changes

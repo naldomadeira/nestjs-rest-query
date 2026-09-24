@@ -1,5 +1,12 @@
 # 03-app-with-drizzle
 
+## 0.0.4-alpha.1
+
+### Patch Changes
+
+- Updated dependencies [[`a1b395d`](https://github.com/naldomadeira/nestjs-rest-query/commit/a1b395d5d0bd9c6627d4eb92fbecb5f70e8487b0), [`a1b395d`](https://github.com/naldomadeira/nestjs-rest-query/commit/a1b395d5d0bd9c6627d4eb92fbecb5f70e8487b0), [`a1b395d`](https://github.com/naldomadeira/nestjs-rest-query/commit/a1b395d5d0bd9c6627d4eb92fbecb5f70e8487b0), [`a1b395d`](https://github.com/naldomadeira/nestjs-rest-query/commit/a1b395d5d0bd9c6627d4eb92fbecb5f70e8487b0)]:
+  - nestjs-rest-query@3.0.0-alpha.1
+
 ## 0.0.4-alpha.0
 
 ### Patch Changes
