@@ -76,14 +76,16 @@ export function sourceFor(preset: string) {
 }
 
 function createTable(table: DrizzleTable): string {
-  const columns = Object.entries(table.columns).map(([name, column]) => {
+  // O nome físico é `column.name`, não a chave: as duas diferem em
+  // `posts.isPinned` (`is_pinned`), como num consumidor snake_case.
+  const columns = Object.values(table.columns).map((column) => {
     const nullability = column.nullable ? '' : ' not null';
-    return `"${name}" ${PHYSICAL[column.kind]}${nullability}`;
+    return `"${column.name}" ${PHYSICAL[column.kind]}${nullability}`;
   });
 
-  const primaryKey = Object.entries(table.columns)
-    .filter(([, column]) => column.primaryKey)
-    .map(([name]) => `"${name}"`);
+  const primaryKey = Object.values(table.columns)
+    .filter((column) => column.primaryKey)
+    .map((column) => `"${column.name}"`);
 
   return `create table "${table.name}" (${[
     ...columns,
@@ -162,13 +164,14 @@ function seed(db: ReturnType<typeof drizzle>): void {
   insert(
     db,
     'posts',
-    ['id', 'id_order', 'title', 'title_folded', 'user_id'],
+    ['id', 'id_order', 'title', 'title_folded', 'user_id', 'is_pinned'],
     CORPUS_SEED.posts.map((row) => [
       row.id,
       row.id_order,
       row.title,
       row.title_folded,
       row.user_id,
+      row.isPinned ? 1 : 0,
     ])
   );
 

@@ -4,6 +4,10 @@ import type { UntypedPagination } from '../query-parser';
 export interface PaginationLimits {
   readonly defaultPerPage: number;
   readonly maxPerPage: number;
+  /** @default true */
+  readonly allowUnpaginated?: boolean;
+  /** @default maxPerPage */
+  readonly maxUnpaginatedRows?: number;
 }
 
 export interface PlanPagination {
@@ -11,6 +15,17 @@ export interface PlanPagination {
   readonly page: number;
   readonly perPage: number;
   readonly offset: number;
+  /**
+   * Teto de linhas quando `paginate` é `false` (spec §14, bug #6 do relato de
+   * consumidor externo).
+   *
+   * Contrato com os adapters: sem paginação, buscar **no máximo
+   * `maxRows + 1`** linhas de root. A linha a mais é o que permite ao serviço
+   * distinguir "exatamente no teto" de "passou do teto" sem um `COUNT`; o
+   * serviço recusa com 400 quando recebe mais que `maxRows`. Com paginação, o
+   * campo não tem efeito.
+   */
+  readonly maxRows: number;
 }
 
 /** Inteiro decimal completo e positivo. Sem zero à esquerda, sem sinal. */
@@ -75,6 +90,10 @@ export function validatePagination(
   limits: PaginationLimits
 ): PlanPagination {
   const paginate = readPaginate(raw.paginate);
+  if (!paginate && limits.allowUnpaginated === false) {
+    reject('paginate', 'unpaginated requests are not allowed on this endpoint');
+  }
+  const maxRows = limits.maxUnpaginatedRows ?? limits.maxPerPage;
   const page = readPositiveInteger(raw.page, 'page', 1);
   const perPage = readPositiveInteger(
     raw.perPage,
@@ -91,5 +110,24 @@ export function validatePagination(
     reject('page', 'resulting offset is outside the safe integer range');
   }
 
-  return Object.freeze({ paginate, page, perPage, offset });
+  return Object.freeze({ paginate, page, perPage, offset, maxRows });
+}
+
+/**
+ * Recusa um resultado sem paginação que passou do teto (ver
+ * `PlanPagination.maxRows`).
+ *
+ * Nunca trunca: devolver as primeiras `maxRows` linhas como se fossem todas
+ * seria exatamente a página silenciosamente errada que o spec §5.6 proíbe.
+ */
+export function assertWithinUnpaginatedCap(
+  pagination: PlanPagination,
+  rows: number
+): void {
+  if (pagination.paginate || rows <= pagination.maxRows) return;
+  throw inputError(
+    'PAGINATION_INVALID',
+    `Invalid paginate: unpaginated result exceeds ${pagination.maxRows} rows; request it page by page`,
+    { param: 'paginate', maxRows: pagination.maxRows }
+  );
 }

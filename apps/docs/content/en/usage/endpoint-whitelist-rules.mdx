@@ -313,11 +313,36 @@ and `idOrder` in example 03.
 | Parameter  | Type             | Default | Notes                                             |
 | ---------- | ---------------- | ------- | ------------------------------------------------- |
 | `page`     | positive integer | `1`     |                                                   |
-| `perPage`  | positive integer | `20`    | Above `maxPerPage` (default `100`) it is a `400`. |
+| `perPage`  | positive integer | `10`    | Above `maxPerPage` (default `500`) it is a `400`. |
 | `paginate` | boolean literal  | `true`  | `false` returns `{ data }` with no page metadata. |
 
 Both defaults are set in `forRoot` — see
-[Installation](/docs/getting-started/installation). Ordering is always
+[Installation](/docs/getting-started/installation).
+
+### `paginate=false` is capped
+
+An unpaginated response is never unbounded:
+
+| Where                                   | Key                  | Default                    | Effect                                                            |
+| --------------------------------------- | -------------------- | -------------------------- | ----------------------------------------------------------------- |
+| `forRoot({ pagination })`               | `maxUnpaginatedRows` | the effective `maxPerPage` | row cap of an unpaginated response, for every endpoint            |
+| `forRoot({ pagination })`               | `allowUnpaginated`   | `true`                     | `false` refuses `paginate=false` on every endpoint                |
+| `defineQueryRules(..., { pagination })` | the same two keys    | inherits the global value  | each key the endpoint declares **replaces** the global one for it |
+
+- The adapter fetches at most `maxUnpaginatedRows + 1` roots. One row over the
+  cap makes the request a `400 PAGINATION_INVALID` with
+  `details: { param: 'paginate', maxRows }` — the list is never silently cut.
+- `allowUnpaginated: false` is a `400 PAGINATION_INVALID` before any query runs,
+  and the endpoint's Swagger stops documenting `paginate`.
+- With a `many` include the cap counts roots, not join rows.
+
+````typescript
+// Every brand, for a dropdown: raise the cap for this endpoint only.
+defineQueryRules(registry, 'brand', { /* ... */ pagination: { maxUnpaginatedRows: 500 } });
+
+// A large table: unpaginated listings are refused here.
+defineQueryRules(registry, 'product', { /* ... */ pagination: { allowUnpaginated: false } });
+``` Ordering is always
 deterministic: without a total, unique, non-null key appended at the end, two
 pages could repeat or lose rows, which is why the primary-key tie-break is
 mandatory rather than optional.
@@ -333,3 +358,4 @@ Re-read every one of them; it may have been exposing more than you meant.
 | `fields` optional, and it restricted `sorts`            | `fields.root` mandatory; `fields` and `sorts` independent |
 | `alias`                                                 | gone                                                      |
 | `RulesConfig`                                           | `CompiledQueryRules`, returned by `defineQueryRules`      |
+````

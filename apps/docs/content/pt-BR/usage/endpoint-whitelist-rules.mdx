@@ -314,11 +314,37 @@ exemplo 04 e `idOrder` no exemplo 03.
 | Parâmetro  | Tipo             | Default | Observações                                         |
 | ---------- | ---------------- | ------- | --------------------------------------------------- |
 | `page`     | inteiro positivo | `1`     |                                                     |
-| `perPage`  | inteiro positivo | `20`    | Acima do `maxPerPage` (default `100`) é `400`.      |
+| `perPage`  | inteiro positivo | `10`    | Acima do `maxPerPage` (default `500`) é `400`.      |
 | `paginate` | literal booleano | `true`  | `false` devolve `{ data }` sem metadados de página. |
 
 Os dois defaults são definidos no `forRoot` — veja
-[Instalação](/pt-BR/docs/getting-started/installation). A ordenação é sempre
+[Instalação](/pt-BR/docs/getting-started/installation).
+
+### `paginate=false` tem teto
+
+Uma resposta sem paginação nunca é ilimitada:
+
+| Onde                                    | Chave                | Default                | Efeito                                                         |
+| --------------------------------------- | -------------------- | ---------------------- | -------------------------------------------------------------- |
+| `forRoot({ pagination })`               | `maxUnpaginatedRows` | o `maxPerPage` efetivo | teto de linhas de uma resposta sem paginação, em todo endpoint |
+| `forRoot({ pagination })`               | `allowUnpaginated`   | `true`                 | `false` recusa `paginate=false` em todo endpoint               |
+| `defineQueryRules(..., { pagination })` | as mesmas duas       | herda a global         | cada chave declarada pelo endpoint **substitui** a global nele |
+
+- O adapter busca no máximo `maxUnpaginatedRows + 1` roots. Uma linha acima do
+  teto torna a requisição `400 PAGINATION_INVALID` com
+  `details: { param: 'paginate', maxRows }` — a lista nunca é cortada em
+  silêncio.
+- `allowUnpaginated: false` é `400 PAGINATION_INVALID` antes de qualquer query,
+  e o Swagger do endpoint deixa de documentar `paginate`.
+- Com include de relação `many`, o teto conta roots, não linhas de join.
+
+````typescript
+// Todas as marcas, para um dropdown: teto maior só neste endpoint.
+defineQueryRules(registry, 'brand', { /* ... */ pagination: { maxUnpaginatedRows: 500 } });
+
+// Tabela grande: listagem sem paginação é recusada aqui.
+defineQueryRules(registry, 'product', { /* ... */ pagination: { allowUnpaginated: false } });
+``` A ordenação é sempre
 determinística: sem uma chave total, única e não nula anexada ao final, duas
 páginas poderiam repetir ou perder linhas, e é por isso que o desempate por
 chave primária é obrigatório e não opcional.
@@ -334,3 +360,4 @@ Releia todas elas; podem estar expondo mais do que você pretendia.
 | `fields` opcional, e ele restringia `sorts`             | `fields.root` obrigatório; `fields` e `sorts` independentes       |
 | `alias`                                                 | não existe mais                                                   |
 | `RulesConfig`                                           | `CompiledQueryRules`, devolvido por `defineQueryRules`            |
+````

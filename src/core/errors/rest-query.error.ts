@@ -10,6 +10,17 @@ export interface RestQueryErrorEnvelope {
 }
 
 /**
+ * Marca de identidade no registro global de símbolos.
+ *
+ * Cada subpath publicado é um bundle com a sua cópia desta classe, e o erro
+ * lançado pelo adapter (`nestjs-rest-query/typeorm`) é capturado pelo serviço
+ * do root. Com `instanceof` nominal, esse `catch` não reconhecia o erro: um
+ * 400 do adapter — `CAPABILITY_UNAVAILABLE`, por exemplo — virava 500 cru. A
+ * mesma causa do bug do `DecimalValue` (ver `logical-values.ts`).
+ */
+const REST_QUERY_ERROR_BRAND = Symbol.for('nestjs-rest-query/RestQueryError');
+
+/**
  * Erro serializável do contrato v3.
  *
  * `details` nunca carrega o valor cru enviado pelo cliente: apenas o path, o
@@ -17,6 +28,14 @@ export interface RestQueryErrorEnvelope {
  * devolver ao consumidor (spec §17.1).
  */
 export class RestQueryError extends Error {
+  static [Symbol.hasInstance](value: unknown): boolean {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      (value as Record<symbol, unknown>)[REST_QUERY_ERROR_BRAND] === true
+    );
+  }
+
   readonly details?: ErrorDetails;
 
   constructor(
@@ -27,6 +46,7 @@ export class RestQueryError extends Error {
   ) {
     super(message);
     this.name = 'RestQueryError';
+    Object.defineProperty(this, REST_QUERY_ERROR_BRAND, { value: true });
     if (details) this.details = Object.freeze({ ...details });
     Object.setPrototypeOf(this, RestQueryError.prototype);
   }

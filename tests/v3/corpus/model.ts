@@ -45,6 +45,7 @@ export const CORPUS_MODEL = {
       title: 'string',
       title_folded: 'string',
       user_id: 'integer',
+      isPinned: 'boolean',
     },
     primaryKey: ['id'],
     relations: { author: 'one', tags: 'many' },

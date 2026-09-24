@@ -15,6 +15,17 @@ export interface FieldProjectionInput {
   readonly default: readonly string[];
 }
 
+/**
+ * Política de paginação do endpoint. Cada chave declarada **substitui** a do
+ * `forRoot` para este endpoint; a omitida herda a global.
+ */
+export interface PaginationRulesInput {
+  /** `false` recusa `?paginate=false` neste endpoint com 400. */
+  readonly allowUnpaginated?: boolean;
+  /** Teto de linhas de uma resposta sem paginação neste endpoint. */
+  readonly maxUnpaginatedRows?: number;
+}
+
 export interface QueryRulesInput {
   readonly filters?: readonly FilterRuleInput[];
   readonly sorts?: readonly string[];
@@ -24,4 +35,5 @@ export interface QueryRulesInput {
   };
   readonly includes?: readonly string[];
   readonly search?: readonly string[];
+  readonly pagination?: PaginationRulesInput;
 }

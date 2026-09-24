@@ -175,3 +175,35 @@ describe('defineQueryRules', () => {
     expect(Object.isFrozen(define({}))).toBe(true);
   });
 });
+
+describe('regression: unpaginated global cap (consumer report #6) — rules', () => {
+  it('sem política declarada, o endpoint herda a global', () => {
+    expect(define({}).pagination).toBeUndefined();
+  });
+
+  it('guarda só as chaves declaradas, congeladas', () => {
+    const rules = define({ pagination: { allowUnpaginated: false } });
+    expect(rules.pagination).toEqual({ allowUnpaginated: false });
+    expect(Object.isFrozen(rules.pagination)).toBe(true);
+    expect(
+      define({ pagination: { maxUnpaginatedRows: 500 } }).pagination
+    ).toEqual({ maxUnpaginatedRows: 500 });
+  });
+
+  it.each([0, -3, 2.5, Number.POSITIVE_INFINITY])(
+    'recusa maxUnpaginatedRows=%p na construção',
+    (maxUnpaginatedRows) => {
+      expect(() => define({ pagination: { maxUnpaginatedRows } })).toThrow(
+        expect.objectContaining({ code: 'SOURCE_CONFIGURATION_INVALID' })
+      );
+    }
+  );
+
+  it('recusa allowUnpaginated que não seja booleano', () => {
+    expect(() =>
+      define({ pagination: { allowUnpaginated: 'false' as never } })
+    ).toThrow(
+      expect.objectContaining({ code: 'SOURCE_CONFIGURATION_INVALID' })
+    );
+  });
+});

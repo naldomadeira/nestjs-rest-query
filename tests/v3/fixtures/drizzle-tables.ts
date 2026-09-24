@@ -164,6 +164,12 @@ export const postsTable: DrizzleTable = createDrizzleTable({
       nullable: false,
       primaryKey: false,
     },
+    isPinned: {
+      name: 'is_pinned',
+      kind: 'boolean',
+      nullable: false,
+      primaryKey: false,
+    },
   },
 });
 

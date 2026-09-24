@@ -58,14 +58,29 @@ export function buildDQBSwaggerDecorators(
       description: 'Quantidade de itens por pagina.',
       example: 10,
     }),
-    ApiQuery({
-      name: 'paginate',
-      required: false,
-      type: Boolean,
-      description: 'Desabilita paginacao quando `false`.',
-      example: true,
-    }),
   ];
+
+  // Um endpoint que recusa `paginate=false` não documenta o parâmetro: a
+  // única coisa que o Swagger UI poderia fazer com ele é produzir um 400.
+  if (rules.allowUnpaginated) {
+    const cap =
+      rules.maxUnpaginatedRows !== undefined
+        ? `${rules.maxUnpaginatedRows} linhas`
+        : '`maxUnpaginatedRows` linhas (default: `maxPerPage`)';
+    decorators.push(
+      ApiQuery({
+        name: 'paginate',
+        required: false,
+        type: Boolean,
+        description: [
+          'Desabilita paginacao quando `false`.',
+          '',
+          `Sem paginacao a resposta tem teto de ${cap}; acima dele a resposta e 400 \`PAGINATION_INVALID\`, nunca uma lista truncada.`,
+        ].join('\n'),
+        example: true,
+      })
+    );
+  }
 
   if (rules.sorts?.length) {
     decorators.push(

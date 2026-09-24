@@ -24,7 +24,7 @@ export interface BuildPlanOptions {
 
 const DEFAULT_LIMITS: PaginationLimits = {
   defaultPerPage: 10,
-  maxPerPage: 100,
+  maxPerPage: 500,
 };
 
 /**
@@ -69,15 +69,42 @@ export function buildQueryPlan(
       resolved.includes
     ),
     includes: resolved.includes,
-    pagination: validatePagination(resolved.pagination, {
-      ...DEFAULT_LIMITS,
-      ...options.pagination,
-    }),
+    pagination: validatePagination(
+      resolved.pagination,
+      paginationLimits(options.pagination, rules)
+    ),
     textProfile: options.textProfile ?? 'portable-strict',
     consistency: options.consistency ?? 'eventual',
   };
 
   return freezePlan(plan);
+}
+
+/**
+ * Política de paginação efetiva: default da biblioteca, depois `forRoot`,
+ * depois o endpoint.
+ *
+ * Cada chave que o endpoint declarou substitui a global — é o dono do endpoint
+ * quem sabe se uma listagem cabe inteira numa resposta. A ausente herda. Chave
+ * global `undefined` não apaga o default: um `forRoot({ pagination: {} })`
+ * não pode transformar o teto em "sem teto".
+ */
+function paginationLimits(
+  global: Partial<PaginationLimits> | undefined,
+  rules: CompiledQueryRules
+): PaginationLimits {
+  const limits: {
+    -readonly [K in keyof PaginationLimits]: PaginationLimits[K];
+  } = { ...DEFAULT_LIMITS };
+  for (const source of [global, rules.pagination]) {
+    if (!source) continue;
+    for (const [key, value] of Object.entries(source)) {
+      if (value !== undefined) {
+        (limits as Record<string, unknown>)[key] = value;
+      }
+    }
+  }
+  return limits;
 }
 
 /**

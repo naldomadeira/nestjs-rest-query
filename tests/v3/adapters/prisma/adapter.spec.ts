@@ -504,11 +504,11 @@ describe('PrismaAdapter compile', () => {
     ]);
   });
 
-  it('omite skip e take quando o plano não pagina', () => {
+  it('sem paginação, omite skip e limita take ao teto + 1 (bug #6)', () => {
     const data = compile({ paginate: 'false' }, 'user.default');
 
     expect(data.skip).toBeUndefined();
-    expect(data.take).toBeUndefined();
+    expect(data.take).toBe(501);
   });
 });
 

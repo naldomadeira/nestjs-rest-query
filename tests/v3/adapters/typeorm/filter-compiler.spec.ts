@@ -36,7 +36,7 @@ describe('compilação de filtros TypeORM', () => {
       { filter: { 'posts.title': { eq: 'a' } } },
       'user.deep'
     );
-    expect(sql).toMatch(/EXISTS \(SELECT 1 FROM posts/i);
+    expect(sql).toMatch(/EXISTS \(SELECT 1 FROM "posts"/i);
     expect(sql).not.toMatch(/LEFT JOIN .*posts/i);
   });
 
@@ -92,7 +92,7 @@ describe('compilação de filtros TypeORM', () => {
       { filter: { posts: { isNull: 'true' } } },
       'user.deep'
     );
-    expect(sql).toMatch(/NOT EXISTS \(SELECT 1 FROM posts/i);
+    expect(sql).toMatch(/NOT EXISTS \(SELECT 1 FROM "posts"/i);
   });
 
   it('isNull=false em relação many vira EXISTS', () => {
@@ -100,7 +100,7 @@ describe('compilação de filtros TypeORM', () => {
       { filter: { posts: { isNull: 'false' } } },
       'user.deep'
     );
-    expect(sql).toMatch(/EXISTS \(SELECT 1 FROM posts/i);
+    expect(sql).toMatch(/EXISTS \(SELECT 1 FROM "posts"/i);
     expect(sql).not.toMatch(/NOT EXISTS/i);
   });
 

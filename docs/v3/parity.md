@@ -7,14 +7,14 @@ não faz parte do contrato.
 
 ## O corpus é dado, não código
 
-`tests/v3/corpus/` guarda o contrato como dado: o modelo canônico, o seed e 66
+`tests/v3/corpus/` guarda o contrato como dado: o modelo canônico, o seed e 84
 casos com status, código de erro, IDs, ordem, total e shape esperados.
 
 ```
 tests/v3/corpus/
   model.ts        modelo canônico — cada adapter deriva daqui suas tabelas
   seed.ts         dados, em NFC, com as colunas *_folded já preenchidas
-  cases.ts        os 66 casos e suas expectativas
+  cases.ts        os 84 casos e suas expectativas
   corpus.types.ts tipos, incluindo o de divergência
 ```
 
@@ -70,7 +70,7 @@ Três propriedades tornam isso diferente de um skip:
 2. Se o adapter voltar a concordar, o teste **quebra** e obriga a remover a
    exceção — uma isenção não sobrevive à limitação que a justificou.
 3. `corpus.spec.ts` mantém um inventário: adicionar uma divergência muda uma
-   lista revisada, em vez de passar despercebida entre 66 casos.
+   lista revisada, em vez de passar despercebida entre 84 casos.
 
 Divergência é proibida em caso que espera erro. Recusar entrada inválida é
 obrigação de todos os adapters, e o núcleo decide isso antes de qualquer um

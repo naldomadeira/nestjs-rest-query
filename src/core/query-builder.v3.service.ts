@@ -23,6 +23,7 @@ import type {
   RelationDescriptor,
 } from './schema';
 import { checkPortabilityProfile } from './portability';
+import { assertWithinUnpaginatedCap } from './semantic-validator';
 import type { QueryInputLike } from './query-parser';
 import { StructuredLogger } from '@infra/structured-logger';
 
@@ -109,6 +110,10 @@ export class QueryBuilderService {
       }
 
       const result = await source.adapter.execute(compiled);
+      // Defesa em profundidade: os adapters embarcados já buscam no máximo
+      // `maxRows + 1`, mas um adapter de terceiro que ignore o contrato ainda
+      // não consegue devolver mais que o teto ao cliente.
+      assertWithinUnpaginatedCap(plan.pagination, result.rows.length);
       return normalizeResult<TRow>(result.rows, result.total, plan);
     } catch (error) {
       if (error instanceof RestQueryError) throw toHttpException(error);

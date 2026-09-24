@@ -21,18 +21,40 @@ import { predicateOnly, type CompiledTypeOrmQuery } from './compile-plan';
 export async function executeCompiled<T extends ObjectLiteral>(
   compiled: CompiledTypeOrmQuery<T>
 ): Promise<AdapterResult<T>> {
-  const { plan, data, count, joins, repository } = compiled;
+  const { plan, count } = compiled;
 
   if (!plan.pagination.paginate) {
-    return { rows: await data.getMany(), queryCount: 1 };
+    // Sem paginação ainda há teto (`PlanPagination.maxRows`): a janela é a
+    // primeira, com uma linha a mais para o serviço distinguir "no teto" de
+    // "passou do teto". Sem ela, `paginate=false` devolvia a tabela inteira.
+    const window = await selectWindow(compiled, plan.pagination.maxRows + 1, 0);
+    return { rows: window.rows, queryCount: window.queries };
   }
 
   const total = await count.getCount();
   const { offset, perPage } = plan.pagination;
+  const window = await selectWindow(compiled, perPage, offset);
+  return { rows: window.rows, total, queryCount: window.queries + 1 };
+}
+
+/**
+ * Uma janela de roots, com `limit` e `offset` aplicados **aos roots**.
+ *
+ * Com relação `many` na projeção, `LIMIT` direto cortaria linhas de join no
+ * meio de um root, então a janela vira duas fases: a primeira escolhe os
+ * roots, a segunda os hidrata. É o mesmo caminho para a página e para o teto
+ * do `paginate=false`.
+ */
+async function selectWindow<T extends ObjectLiteral>(
+  compiled: CompiledTypeOrmQuery<T>,
+  limit: number,
+  offset: number
+): Promise<{ rows: T[]; queries: number }> {
+  const { plan, data, joins, repository } = compiled;
 
   if (!joins.hasManyPresentation) {
-    const rows = await data.limit(perPage).offset(offset).getMany();
-    return { rows, total, queryCount: 2 };
+    const rows = await data.limit(limit).offset(offset).getMany();
+    return { rows, queries: 1 };
   }
 
   const primaryKey = plan.schema.primaryKey;
@@ -42,31 +64,27 @@ export async function executeCompiled<T extends ObjectLiteral>(
     escapeCharacter: compiled.escapeCharacter,
   };
 
-  // Fase 1: os roots da página, sem nenhum join de apresentação.
+  // Fase 1: os roots da janela, sem nenhum join de apresentação.
   const keysQuery = repository.createQueryBuilder(ROOT_ALIAS);
   compileJoins(keysQuery, context.joins);
   keysQuery.select(primaryKey.map((column) => `${ROOT_ALIAS}.${column}`));
   compileFilters(keysQuery, context);
   compileSort(keysQuery, plan, context);
   for (const customize of compiled.keyCustomizers) customize(keysQuery);
-  keysQuery.limit(perPage).offset(offset);
+  keysQuery.limit(limit).offset(offset);
   const keyRows = await keysQuery.getRawMany<Record<string, unknown>>();
   const keys = keyRows.map((row) =>
     primaryKey.map((column) => row[`${ROOT_ALIAS}_${column}`])
   );
 
-  if (keys.length === 0) return { rows: [], total, queryCount: 3 };
+  if (keys.length === 0) return { rows: [], queries: 2 };
 
   // Fase 2: hidratação completa restrita aos roots escolhidos.
   const hydration = data.clone();
   restrictToKeys(hydration, primaryKey, keys);
 
   const rows = await hydration.getMany();
-  return {
-    rows: reorderByKeys(rows, primaryKey, keys),
-    total,
-    queryCount: 3,
-  };
+  return { rows: reorderByKeys(rows, primaryKey, keys), queries: 2 };
 }
 
 /**

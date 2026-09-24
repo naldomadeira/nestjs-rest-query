@@ -1,6 +1,5 @@
 import type { DataSource } from 'typeorm';
 import type { AnyQuerySource } from '@contracts/v3';
-import { QueryBuilderService } from '@core/query-builder.v3.service';
 import type {
   CorpusAdapterId,
   CorpusCase,
@@ -10,6 +9,7 @@ import type {
 import { CORPUS_SEED } from '../corpus/seed';
 import { RULES_PRESETS } from './rules';
 import type { CorpusEntities } from './entity-schemas';
+import { publishedQueryBuilderService } from './published-layout';
 
 export interface CorpusOutcome {
   kind: 'rows' | 'error';
@@ -21,7 +21,13 @@ export interface CorpusOutcome {
   code?: string;
 }
 
-const service = new QueryBuilderService({});
+/**
+ * O serviço vem de uma cópia do núcleo separada da dos adapters, como no
+ * pacote publicado (ver `published-layout.ts`). É o que faz o corpus inteiro —
+ * nos três contract tests e nas nove células — medir também a fronteira entre
+ * bundles, onde o bug #1 do relato de consumidor externo morava.
+ */
+const service = new (publishedQueryBuilderService())({});
 
 /**
  * Expectativa que vale para esta célula (spec §5 e §24).

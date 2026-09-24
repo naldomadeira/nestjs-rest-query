@@ -232,7 +232,11 @@ valor que o cliente enviou.
 }
 ```
 
-Com `paginate=false` a resposta é `{ "data": [...] }` e nada mais. O `lastPage`
+Com `paginate=false` a resposta é `{ "data": [...] }` e nada mais — mas **com
+teto**: no máximo `pagination.maxUnpaginatedRows` linhas (default: o
+`maxPerPage` efetivo). Um resultado maior é `400 PAGINATION_INVALID`, nunca uma
+lista truncada, e um endpoint pode proibir `paginate=false`. Veja
+[Paginação](/pt-BR/docs/usage/endpoint-whitelist-rules#paginação). O `lastPage`
 nunca é `0` — o contrato promete no mínimo `1`.
 
 Quem produz esse JSON é o núcleo, não o adapter. Duas consequências:
@@ -268,7 +272,7 @@ Ramifique no `code`, nunca na `message`.
 | `OPERATOR_NOT_ALLOWED`         | 400        | o campo não autoriza aquele operador                                                                                                                                                      |
 | `OPERATOR_TYPE_MISMATCH`       | 400        | o operador não faz sentido para aquele kind — `like` num integer, `sort` através de relação `many`                                                                                        |
 | `FILTER_VALUE_INVALID`         | 400        | o valor não decodifica para o kind declarado                                                                                                                                              |
-| `PAGINATION_INVALID`           | 400        | `page`, `perPage` ou `paginate` não é literal válido, ou excede o `maxPerPage`                                                                                                            |
+| `PAGINATION_INVALID`           | 400        | `page`, `perPage` ou `paginate` não é literal válido, ou excede o `maxPerPage`; `paginate=false` é proibido no endpoint, ou o resultado passa do `maxUnpaginatedRows`                     |
 | `SORT_CONFLICT`                | 400        | o mesmo path foi pedido ascendente e descendente                                                                                                                                          |
 | `CAPABILITY_UNAVAILABLE`       | 400 ou 500 | o operador ou a forma não pode ser atendida: sem coluna dobrada, sem ordem portável, padrões do Prisma em `sqlite`/`sqlserver` (400); chave primária sem ordem portável (500)             |
 | `PORTABILITY_PROFILE_MISMATCH` | 500        | `portability.enforce` ligado e os fatos do perfil da source não batem                                                                                                                     |

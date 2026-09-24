@@ -12,7 +12,10 @@ type ResolvedConfig = Required<
 >;
 
 const DEFAULTS: ResolvedConfig = {
-  pagination: { defaultPerPage: 10, maxPerPage: 100 },
+  // `maxUnpaginatedRows` não tem default fixo: herda o `maxPerPage` efetivo,
+  // resolvido em `forRoot`. Um só número responde "quantas linhas uma
+  // resposta pode ter" até alguém decidir separar os dois.
+  pagination: { defaultPerPage: 10, maxPerPage: 500, allowUnpaginated: true },
   textProfile: 'portable-strict',
   consistency: 'eventual',
   logging: { enabled: false, level: 'info', redactValues: true },
@@ -48,6 +51,13 @@ export class DynamicQueryBuilderModule {
         DEFAULTS.pagination.defaultPerPage!,
       maxPerPage:
         config.pagination?.maxPerPage ?? DEFAULTS.pagination.maxPerPage!,
+      allowUnpaginated:
+        config.pagination?.allowUnpaginated ??
+        DEFAULTS.pagination.allowUnpaginated!,
+      maxUnpaginatedRows:
+        config.pagination?.maxUnpaginatedRows ??
+        config.pagination?.maxPerPage ??
+        DEFAULTS.pagination.maxPerPage!,
     };
 
     if (pagination.maxPerPage < pagination.defaultPerPage) {
@@ -65,6 +75,24 @@ export class DynamicQueryBuilderModule {
         'SOURCE_CONFIGURATION_INVALID',
         'pagination.defaultPerPage must be at least 1',
         { defaultPerPage: pagination.defaultPerPage }
+      );
+    }
+
+    if (typeof pagination.allowUnpaginated !== 'boolean') {
+      throw configurationError(
+        'SOURCE_CONFIGURATION_INVALID',
+        'pagination.allowUnpaginated must be a boolean',
+        { allowUnpaginated: pagination.allowUnpaginated }
+      );
+    }
+    if (
+      !Number.isSafeInteger(pagination.maxUnpaginatedRows) ||
+      pagination.maxUnpaginatedRows < 1
+    ) {
+      throw configurationError(
+        'SOURCE_CONFIGURATION_INVALID',
+        'pagination.maxUnpaginatedRows must be a positive integer',
+        { maxUnpaginatedRows: pagination.maxUnpaginatedRows }
       );
     }
 

@@ -302,13 +302,19 @@ describe('many-to-many atravessa a tabela de junção', () => {
     // `articlesId` e `labelsId` são nomes que a estratégia de nomes do TypeORM
     // inventa, não do consumidor. Sem aspas, o PostgreSQL os dobra para
     // minúsculas e não acha a coluna — a m2m compilaria e morreria no driver.
+    // Desde o bug #2 do relato de consumidor, **todo** identificador da
+    // subquery sai citado, não só os da junção.
     const { quotedSql } = compileArticle({
       filter: { 'labels.name': { eq: 'oss' } },
     });
 
-    expect(quotedSql).toContain('"articles_labels_labels" dqb_ex_labels_j');
-    expect(quotedSql).toContain('dqb_ex_labels_j."articlesId"');
-    expect(quotedSql).toContain('dqb_ex_labels_j."labelsId"');
+    expect(quotedSql).toContain(
+      'EXISTS (SELECT 1 FROM "articles_labels_labels" "dqb_ex_labels_j" ' +
+        'INNER JOIN "labels" "dqb_ex_labels" ' +
+        'ON "dqb_ex_labels"."id" = "dqb_ex_labels_j"."labelsId" ' +
+        'WHERE "dqb_ex_labels_j"."articlesId" = "root"."id" ' +
+        'AND "dqb_ex_labels"."name" = :dqb_0)'
+    );
   });
 
   it('a busca atravessa a mesma junção, contra a coluna dobrada', () => {

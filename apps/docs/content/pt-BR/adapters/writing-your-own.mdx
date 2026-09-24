@@ -86,7 +86,12 @@ export interface RestQueryAdapterV3<
 export interface AdapterResult<TRow> {
   /** Linhas já hidratadas em forma aninhada, ainda com colunas internas. */
   readonly rows: readonly TRow[];
-  /** Ausente quando o plano pediu paginate=false. */
+  /**
+   * Ausente quando o plano pediu paginate=false. Nesse caso, busque no máximo
+   * `plan.pagination.maxRows + 1` roots: o serviço recusa com 400 um resultado
+   * acima de `maxRows`, e a linha a mais é como ele distingue "no teto" de
+   * "passou do teto" sem um COUNT.
+   */
   readonly total?: number;
   /** Quantas queries foram emitidas; usado pelos testes de orçamento. */
   readonly queryCount?: number;

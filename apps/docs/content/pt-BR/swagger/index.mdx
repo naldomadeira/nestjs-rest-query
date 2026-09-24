@@ -122,7 +122,7 @@ na v3.
 | ---------- | ------------------------------------ | -------------------------------------------------------------------------- |
 | `page`     | sempre                               | —                                                                          |
 | `perPage`  | sempre                               | —                                                                          |
-| `paginate` | sempre                               | —                                                                          |
+| `paginate` | salvo quando as regras o proíbem     | o teto de linhas sem paginação                                             |
 | `sort`     | quando `sorts` não está vazio        | todo path ordenável, mais um exemplo ascendente e um descendente           |
 | `fields`   | sempre (`fields.root` é obrigatório) | o `allowed` do root mais o `allowed` de cada relação, como paths pontuados |
 | `includes` | quando `includes` não está vazio     | todo path de relação incluível                                             |
@@ -177,6 +177,19 @@ aninhado.
 Sem ele, os filtros chegam malformados ao controller e são ignorados. Para
 Postman, um frontend, ou qualquer cliente que monte a URL sozinho, o interceptor
 não é necessário.
+
+O campo do formulário aceita uma expressão (`[name][eq]=Ada` ou
+`filter[name][eq]=Ada`) ou várias unidas por `&`
+(`[name][eq]=Ada&[score][gt]=10`).
+
+O `@nestjs/swagger` não chama o interceptor no servidor: ele o grava no
+`swagger-ui-init.js` com `fn.toString()`, e o browser executa esse texto sem
+nada deste pacote no escopo. Por isso a função que
+`dqbSwaggerRequestInterceptor(document)` devolve é totalmente autocontida — as
+rotas marcadas viajam dentro do próprio código, como literal. No
+`3.0.0-alpha.0` ela era uma closure sobre helpers do módulo, e todo "Try it
+out" falhava com `ReferenceError: interceptSwaggerRequest is not defined`;
+atualize em vez de copiar um contorno para a sua aplicação.
 
 ---
 

@@ -72,3 +72,58 @@ describe('toSwaggerRulesView', () => {
     expect(view.filters).not.toContain('name_folded');
   });
 });
+
+describe('regression: unpaginated global cap (consumer report #6) — Swagger', () => {
+  const parametersOf = (preset: string) => {
+    class Endpoint {
+      list(): void {}
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(
+      Endpoint.prototype,
+      'list'
+    )!;
+    ApiDynamicQuery(RULES_PRESETS[preset])(
+      Endpoint.prototype,
+      'list',
+      descriptor
+    );
+    return (Reflect.getMetadata('swagger/apiParameters', descriptor.value) ??
+      []) as { name: string; description?: string }[];
+  };
+
+  it('a visão carrega a política de paginação do endpoint', () => {
+    expect(toSwaggerRulesView(rules)).toEqual(
+      expect.objectContaining({ allowUnpaginated: true })
+    );
+    expect(toSwaggerRulesView(rules).maxUnpaginatedRows).toBeUndefined();
+    expect(
+      toSwaggerRulesView(RULES_PRESETS['user.unpaginated-capped'])
+        .maxUnpaginatedRows
+    ).toBe(5);
+    expect(
+      toSwaggerRulesView(RULES_PRESETS['user.unpaginated-forbidden'])
+        .allowUnpaginated
+    ).toBe(false);
+  });
+
+  it('documenta o teto de paginate=false', () => {
+    const global = parametersOf('user.default').find(
+      (parameter) => parameter.name === 'paginate'
+    );
+    expect(global?.description).toContain('maxUnpaginatedRows');
+    expect(global?.description).toContain('PAGINATION_INVALID');
+
+    const own = parametersOf('user.unpaginated-capped').find(
+      (parameter) => parameter.name === 'paginate'
+    );
+    expect(own?.description).toContain('5 linhas');
+  });
+
+  it('não documenta paginate quando o endpoint o proíbe', () => {
+    const names = parametersOf('user.unpaginated-forbidden').map(
+      (parameter) => parameter.name
+    );
+    expect(names).toContain('page');
+    expect(names).not.toContain('paginate');
+  });
+});

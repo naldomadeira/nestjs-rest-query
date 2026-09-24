@@ -4,30 +4,22 @@ Esta skill orienta a instalação, configuração, uso e troubleshooting da bibl
 
 ## Propósito
 
-Serve como guia operacional para criar endpoints dinâmicos com filtros, ordenação, paginação, seleção de campos, includes e busca textual opcional — sem reinventar parsing de query string em cada projeto.
+Serve como guia operacional para criar endpoints dinâmicos com filtros, ordenação, paginação, seleção de campos, includes e busca textual — sem reinventar parsing de query string em cada projeto. Cobre as **duas linhas públicas** da biblioteca, que têm APIs incompatíveis: a skill começa detectando a versão instalada (`package.json`, lockfile e estilo de import) e segue o guia da linha certa.
 
 ## O que cobre
 
-- Setup do módulo e configurações obrigatórias no `main.ts`
-- Registro com adapter TypeORM (default) ou Drizzle
-- Uso de `@ApiDynamicQuery`, `@DynamicQuery` e `@QueryRules`
-- Definição segura de `RulesConfig` (whitelist-first)
-- Busca nativa opcional com `search`, inclusive aninhada
-- Diferença entre propriedades da entidade (`camelCase`) e SQL manual em `customize` (TypeORM)
-- Restrição de operadores global e por endpoint com `RulesConfig.operators`
-- Troubleshooting dos erros mais comuns
+- Detecção da versão: `forRoot({ adapter })`/`RulesConfig` = 2.x; `defineQueryRules` + `typeormSource()`/`prismaSource()`/`drizzleSource()` = 3.x
+- **3.x**: schema lógico e regras por endpoint, sources por ORM, colunas dobradas e de ordem portável, gramática da query, teto de `paginate=false`, envelope de erro, Swagger, defeitos conhecidos por versão do alpha
+- **2.x**: setup com adapter no `forRoot`, `RulesConfig`, operadores, `customize`, troubleshooting
+- Migração 2.x → 3.x, apontando para o `MIGRATION.md`
 
 ## Estrutura
 
-- `SKILL.md`: guia principal (carregado pelo agente quando a skill é ativada)
-- `references/`: referências detalhadas
-  - `setup-reference.md`: pré-requisitos, bootstrap e configuração completa
-  - `operators-reference.md`: os 14 operadores com exemplos e SQL gerado
-  - `rules-reference.md`: estrutura do `RulesConfig` e padrões de whitelist
-  - `advanced-patterns.md`: 8 padrões com `customize` (soft delete, tenant, etc.)
-  - `troubleshooting.md`: erros comuns e como corrigir
-- `evals/`: cenários de avaliação para a skill
-- `scripts/validate-setup.sh`: script de validação automática do setup do projeto consumidor
+- `SKILL.md`: detecção de versão, roteamento e a 3.x em uma página
+- `references/v3/`: `setup.md`, `schema-and-rules.md`, `query-grammar.md`, `adapters.md`, `troubleshooting.md`, `migrating-from-v2.md`
+- `references/v2/`: `guide.md` (o guia 2.x) e as referências de setup, operadores, regras, padrões avançados e troubleshooting da 2.x
+- `evals/`: cenários de avaliação (2.x, 3.x, detecção e migração)
+- `scripts/validate-setup.sh`: valida o setup do projeto consumidor e informa a linha detectada
 
 ## Instalação da skill
 

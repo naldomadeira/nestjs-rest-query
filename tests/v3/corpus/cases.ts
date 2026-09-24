@@ -808,7 +808,7 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     description: 'perPage não pode exceder maxPerPage',
     tags: ['pagination'],
     rules: 'user.default',
-    query: { perPage: '101' },
+    query: { perPage: '501' },
     expect: { kind: 'error', status: 400, code: 'PAGINATION_INVALID' },
   },
   {
@@ -852,6 +852,100 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     rules: 'user.default',
     query: { fields: 'company.*' },
     expect: { kind: 'error', status: 400, code: 'QUERY_SYNTAX_INVALID' },
+  },
+  // --- Regressões do relato de consumidor externo (3.0.0-alpha.0) ---
+  //
+  // Todo caso deste corpus roda com o núcleo numa cópia separada da do
+  // adapter (`fixtures/published-layout.ts`), como no pacote publicado. É
+  // essa topologia, e não o operador, que reproduzia o bug #1.
+  {
+    id: 'regression/decimal-eq-binds-as-text',
+    description:
+      'bug #1: filtro eq em decimal chega ao driver como texto, não como objeto',
+    tags: ['decimal', 'regression'],
+    rules: 'user.default',
+    query: { filter: { balance: { eq: '0.10' } } },
+    expect: { kind: 'rows', ids: [2], total: 1, lastPage: 1 },
+  },
+  {
+    id: 'regression/decimal-gte-lte',
+    description: 'bug #1: gte e lte em decimal no mesmo campo',
+    tags: ['decimal', 'regression'],
+    rules: 'user.default',
+    query: { filter: { balance: { gte: '1.00', lte: '3.00' } } },
+    expect: { kind: 'rows', ids: [5, 6, 7], total: 3, lastPage: 1 },
+  },
+  {
+    id: 'regression/decimal-between',
+    description: 'bug #1: between em decimal, com negativo e zero',
+    tags: ['decimal', 'regression'],
+    rules: 'user.default',
+    query: { filter: { balance: { between: '-1.50,0.10' } } },
+    expect: { kind: 'rows', ids: [2, 3, 4], total: 3, lastPage: 1 },
+  },
+  {
+    id: 'regression/date-between-binds-as-text',
+    description: 'bug #1, mesma classe: date (CivilDate) atravessa o bundle',
+    tags: ['date', 'regression'],
+    rules: 'user.default',
+    query: { filter: { born_on: { between: '1800-01-01,1900-01-01' } } },
+    expect: { kind: 'rows', ids: [1], total: 1, lastPage: 1 },
+  },
+  {
+    /**
+     * `posts.isPinned` é a propriedade; a coluna é `is_pinned`. O EXISTS do
+     * TypeORM emitia `dqb_ex_posts.isPinned`, sem aspas: coluna inexistente
+     * em qualquer banco (500), e o PostgreSQL ainda a dobrava para
+     * `ispinned`. Posts fixados: um do user 1, um do user 3.
+     */
+    id: 'regression/many-relation-filter-uses-physical-column',
+    description:
+      'bug #2: filtro por relação many usa o nome físico da coluna da folha',
+    tags: ['relation-many', 'regression'],
+    rules: 'user.deep',
+    query: { filter: { 'posts.isPinned': { eq: 'true' } } },
+    expect: { kind: 'rows', ids: [1, 3], total: 2, lastPage: 1 },
+  },
+  {
+    id: 'regression/many-relation-physical-column-with-negation',
+    description: 'bug #2: a mesma folha mapeada com false continua existencial',
+    tags: ['relation-many', 'regression'],
+    rules: 'user.deep',
+    query: { filter: { 'posts.isPinned': { eq: 'false' } } },
+    expect: { kind: 'rows', ids: [1, 2], total: 2, lastPage: 1 },
+  },
+  {
+    id: 'regression/unpaginated-over-cap-is-refused',
+    description:
+      'bug #6: paginate=false acima do teto do endpoint é 400, nunca truncado',
+    tags: ['pagination', 'regression'],
+    rules: 'user.unpaginated-capped',
+    query: { paginate: 'false' },
+    expect: { kind: 'error', status: 400, code: 'PAGINATION_INVALID' },
+  },
+  {
+    id: 'regression/unpaginated-at-cap-returns-everything',
+    description: 'bug #6: exatamente no teto, paginate=false devolve tudo',
+    tags: ['pagination', 'regression'],
+    rules: 'user.unpaginated-at-cap',
+    query: { paginate: 'false' },
+    expect: { kind: 'rows', ids: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] },
+  },
+  {
+    id: 'regression/unpaginated-under-cap-after-filter',
+    description: 'bug #6: o teto vale para o resultado filtrado, não a tabela',
+    tags: ['pagination', 'regression'],
+    rules: 'user.unpaginated-capped',
+    query: { paginate: 'false', filter: { id: { lte: '5' } } },
+    expect: { kind: 'rows', ids: [1, 2, 3, 4, 5] },
+  },
+  {
+    id: 'regression/unpaginated-forbidden-by-endpoint',
+    description: 'bug #6: o endpoint pode proibir paginate=false',
+    tags: ['pagination', 'regression'],
+    rules: 'user.unpaginated-forbidden',
+    query: { paginate: 'false' },
+    expect: { kind: 'error', status: 400, code: 'PAGINATION_INVALID' },
   },
   {
     id: 'syntax/filter-must-be-an-object',

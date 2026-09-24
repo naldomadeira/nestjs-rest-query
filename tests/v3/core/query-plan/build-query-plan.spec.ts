@@ -113,3 +113,33 @@ describe('buildQueryPlan', () => {
     ).toThrow(expect.objectContaining({ code: 'FIELD_NOT_ALLOWED' }));
   });
 });
+
+describe('regression: unpaginated global cap (consumer report #6) — precedência', () => {
+  const unpaginated = { paginate: 'false' };
+
+  it('default da biblioteca -> forRoot -> endpoint, chave a chave', () => {
+    const plain = RULES_PRESETS['user.default'];
+    const capped = RULES_PRESETS['user.unpaginated-capped'];
+
+    expect(buildQueryPlan(unpaginated, plain).pagination.maxRows).toBe(500);
+    expect(
+      buildQueryPlan(unpaginated, plain, {
+        pagination: { maxUnpaginatedRows: 40 },
+      }).pagination.maxRows
+    ).toBe(40);
+    // O endpoint declarou o seu: ele vence o global.
+    expect(
+      buildQueryPlan(unpaginated, capped, {
+        pagination: { maxUnpaginatedRows: 40 },
+      }).pagination.maxRows
+    ).toBe(5);
+  });
+
+  it('chave global undefined não apaga o default', () => {
+    expect(
+      buildQueryPlan(unpaginated, RULES_PRESETS['user.default'], {
+        pagination: { maxPerPage: undefined, maxUnpaginatedRows: undefined },
+      }).pagination.maxRows
+    ).toBe(500);
+  });
+});

@@ -4,6 +4,8 @@ import { calls, fakeSource } from '../fixtures/fake-adapter';
 import { RULES_PRESETS } from '../fixtures/rules';
 import { defineQuerySchema } from '@core/schema';
 import type { ProfileFacts } from '@core/portability';
+import { defineQueryRules } from '@core/authorization';
+import { CORPUS_SCHEMAS } from '../fixtures/schemas';
 
 const rules = RULES_PRESETS['user.default'];
 
@@ -306,5 +308,125 @@ describe('QueryBuilderService (v3)', () => {
     const plan = service.buildPlan({ sort: 'name' }, rules);
     expect(plan.sorts).toHaveLength(1);
     expect(calls).toHaveLength(0);
+  });
+});
+
+/**
+ * Bug #6 do relato de consumidor externo: `GET /v1/products?paginate=false`
+ * devolvia a tabela inteira (`ORDER BY` sem `LIMIT`), ignorando `maxPerPage`, e
+ * nenhuma regra de endpoint conseguia desligar isso.
+ */
+describe('regression: unpaginated global cap (consumer report #6) — service', () => {
+  const rows = (count: number) =>
+    Array.from({ length: count }, (_, index) => ({
+      id: index + 1,
+      name: `u${index + 1}`,
+    }));
+
+  /** Adapter que ignora `maxRows` e devolve o que o banco tiver. */
+  function sourceReturning(count: number) {
+    const source = fakeSource();
+    return {
+      ...source,
+      adapter: {
+        ...source.adapter,
+        execute: async () => ({ rows: rows(count), queryCount: 1 }),
+      },
+    };
+  }
+
+  const endpoint = (pagination?: {
+    allowUnpaginated?: boolean;
+    maxUnpaginatedRows?: number;
+  }) =>
+    defineQueryRules(CORPUS_SCHEMAS, 'user', {
+      sorts: ['id'],
+      fields: { root: { allowed: ['id', 'name'], default: ['id', 'name'] } },
+      ...(pagination ? { pagination } : {}),
+    });
+
+  const refusal = (maxRows?: number) =>
+    expect.objectContaining({
+      response: expect.objectContaining({
+        code: 'PAGINATION_INVALID',
+        details: maxRows
+          ? { param: 'paginate', maxRows }
+          : { param: 'paginate' },
+      }),
+    });
+
+  it('sem configuração, o teto é o maxPerPage default (500)', async () => {
+    const service = new QueryBuilderService({});
+
+    await expect(
+      service.execute(sourceReturning(500), { paginate: 'false' }, endpoint())
+    ).resolves.toEqual({ data: rows(500) });
+    await expect(
+      service.execute(sourceReturning(501), { paginate: 'false' }, endpoint())
+    ).rejects.toEqual(refusal(500));
+  });
+
+  it('o teto global de forRoot vale para todo endpoint', async () => {
+    const service = new QueryBuilderService({
+      pagination: { maxUnpaginatedRows: 3 },
+    });
+
+    await expect(
+      service.execute(sourceReturning(4), { paginate: 'false' }, endpoint())
+    ).rejects.toEqual(refusal(3));
+  });
+
+  it('o endpoint substitui o teto global', async () => {
+    const service = new QueryBuilderService({
+      pagination: { maxUnpaginatedRows: 3 },
+    });
+
+    await expect(
+      service.execute(
+        sourceReturning(4),
+        { paginate: 'false' },
+        endpoint({ maxUnpaginatedRows: 10 })
+      )
+    ).resolves.toEqual({ data: rows(4) });
+  });
+
+  it('o endpoint pode proibir paginate=false, e nada chega ao adapter', async () => {
+    const service = new QueryBuilderService({});
+
+    await expect(
+      service.execute(
+        sourceReturning(1),
+        { paginate: 'false' },
+        endpoint({ allowUnpaginated: false })
+      )
+    ).rejects.toEqual(refusal());
+    expect(calls.some((call) => call.kind === 'execute')).toBe(false);
+  });
+
+  it('forRoot pode proibir paginate=false e um endpoint reabrir', async () => {
+    const service = new QueryBuilderService({
+      pagination: { allowUnpaginated: false },
+    });
+
+    await expect(
+      service.execute(sourceReturning(1), { paginate: 'false' }, endpoint())
+    ).rejects.toEqual(refusal());
+    await expect(
+      service.execute(
+        sourceReturning(1),
+        { paginate: 'false' },
+        endpoint({ allowUnpaginated: true })
+      )
+    ).resolves.toEqual({ data: rows(1) });
+  });
+
+  it('respostas paginadas não são afetadas pelo teto', async () => {
+    const service = new QueryBuilderService({
+      pagination: { maxUnpaginatedRows: 1 },
+    });
+
+    await expect(
+      service.execute(sourceReturning(1), { perPage: '50' }, endpoint())
+    ).resolves.toEqual(expect.objectContaining({ perPage: 50 }));
   });
 });

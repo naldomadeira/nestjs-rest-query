@@ -277,10 +277,24 @@ describe('toDataSql', () => {
     );
   });
 
-  it('omite a paginação quando o plano não pagina', () => {
+  it('sem paginação, busca no máximo o teto + 1 linhas (bug #6)', () => {
+    // `paginate=false` não é "sem limite": o adapter busca uma linha além do
+    // teto para o serviço recusar o resultado que passou dele.
     const { data } = statementFor({ paginate: 'false' }, 'user.default');
 
-    expect(render(toDataSql(data)).sql).not.toContain('limit');
+    const rendered = render(toDataSql(data));
+    expect(rendered.sql).toContain('limit ? offset ?');
+    expect(rendered.params.slice(-2)).toEqual([501, 0]);
+  });
+
+  it('omite a paginação quando o statement não traz limit', () => {
+    // Um `customize` pode remover o limite do statement de dados; o compilador
+    // de SQL não inventa um.
+    const { data } = statementFor({ paginate: 'false' }, 'user.default');
+
+    expect(render(toDataSql({ ...data, limit: undefined })).sql).not.toContain(
+      'limit'
+    );
   });
 });
 

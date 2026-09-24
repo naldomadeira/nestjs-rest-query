@@ -77,6 +77,7 @@ const TABLES: readonly TableSpec[] = [
       ['title', 'string'],
       ['title_folded', 'string'],
       ['user_id', 'integer'],
+      ['is_pinned', 'boolean'],
     ],
     primaryKey: ['id'],
   },
@@ -166,6 +167,7 @@ export async function seedSqlite(): Promise<void> {
       title: row.title,
       title_folded: row.title_folded,
       user_id: row.user_id,
+      isPinned: row.isPinned,
     })),
   });
 
