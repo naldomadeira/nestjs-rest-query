@@ -141,6 +141,32 @@ const userNoSearch = defineQueryRules(CORPUS_SCHEMAS, 'user', {
   includes: ['company'],
 });
 
+/**
+ * `search` com um alvo através de uma relação `one` **anulável**.
+ *
+ * A busca é um OR entre os alvos: um root sem `company` que casa pelo próprio
+ * `name` tem de continuar no resultado e no `total`. Compilar o alvo
+ * `company.name` como junção de predicado (INNER) derrubava esse root no
+ * Drizzle, enquanto TypeORM e Prisma o mantinham. `company.name` também é
+ * filtro aqui, para medir que um filtro (AND) sobre a mesma relação continua
+ * exigindo a junção.
+ */
+const userSearchCompany = defineQueryRules(CORPUS_SCHEMAS, 'user', {
+  filters: [
+    { path: 'id', operators: ['eq'] },
+    { path: 'company.name', operators: ['eq'] },
+  ],
+  sorts: ['id'],
+  fields: {
+    root: userRootFields,
+    relations: {
+      company: { allowed: ['id', 'name'], default: ['id', 'name'] },
+    },
+  },
+  includes: ['company'],
+  search: ['name', 'company.name'],
+});
+
 const postPortableOrder = defineQueryRules(CORPUS_SCHEMAS, 'post', {
   filters: [
     { path: 'id', operators: ['eq', 'in'] },
@@ -179,6 +205,7 @@ export const RULES_PRESETS: Readonly<Record<string, CompiledQueryRules>> = {
   'user.company-root-only': userCompanyRootOnly,
   'user.deep': userDeep,
   'user.no-search': userNoSearch,
+  'user.search-company': userSearchCompany,
   'post.portable-order': postPortableOrder,
   'tag.default': tagDefault,
   'user.unpaginated-capped': userUnpaginated({ maxUnpaginatedRows: 5 }),

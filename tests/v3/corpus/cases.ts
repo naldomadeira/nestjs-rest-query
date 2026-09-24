@@ -269,6 +269,25 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     divergences: { prisma: PRISMA_PATTERN_REFUSAL },
   },
   {
+    /**
+     * Busca por alvo através de `one` anulável mantém o root sem relação.
+     *
+     * O termo `u` casa `under_score` (10, sem company) e `100% pure` (7) pelo
+     * próprio `name`, e `Nimbus` (company de 5, 6 e 7) pelo alvo
+     * `company.name`. Como a busca é OR, o usuário 10 continua no resultado e
+     * no `total` mesmo sem company: compilado como INNER JOIN, ele sumia dos
+     * dois.
+     */
+    id: 'search/through-nullable-one-keeps-root',
+    description:
+      'search através de one anulável não derruba o root sem relação',
+    tags: ['relation-one', 'null', 'case-fold'],
+    rules: 'user.search-company',
+    query: { search: 'u' },
+    expect: { kind: 'rows', ids: [5, 6, 7, 10], total: 4, lastPage: 1 },
+    divergences: { prisma: PRISMA_PATTERN_REFUSAL },
+  },
+  {
     id: 'search/not-configured',
     description: 'search em endpoint sem campos de busca é rejeitado',
     tags: ['case-fold'],
