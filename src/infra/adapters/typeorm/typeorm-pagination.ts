@@ -67,14 +67,23 @@ async function selectWindow<T extends ObjectLiteral>(
   // Fase 1: os roots da janela, sem nenhum join de apresentação.
   const keysQuery = repository.createQueryBuilder(ROOT_ALIAS);
   compileJoins(keysQuery, context.joins);
-  keysQuery.select(primaryKey.map((column) => `${ROOT_ALIAS}.${column}`));
+  // Alias explícito por parte da chave: sem ele o `getRawMany` nomeia a coluna
+  // `alias_<databaseName>`, e ler por `alias_<propertyName>` dava `undefined`
+  // sempre que a PK tem nome físico próprio (`@PrimaryColumn({ name })`,
+  // naming strategy) — página vazia com `total` certo.
+  primaryKey.forEach((column, part) => {
+    const expression = `${ROOT_ALIAS}.${column}`;
+    const alias = keyAlias(part);
+    if (part === 0) keysQuery.select(expression, alias);
+    else keysQuery.addSelect(expression, alias);
+  });
   compileFilters(keysQuery, context);
   compileSort(keysQuery, plan, context);
   for (const customize of compiled.keyCustomizers) customize(keysQuery);
   keysQuery.limit(limit).offset(offset);
   const keyRows = await keysQuery.getRawMany<Record<string, unknown>>();
   const keys = keyRows.map((row) =>
-    primaryKey.map((column) => row[`${ROOT_ALIAS}_${column}`])
+    primaryKey.map((_column, part) => row[keyAlias(part)])
   );
 
   if (keys.length === 0) return { rows: [], queries: 2 };
@@ -86,6 +95,9 @@ async function selectWindow<T extends ObjectLiteral>(
   const rows = await hydration.getMany();
   return { rows: reorderByKeys(rows, primaryKey, keys), queries: 2 };
 }
+
+/** Nome da coluna crua que carrega a parte `part` da chave na fase 1. */
+const keyAlias = (part: number): string => `dqb_key_${part}`;
 
 /**
  * Restringe aos roots da primeira fase.
