@@ -114,17 +114,17 @@ async function main() {
     throw new Error('#1: DecimalValue identity differs between CJS and ESM');
   }
 
-  // #6 — `paginate=false` tem teto global (default `maxPerPage` = 100), busca
+  // #6 — `paginate=false` tem teto global (default `maxPerPage` = 500), busca
   // no máximo teto + 1 linhas e recusa em vez de truncar.
   calls.length = 0;
-  rowsToReturn = Array.from({ length: 101 }, (_, id) => ({ id, price: '1' }));
+  rowsToReturn = Array.from({ length: 501 }, (_, id) => ({ id, price: '1' }));
   let refused = null;
   try {
     await service.execute(source, { paginate: 'false' }, rules);
   } catch (error) {
     refused = error.getResponse ? error.getResponse() : error;
   }
-  if (calls[0].take !== 101) {
+  if (calls[0].take !== 501) {
     throw new Error(`#6: unpaginated query fetched take=${calls[0].take}`);
   }
   if (!refused || refused.code !== 'PAGINATION_INVALID') {

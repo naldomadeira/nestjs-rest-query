@@ -47,9 +47,9 @@ export const ListQuery = createParamDecorator(
 DynamicQueryBuilderModule.forRoot({
   pagination: {
     defaultPerPage: 10,
-    maxPerPage: 100, // perPage above it → 400, never clamped
+    maxPerPage: 500, // perPage above it → 400, never clamped
     allowUnpaginated: true, // false → ?paginate=false is a 400 everywhere
-    maxUnpaginatedRows: 100, // default: the effective maxPerPage
+    maxUnpaginatedRows: 500, // default: the effective maxPerPage
   },
   textProfile: 'portable-strict', // the only implemented profile
   consistency: 'eventual', // 'transactional' is refused at boot

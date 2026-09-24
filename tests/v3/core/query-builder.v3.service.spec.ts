@@ -355,15 +355,15 @@ describe('regression: unpaginated global cap (consumer report #6) — service', 
       }),
     });
 
-  it('sem configuração, o teto é o maxPerPage default (100)', async () => {
+  it('sem configuração, o teto é o maxPerPage default (500)', async () => {
     const service = new QueryBuilderService({});
 
     await expect(
-      service.execute(sourceReturning(100), { paginate: 'false' }, endpoint())
-    ).resolves.toEqual({ data: rows(100) });
+      service.execute(sourceReturning(500), { paginate: 'false' }, endpoint())
+    ).resolves.toEqual({ data: rows(500) });
     await expect(
-      service.execute(sourceReturning(101), { paginate: 'false' }, endpoint())
-    ).rejects.toEqual(refusal(100));
+      service.execute(sourceReturning(501), { paginate: 'false' }, endpoint())
+    ).rejects.toEqual(refusal(500));
   });
 
   it('o teto global de forRoot vale para todo endpoint', async () => {

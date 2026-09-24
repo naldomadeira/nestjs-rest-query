@@ -14,9 +14,9 @@ describe('DynamicQueryBuilderModule.forRoot', () => {
     expect(DynamicQueryBuilderModule.config).toEqual({
       pagination: {
         defaultPerPage: 10,
-        maxPerPage: 100,
+        maxPerPage: 500,
         allowUnpaginated: true,
-        maxUnpaginatedRows: 100,
+        maxUnpaginatedRows: 500,
       },
       textProfile: 'portable-strict',
       consistency: 'eventual',
@@ -89,7 +89,7 @@ describe('regression: unpaginated global cap (consumer report #6) — forRoot', 
     });
     expect(DynamicQueryBuilderModule.config.pagination).toEqual({
       defaultPerPage: 10,
-      maxPerPage: 100,
+      maxPerPage: 500,
       allowUnpaginated: false,
       maxUnpaginatedRows: 1000,
     });

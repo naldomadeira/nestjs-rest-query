@@ -151,7 +151,7 @@ import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
 @Module({
   imports: [
     DynamicQueryBuilderModule.forRoot({
-      pagination: { defaultPerPage: 10, maxPerPage: 100 },
+      pagination: { defaultPerPage: 10, maxPerPage: 500 },
     }),
   ],
 })
@@ -181,7 +181,7 @@ implicit default adapter: the adapter is decided by the **source** you pass to
 | Option               | Type      | Default      | Description                                                                       |
 | -------------------- | --------- | ------------ | --------------------------------------------------------------------------------- |
 | `defaultPerPage`     | `number`  | `10`         | Items per page when the request carries no `perPage`.                             |
-| `maxPerPage`         | `number`  | `100`        | Upper bound. A larger `perPage` is a `400`, not a silent clamp.                   |
+| `maxPerPage`         | `number`  | `500`        | Upper bound. A larger `perPage` is a `400`, not a silent clamp.                   |
 | `allowUnpaginated`   | `boolean` | `true`       | `false` refuses `?paginate=false` with a `400` on every endpoint.                 |
 | `maxUnpaginatedRows` | `number`  | `maxPerPage` | Row cap of a `paginate=false` response; above it the request is a `400`, not cut. |
 

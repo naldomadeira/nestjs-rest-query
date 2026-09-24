@@ -15,7 +15,7 @@ const DEFAULTS: ResolvedConfig = {
   // `maxUnpaginatedRows` não tem default fixo: herda o `maxPerPage` efetivo,
   // resolvido em `forRoot`. Um só número responde "quantas linhas uma
   // resposta pode ter" até alguém decidir separar os dois.
-  pagination: { defaultPerPage: 10, maxPerPage: 100, allowUnpaginated: true },
+  pagination: { defaultPerPage: 10, maxPerPage: 500, allowUnpaginated: true },
   textProfile: 'portable-strict',
   consistency: 'eventual',
   logging: { enabled: false, level: 'info', redactValues: true },

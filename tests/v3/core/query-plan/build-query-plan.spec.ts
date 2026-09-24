@@ -121,7 +121,7 @@ describe('regression: unpaginated global cap (consumer report #6) — precedênc
     const plain = RULES_PRESETS['user.default'];
     const capped = RULES_PRESETS['user.unpaginated-capped'];
 
-    expect(buildQueryPlan(unpaginated, plain).pagination.maxRows).toBe(100);
+    expect(buildQueryPlan(unpaginated, plain).pagination.maxRows).toBe(500);
     expect(
       buildQueryPlan(unpaginated, plain, {
         pagination: { maxUnpaginatedRows: 40 },
@@ -140,6 +140,6 @@ describe('regression: unpaginated global cap (consumer report #6) — precedênc
       buildQueryPlan(unpaginated, RULES_PRESETS['user.default'], {
         pagination: { maxPerPage: undefined, maxUnpaginatedRows: undefined },
       }).pagination.maxRows
-    ).toBe(100);
+    ).toBe(500);
   });
 });

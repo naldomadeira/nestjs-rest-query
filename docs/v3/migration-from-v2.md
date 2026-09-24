@@ -50,14 +50,14 @@ default implícito — quem determina o adapter é a source.
 DynamicQueryBuilderModule.forRoot({
   adapter: new DrizzleAdapter(),
   operators: { allowed: ['eq', 'like'] },
-  pagination: { defaultPerPage: 10, maxPerPage: 100 },
+  pagination: { defaultPerPage: 10, maxPerPage: 500 },
 });
 
 // v3
 DynamicQueryBuilderModule.forRoot({
   pagination: {
     defaultPerPage: 10,
-    maxPerPage: 100,
+    maxPerPage: 500,
     // teto de `paginate=false`; ver §7.1
     allowUnpaginated: true,
     maxUnpaginatedRows: 100,
@@ -73,8 +73,9 @@ DynamicQueryBuilderModule.forRoot({
 `forRoot no longer accepts "<chave>"; see the v2 to v3 migration guide`. A
 restrição de operadores agora é **por campo**, declarada nas regras do endpoint.
 
-Os defaults de paginação **não mudaram**: `defaultPerPage` continua `10` e
-`maxPerPage` continua `100`. O design de 2026-09-03 trazia `20` no bloco de
+`defaultPerPage` continua `10`. `maxPerPage` passa a ter default `500` (na 2.x era
+`100`): um `perPage` entre 101 e 500, que antes era `400`, agora é aceito. Para
+manter o teto antigo, declare `maxPerPage: 100`. O design de 2026-09-03 trazia `20` no bloco de
 exemplo da §8.2 e o código o seguiu; a
 [Emenda 4 da ADR-001](../superpowers/specs/2026-09-04-v3-adr-001-matriz-e-escopo-da-3.0.0.md)
 desfez isso. Se você leu uma versão anterior deste guia que mandava fixar
@@ -532,7 +533,7 @@ padrão (bug #6 da validação por consumidor externo). A semântica agora é:
 
 | Onde                                    | Chave                | Default                      | Efeito                                                                        |
 | --------------------------------------- | -------------------- | ---------------------------- | ----------------------------------------------------------------------------- |
-| `forRoot({ pagination })`               | `maxUnpaginatedRows` | o `maxPerPage` efetivo (100) | teto de linhas de uma resposta sem paginação, para todo endpoint              |
+| `forRoot({ pagination })`               | `maxUnpaginatedRows` | o `maxPerPage` efetivo (500) | teto de linhas de uma resposta sem paginação, para todo endpoint              |
 | `forRoot({ pagination })`               | `allowUnpaginated`   | `true`                       | `false` recusa `paginate=false` em todo endpoint                              |
 | `defineQueryRules(..., { pagination })` | as mesmas duas       | herda a global               | cada chave declarada **substitui** a global naquele endpoint; a omitida herda |
 

@@ -97,7 +97,7 @@ to `execute()`:
 
 ```typescript
 DynamicQueryBuilderModule.forRoot({
-  pagination: { defaultPerPage: 10, maxPerPage: 100 },
+  pagination: { defaultPerPage: 10, maxPerPage: 500 },
   textProfile: 'portable-strict',
 });
 
@@ -131,7 +131,7 @@ import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
 @Module({
   imports: [
     DynamicQueryBuilderModule.forRoot({
-      pagination: { defaultPerPage: 10, maxPerPage: 100 },
+      pagination: { defaultPerPage: 10, maxPerPage: 500 },
     }),
   ],
 })
@@ -357,7 +357,7 @@ user.name_folded = foldText(user.name); // value.normalize('NFC').toLowerCase()
 
 **`paginate=false` is capped, never unbounded.** An unpaginated response may
 hold at most `pagination.maxUnpaginatedRows` rows (default: the effective
-`maxPerPage`, so `100` out of the box). The adapter fetches at most one row past
+`maxPerPage`, so `500` out of the box). The adapter fetches at most one row past
 the cap; if the result is larger, the request is a `400 PAGINATION_INVALID` —
 the list is never silently truncated. An endpoint can declare its own policy in
 the rules, which replaces the global one for that endpoint:
@@ -409,9 +409,9 @@ failed with a `ReferenceError`.
 DynamicQueryBuilderModule.forRoot({
   pagination: {
     defaultPerPage: 10,
-    maxPerPage: 100,
+    maxPerPage: 500,
     allowUnpaginated: true, // `false` refuses ?paginate=false everywhere
-    maxUnpaginatedRows: 100, // defaults to the effective maxPerPage
+    maxUnpaginatedRows: 500, // defaults to the effective maxPerPage
   },
   textProfile: 'portable-strict',
   consistency: 'eventual',

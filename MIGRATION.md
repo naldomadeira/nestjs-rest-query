@@ -117,9 +117,9 @@ guide is this section. There is no implicit default adapter any more: the
 adapter is decided by the source you pass to `execute()`.
 
 Operator restriction moved from a global list to a **per-field** declaration in
-the endpoint rules. Pagination defaults are unchanged: `defaultPerPage` is still
-`10` and `maxPerPage` is still `100`, so page sizes you never configured keep
-the size they had.
+the endpoint rules. `defaultPerPage` is still `10`. `maxPerPage` now defaults to `500` (2.x: `100`):
+a `perPage` between 101 and 500 that used to be a `400` is now accepted. Set
+`maxPerPage: 100` to keep the old ceiling.
 
 `pagination` gained two keys, `allowUnpaginated` (default `true`) and
 `maxUnpaginatedRows` (default: the effective `maxPerPage`). v2 had no cap on
@@ -512,7 +512,7 @@ At minimum these change what your clients receive:
 `paginate=false` semantics, in full:
 
 - **Global cap.** `forRoot({ pagination: { maxUnpaginatedRows } })`, default
-  the effective `maxPerPage` (`100`). The adapter fetches at most
+  the effective `maxPerPage` (`500`). The adapter fetches at most
   `maxUnpaginatedRows + 1` roots; one more than the cap means the request is
   refused with `400 PAGINATION_INVALID` and `details: { param: 'paginate',
 maxRows }`. With a `many` include the cap counts roots, not join rows.

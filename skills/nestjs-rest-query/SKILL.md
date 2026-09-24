@@ -57,7 +57,7 @@ Per model you write a **schema** (what the model is) and per endpoint **rules**
 
 ```typescript
 // app.module.ts — only shared policy; `adapter`/`operators` are refused here
-DynamicQueryBuilderModule.forRoot({ pagination: { defaultPerPage: 10, maxPerPage: 100 } });
+DynamicQueryBuilderModule.forRoot({ pagination: { defaultPerPage: 10, maxPerPage: 500 } });
 
 // product.schema.ts
 export const productSchema = defineQuerySchema({

@@ -153,7 +153,7 @@ import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
 @Module({
   imports: [
     DynamicQueryBuilderModule.forRoot({
-      pagination: { defaultPerPage: 10, maxPerPage: 100 },
+      pagination: { defaultPerPage: 10, maxPerPage: 500 },
     }),
   ],
 })
@@ -182,7 +182,7 @@ O `forRoot` aceita um objeto `QueryBuilderConfigV3`.
 | Opção                | Tipo      | Default      | Descrição                                                                       |
 | -------------------- | --------- | ------------ | ------------------------------------------------------------------------------- |
 | `defaultPerPage`     | `number`  | `10`         | Itens por página quando a requisição não traz `perPage`.                        |
-| `maxPerPage`         | `number`  | `100`        | Teto. Um `perPage` maior é `400`, não um corte silencioso.                      |
+| `maxPerPage`         | `number`  | `500`        | Teto. Um `perPage` maior é `400`, não um corte silencioso.                      |
 | `allowUnpaginated`   | `boolean` | `true`       | `false` recusa `?paginate=false` com `400` em todo endpoint.                    |
 | `maxUnpaginatedRows` | `number`  | `maxPerPage` | Teto de linhas de uma resposta `paginate=false`; acima dele é `400`, não corte. |
 

@@ -115,8 +115,8 @@
     {
       "id": 8,
       "version": "3.x",
-      "prompt": "[nestjs-rest-query 3.0.0-alpha.1] Minha rota GET /brands?paginate=false começou a responder 400 PAGINATION_INVALID. Antes devolvia todas as 350 marcas. O que houve e como resolvo sem liberar a tabela de produtos inteira?",
-      "expected_output": "Explains paginate=false is capped at maxUnpaginatedRows (default maxPerPage = 100) and a larger result is a 400 rather than truncation; fix: pagination: { maxUnpaginatedRows: 500 } in the brands endpoint rules (endpoint key replaces the global), optionally allowUnpaginated: false on products.",
+      "prompt": "[nestjs-rest-query 3.0.0-alpha.1] Minha rota GET /brands?paginate=false começou a responder 400 PAGINATION_INVALID. Antes devolvia todas as 800 marcas. O que houve e como resolvo sem liberar a tabela de produtos inteira?",
+      "expected_output": "Explains paginate=false is capped at maxUnpaginatedRows (default maxPerPage = 500) and a larger result is a 400 rather than truncation; fix: pagination: { maxUnpaginatedRows: 1000 } in the brands endpoint rules (endpoint key replaces the global), optionally allowUnpaginated: false on products.",
       "expectations": [
         "Explains the unpaginated cap and that its default is the effective maxPerPage",
         "States the result is refused, not truncated",
