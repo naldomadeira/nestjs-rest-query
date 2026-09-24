@@ -80,6 +80,9 @@ export {
 export { ApiDynamicQuery } from './api/decorators/api-dynamic-query.decorator';
 export { DynamicQuery } from './api/decorators/dynamic-query.decorator';
 export { QueryRules } from './api/decorators/query-rules.decorator';
+export { RestQuery } from './api/decorators/rest-query.decorator';
+// Tipo do valor entregue por `@RestQuery()` e aceito por `execute()`.
+export type { QueryInputLike } from './core/query-parser';
 export {
   ApiPaginatedResponse,
   type ApiPaginatedResponseOptions,

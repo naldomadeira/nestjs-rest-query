@@ -72,6 +72,7 @@ describe('corpus canônico', () => {
       'prisma:ilike/nfd-input-matches-nfc-storage@sqlite,mssql',
       'prisma:search/or-across-configured-fields@sqlite,mssql',
       'prisma:search/through-many-is-existential@sqlite,mssql',
+      'prisma:search/through-nullable-one-keeps-root@sqlite,mssql',
     ]);
 
     for (const entry of declared) {

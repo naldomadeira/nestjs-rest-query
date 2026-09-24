@@ -3,7 +3,7 @@ import { configurationError } from '@core/errors';
 import type { TypedQueryPlan } from '@core/query-plan';
 import type { PlanFilter } from '@core/semantic-validator';
 import { containsPattern } from '../shared/escape-pattern';
-import type { DrizzleJoinPlanner } from './drizzle-join-planner';
+import type { DrizzleJoinPlanner, JoinPurpose } from './drizzle-join-planner';
 import { toDriverValue } from './drizzle-value';
 import type {
   DrizzleColumnRef,
@@ -35,8 +35,21 @@ export function compileWhere(
     terms.push({
       op: 'or',
       terms: search.targets.map((target) =>
-        scoped(target.relationPath, target.column, context, (ref) =>
-          likeCondition(ref, search.foldedTerm, context.escapeCharacter, false)
+        // `or-predicate`: o alvo é um termo de OR, então a junção de uma
+        // relação `one` fica LEFT — o root sem ela ainda pode casar por outro
+        // alvo, e continua no count.
+        scoped(
+          target.relationPath,
+          target.column,
+          context,
+          (ref) =>
+            likeCondition(
+              ref,
+              search.foldedTerm,
+              context.escapeCharacter,
+              false
+            ),
+          'or-predicate'
         )
       ),
     });
@@ -72,13 +85,14 @@ function scoped(
   relationPath: readonly string[],
   columnPath: string,
   context: DrizzleFilterContext,
-  make: (ref: DrizzleColumnRef) => DrizzleCondition
+  make: (ref: DrizzleColumnRef) => DrizzleCondition,
+  purpose: Exclude<JoinPurpose, 'presentation'> = 'predicate'
 ): DrizzleCondition {
   if (!context.planner.crossesMany(relationPath)) {
-    return make(context.planner.ref(columnPath, 'predicate'));
+    return make(context.planner.ref(columnPath, purpose));
   }
 
-  const joins = context.planner.existsChain(relationPath);
+  const joins = context.planner.existsChain(relationPath, undefined, purpose);
   const segments = columnPath.split('.');
 
   return {

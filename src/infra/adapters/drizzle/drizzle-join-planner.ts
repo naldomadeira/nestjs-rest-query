@@ -8,11 +8,23 @@ import type {
   DrizzleTable,
 } from './drizzle-statement.interface';
 
-export type JoinPurpose = 'predicate' | 'presentation';
+/**
+ * Por que um path foi juntado.
+ *
+ * - `predicate`: termo de filtro (AND). A junção é INNER e entra no count.
+ * - `or-predicate`: alvo de `search`, um termo dentro de um OR. A junção entra
+ *   no count, mas fica LEFT: um INNER derrubaria o root sem a relação mesmo
+ *   quando ele casa por outro alvo do OR.
+ * - `presentation`: projeção e sort. LEFT, e fora do count.
+ */
+export type JoinPurpose = 'predicate' | 'or-predicate' | 'presentation';
 
 interface PlannedJoin {
   readonly join: DrizzleJoin;
+  /** Algum termo AND exige a relação: a junção vira INNER. */
   predicate: boolean;
+  /** O `where` cita a relação: o count precisa da junção. */
+  counted: boolean;
 }
 
 /**
@@ -114,10 +126,13 @@ export class DrizzleJoinPlanner {
       const existing = this.joins.get(path);
 
       if (existing) {
+        // AND vence: uma relação que é filtro e alvo de busca continua INNER.
         existing.predicate ||= purpose === 'predicate';
+        existing.counted ||= purpose !== 'presentation';
       } else {
         this.joins.set(path, {
           predicate: purpose === 'predicate',
+          counted: purpose !== 'presentation',
           join: {
             path,
             table: relation.target.name,
@@ -165,10 +180,11 @@ export class DrizzleJoinPlanner {
    */
   existsChain(
     relationPath: readonly string[],
-    subqueryFrom = this.oneOnlyPrefix(relationPath).length
+    subqueryFrom = this.oneOnlyPrefix(relationPath).length,
+    purpose: Exclude<JoinPurpose, 'presentation'> = 'predicate'
   ): readonly DrizzleJoin[] {
     const prefix = relationPath.slice(0, subqueryFrom);
-    let parentAlias = this.join(prefix, 'predicate');
+    let parentAlias = this.join(prefix, purpose);
     const chain: DrizzleJoin[] = [];
 
     for (let index = prefix.length; index < relationPath.length; index++) {
@@ -194,17 +210,19 @@ export class DrizzleJoinPlanner {
 
   /** Todas as junções do statement de dados, na ordem de registro. */
   all(): readonly DrizzleJoin[] {
-    return [...this.joins.values()].map((planned) =>
-      planned.predicate
-        ? { ...planned.join, kind: 'inner' as const }
-        : planned.join
-    );
+    return [...this.joins.values()].map(kindOf);
   }
 
   /** Só as junções necessárias ao `where`: o que o count precisa. */
   predicateOnly(): readonly DrizzleJoin[] {
     return [...this.joins.values()]
-      .filter((planned) => planned.predicate)
-      .map((planned) => ({ ...planned.join, kind: 'inner' as const }));
+      .filter((planned) => planned.counted)
+      .map(kindOf);
   }
+}
+
+function kindOf(planned: PlannedJoin): DrizzleJoin {
+  return planned.predicate
+    ? { ...planned.join, kind: 'inner' as const }
+    : planned.join;
 }

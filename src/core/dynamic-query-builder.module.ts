@@ -7,7 +7,7 @@ import { DQB_CONFIG_TOKEN } from './constants';
 type ResolvedConfig = Required<
   Pick<
     QueryBuilderConfigV3,
-    'pagination' | 'textProfile' | 'consistency' | 'logging'
+    'pagination' | 'textProfile' | 'consistency' | 'logging' | 'portability'
   >
 >;
 
@@ -19,6 +19,7 @@ const DEFAULTS: ResolvedConfig = {
   textProfile: 'portable-strict',
   consistency: 'eventual',
   logging: { enabled: false, level: 'info', redactValues: true },
+  portability: { enforce: false },
 };
 
 /** Chaves da v2 que deixaram de existir (spec §8.2 e §22). */
@@ -44,6 +45,7 @@ export class DynamicQueryBuilderModule {
     assertNoRemovedKeys(config);
     assertImplementedTextProfile(config);
     assertOfferedConsistency(config);
+    assertBooleanPortabilityEnforce(config);
 
     const pagination = {
       defaultPerPage:
@@ -101,6 +103,12 @@ export class DynamicQueryBuilderModule {
       textProfile: config.textProfile ?? DEFAULTS.textProfile,
       consistency: config.consistency ?? DEFAULTS.consistency,
       logging: Object.freeze({ ...DEFAULTS.logging, ...config.logging }),
+      // Sem esta chave o `QueryBuilderService` lia `portability.enforce` de uma
+      // configuração que nunca a carregava, e `enforce: true` era descartado
+      // calado (consumer report #5).
+      portability: Object.freeze({
+        enforce: config.portability?.enforce ?? DEFAULTS.portability.enforce!,
+      }),
     });
 
     const configProvider: Provider = {
@@ -154,6 +162,22 @@ function assertOfferedConsistency(config: QueryBuilderConfigV3): void {
     'SOURCE_CONFIGURATION_INVALID',
     `consistency "${config.consistency}" is not offered by any bundled adapter (typeorm, prisma, drizzle); every request would be refused with CAPABILITY_UNAVAILABLE (spec §14)`,
     { consistency: config.consistency }
+  );
+}
+
+/**
+ * `portability.enforce` liga uma checagem de segurança: um valor que não seja
+ * booleano (`'false'` vindo de variável de ambiente, por exemplo) não pode ser
+ * interpretado por truthiness em nenhuma das duas direções.
+ */
+function assertBooleanPortabilityEnforce(config: QueryBuilderConfigV3): void {
+  const enforce = config.portability?.enforce;
+  if (enforce === undefined || typeof enforce === 'boolean') return;
+
+  throw configurationError(
+    'SOURCE_CONFIGURATION_INVALID',
+    'portability.enforce must be a boolean',
+    { enforce }
   );
 }
 

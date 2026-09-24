@@ -65,6 +65,9 @@ importers:
       better-sqlite3:
         specifier: ^12.11.1
         version: 12.11.1
+      class-validator:
+        specifier: ^0.14.4
+        version: 0.14.4
       drizzle-orm:
         specifier: 1.0.0-rc.4
         version: 1.0.0-rc.4(@electric-sql/pglite@0.4.1)(@sinclair/typebox@0.34.49)(@types/better-sqlite3@9.6.0)(@types/pg@8.23.1)(better-sqlite3@12.11.1)(mssql@12.7.0)(mysql2@3.24.3(@types/node@25.6.0))(pg@8.20.0)(postgres@3.4.9)(sqlite3@5.1.7)(valibot@1.2.0(typescript@6.0.3))(zod@4.3.6)

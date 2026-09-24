@@ -1,5 +1,6 @@
 export { ApiDynamicQuery } from './decorators/api-dynamic-query.decorator';
 export { DynamicQuery } from './decorators/dynamic-query.decorator';
 export { QueryRules } from './decorators/query-rules.decorator';
+export { RestQuery } from './decorators/rest-query.decorator';
 export type { PaginationQueryDto } from './dtos/pagination-query.dto';
 export { DynamicQueryDto } from './dtos/dynamic-query.dto';

@@ -89,6 +89,38 @@ describe('toDataSql', () => {
     );
   });
 
+  it('emite left join para alvo de search através de one', () => {
+    // A busca é um OR: um INNER JOIN derrubaria o root sem `company` que casa
+    // pelo próprio `name`, no statement de dados e no count.
+    const { data, count } = statementFor(
+      { search: 'u' },
+      'user.search-company'
+    );
+    const join =
+      'left join "companies" as "users__company" on "users"."company_id" = "users__company"."id"';
+
+    expect(render(toDataSql(data)).sql).toContain(join);
+    expect(render(toDataSql(data)).sql).not.toContain('inner join');
+    expect(render(toCountSql(count)).sql).toContain(join);
+    expect(render(toCountSql(count)).sql).not.toContain('inner join');
+  });
+
+  it('mantém inner join quando a relação também é filtro', () => {
+    // O filtro é AND: exigir a junção é a semântica dele, e a busca sobre a
+    // mesma relação não a afrouxa — em qualquer ordem de registro.
+    const { data, count } = statementFor(
+      { search: 'u', filter: { 'company.name': { eq: 'Nimbus' } } },
+      'user.search-company'
+    );
+
+    expect(render(toDataSql(data)).sql).toContain(
+      'inner join "companies" as "users__company"'
+    );
+    expect(render(toCountSql(count)).sql).toContain(
+      'inner join "companies" as "users__company"'
+    );
+  });
+
   it('emite EXISTS correlacionado para relação many', () => {
     const { data } = statementFor({
       filter: { 'posts.title': { eq: 'COBOL' } },
