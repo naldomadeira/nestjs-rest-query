@@ -26,6 +26,9 @@ export default defineConfig({
     'drizzle-orm',
     '@prisma/client',
     /^@nestjs\//,
+    // Carregado sob demanda pela `DynamicQueryDto`, nunca embarcado: é o
+    // class-validator do consumidor que o `ValidationPipe` consulta.
+    'class-validator',
     'reflect-metadata',
     'rxjs',
   ],
