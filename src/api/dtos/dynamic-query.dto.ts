@@ -63,8 +63,10 @@ type AllowDecoratorFactory = () => PropertyDecorator;
  * propriedades com `@Allow()` as torna conhecidas sem validar o conteúdo, que
  * é trabalho do parser e do validador semântico.
  *
- * class-validator não é dependência do pacote: carregado sob demanda, como o
- * `@nestjs/swagger`. Sem ele instalado não há whitelist a satisfazer, e nada é
+ * class-validator é peer opcional, carregado sob demanda como o `@nestjs/swagger`.
+ * O peer não é enfeite: sem ele, um layout estrito (pnpm) não deixa este pacote
+ * resolver o class-validator do consumidor, o `require` falha com
+ * `MODULE_NOT_FOUND` e a marcação some calada. Sem ele instalado não há whitelist a satisfazer, e nada é
  * aplicado. Só "módulo ausente" é engolido; qualquer outro erro sobe.
  *
  * O carregamento passa por `module.require`, e não por `require`: o bundler
