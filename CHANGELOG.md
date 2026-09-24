@@ -1,5 +1,33 @@
 # Changelog
 
+## 3.0.0-alpha.2
+
+### Patch Changes
+
+- [#70](https://github.com/naldomadeira/nestjs-rest-query/pull/70) [`2a46dc9`](https://github.com/naldomadeira/nestjs-rest-query/commit/2a46dc95a76a8e721a747a4b7f3c124c53040c6f) Thanks [@naldomadeira](https://github.com/naldomadeira)! - fix(drizzle): a `search` target through a nullable `one` relation no longer drops roots without that relation
+
+  `search` is an OR across its targets. With `search: ['name', 'company.name']`, the Drizzle adapter joined `company` with an `INNER JOIN`, so a user without a company disappeared from `data` and from `total` even when its own `name` matched. TypeORM and Prisma kept that user.
+
+  Search targets on `one` relations now join with `LEFT JOIN`, in the data statement and in the count. A relation that is also a filter (an AND term) still joins with `INNER JOIN`.
+
+- [#70](https://github.com/naldomadeira/nestjs-rest-query/pull/70) [`2a46dc9`](https://github.com/naldomadeira/nestjs-rest-query/commit/2a46dc95a76a8e721a747a4b7f3c124c53040c6f) Thanks [@naldomadeira](https://github.com/naldomadeira)! - fix(api): `@Query() query: DynamicQueryDto` survives `ValidationPipe({ whitelist: true })`, and new `@RestQuery()` (consumer report [#4](https://github.com/naldomadeira/nestjs-rest-query/issues/4))
+
+  `DynamicQueryDto` had no class-validator decorators, so a global `ValidationPipe({ whitelist: true })` stripped all eight properties and the handler received an empty object — no `400` (Nest forces `forbidUnknownValues: false`), the query simply stopped filtering, sorting and paginating.
+  - When `class-validator` is installed, `page`, `perPage`, `paginate`, `sort`, `fields`, `includes`, `filter` and `search` are now marked with `@Allow()`, so the whitelist keeps them (nested `filter` included). `class-validator` is now an optional peer dependency — declared so that strict layouts like pnpm's let this package resolve the consumer's copy — and it is loaded lazily: nothing happens when it is absent. This applies to the CommonJS build, which is how Nest apps load the package.
+  - New `@RestQuery()` param decorator returns the raw `request.query` (typed `QueryInputLike`, now exported as a type). `ValidationPipe` does not touch it, so it also works under `forbidNonWhitelisted: true` and in ESM apps. Unknown params are still rejected by `execute()` with `QUERY_SYNTAX_UNKNOWN_PARAM`.
+
+- [#70](https://github.com/naldomadeira/nestjs-rest-query/pull/70) [`2a46dc9`](https://github.com/naldomadeira/nestjs-rest-query/commit/2a46dc95a76a8e721a747a4b7f3c124c53040c6f) Thanks [@naldomadeira](https://github.com/naldomadeira)! - fix(core): `forRoot({ portability: { enforce: true } })` is no longer discarded (consumer report [#5](https://github.com/naldomadeira/nestjs-rest-query/issues/5))
+
+  `forRoot` built its frozen configuration from `pagination`, `textProfile`, `consistency` and `logging` only, so `portability` never reached `QueryBuilderService`. With `enforce: true`, a source without `portabilityProfile` still ran instead of failing with `PORTABILITY_PROFILE_MISMATCH`.
+
+  `portability` is now part of the resolved configuration (default `{ enforce: false }`, also visible in `DynamicQueryBuilderModule.config`), and `forRoot` rejects a non-boolean `enforce` with `SOURCE_CONFIGURATION_INVALID`.
+
+- [#70](https://github.com/naldomadeira/nestjs-rest-query/pull/70) [`2a46dc9`](https://github.com/naldomadeira/nestjs-rest-query/commit/2a46dc95a76a8e721a747a4b7f3c124c53040c6f) Thanks [@naldomadeira](https://github.com/naldomadeira)! - fix(typeorm): two-phase pagination no longer returns an empty page when the primary key has its own column name
+
+  With a `many` relation in the projection, pagination runs in two phases: the first selects the page's root keys, the second hydrates them. The first phase read each key from the raw row by its **property** name (`root_userId`), but TypeORM names raw columns after the **physical** column (`root_user_id`). With `@PrimaryGeneratedColumn({ name: 'user_id' }) userId`, or a naming strategy that renames the PK, every key was `undefined` and the response was `200` with the right `total` and an empty `data`.
+
+  Each key part is now selected under an explicit alias, so the lookup no longer depends on how the column is named. Composite keys keep working.
+
 ## 3.0.0-alpha.1
 
 ### Minor Changes

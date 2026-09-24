@@ -17,8 +17,12 @@
     "parity-g2-prisma-empty-in",
     "parity-g7-error-messages",
     "v3-alpha-decimal-binding",
+    "v3-alpha-drizzle-search-left-join",
+    "v3-alpha-dto-whitelist",
+    "v3-alpha-portability-enforce",
     "v3-alpha-swagger-interceptor",
     "v3-alpha-typeorm-exists-columns",
+    "v3-alpha-typeorm-mapped-pk-pagination",
     "v3-alpha-unpaginated-cap",
     "v3-semantic-core"
   ]
