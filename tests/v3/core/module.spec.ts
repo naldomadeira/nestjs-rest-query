@@ -1,5 +1,10 @@
+import { InternalServerErrorException } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
 import { DynamicQueryBuilderModule } from '@core/dynamic-query-builder.module';
 import { RestQueryError } from '@core/errors';
+import { QueryBuilderService } from '@core/query-builder.v3.service';
+import { fakeSource } from '../fixtures/fake-adapter';
+import { RULES_PRESETS } from '../fixtures/rules';
 
 describe('DynamicQueryBuilderModule.forRoot', () => {
   /**
@@ -21,6 +26,7 @@ describe('DynamicQueryBuilderModule.forRoot', () => {
       textProfile: 'portable-strict',
       consistency: 'eventual',
       logging: { enabled: false, level: 'info', redactValues: true },
+      portability: { enforce: false },
     });
   });
 
@@ -182,4 +188,65 @@ describe('DynamicQueryBuilderModule.forRoot e opções reservadas', () => {
     );
     expect(DynamicQueryBuilderModule.config.consistency).toBe('eventual');
   });
+});
+
+describe('regression: portability.enforce (consumer report #5) — forRoot', () => {
+  it('guarda portability na configuração congelada', () => {
+    DynamicQueryBuilderModule.forRoot({ portability: { enforce: true } });
+    expect(DynamicQueryBuilderModule.config.portability).toEqual({
+      enforce: true,
+    });
+    expect(Object.isFrozen(DynamicQueryBuilderModule.config.portability)).toBe(
+      true
+    );
+  });
+
+  it('recusa source sem portabilityProfile quando enforce é true', async () => {
+    // O relato: `forRoot({ portability: { enforce: true } })` era descartado
+    // ao congelar a configuração, e a source sem perfil passava calada.
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        DynamicQueryBuilderModule.forRoot({ portability: { enforce: true } }),
+      ],
+    }).compile();
+    const service = moduleRef.get(QueryBuilderService);
+
+    const failure = await service
+      .execute(fakeSource(), {}, RULES_PRESETS['user.default'])
+      .then(
+        () => undefined,
+        (error: unknown) => error
+      );
+
+    expect(failure).toBeInstanceOf(InternalServerErrorException);
+    expect(
+      (failure as InternalServerErrorException).getResponse()
+    ).toMatchObject({ code: 'PORTABILITY_PROFILE_MISMATCH' });
+    await moduleRef.close();
+  });
+
+  it('mantém a checagem desligada por default', async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [DynamicQueryBuilderModule.forRoot({})],
+    }).compile();
+    const service = moduleRef.get(QueryBuilderService);
+
+    await expect(
+      service.execute(fakeSource(), {}, RULES_PRESETS['user.default'])
+    ).resolves.toBeDefined();
+    await moduleRef.close();
+  });
+
+  it.each(['yes', 1, null])(
+    'recusa portability.enforce=%p na inicialização',
+    (enforce) => {
+      expect(() =>
+        DynamicQueryBuilderModule.forRoot({
+          portability: { enforce: enforce as never },
+        })
+      ).toThrow(
+        expect.objectContaining({ code: 'SOURCE_CONFIGURATION_INVALID' })
+      );
+    }
+  );
 });
