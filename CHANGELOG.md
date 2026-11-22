@@ -1,5 +1,137 @@
 # Changelog
 
+## 3.0.0
+
+### Major Changes
+
+- [#75](https://github.com/naldomadeira/nestjs-rest-query/pull/75) [`7e032bb`](https://github.com/naldomadeira/nestjs-rest-query/commit/7e032bbf1313cb1cd6efdc26aaced0846cc8fe1f) Thanks [@naldomadeira](https://github.com/naldomadeira)! - Closes consumer report [#7](https://github.com/naldomadeira/nestjs-rest-query/issues/7). Error bodies carry `error` (`"Bad Request"` / `"Internal Server Error"`) like every Nest `HttpException`. A `500` no longer returns its message and `details` by default — only `code` and a generic message — and the full error goes to the configured logger even with logging disabled; `forRoot({ errors: { exposeInternalDetails: true } })` restores it, and `toHttpException(error, options)` takes the same option. A source created per request no longer rebuilds and re-validates its schema: the TypeORM and Drizzle adapters memoize it and the service skips an already-validated (rules, schema) pair. Swagger documents the operators of each filter field instead of the endpoint's union. `normalizeResult` and `normalizeRows` are exported, to build the response envelope from rows fetched elsewhere after `buildPlan`.
+
+- [#72](https://github.com/naldomadeira/nestjs-rest-query/pull/72) [`fb5472d`](https://github.com/naldomadeira/nestjs-rest-query/commit/fb5472dc82a7415b6b0409ea3c4ff9da19dc7b6c) Thanks [@naldomadeira](https://github.com/naldomadeira)! - The Drizzle adapter now supports `drizzle-orm` 0.45.x, the stable line, besides the 1.x RCs: the peer range is `^0.45.0 || >=1.0.0-rc.4 <1.0.0`. 0.45 is measured on PostgreSQL and MySQL; it has no SQL Server driver, so Drizzle on SQL Server still needs 1.x.
+
+- [#73](https://github.com/naldomadeira/nestjs-rest-query/pull/73) [`395dad9`](https://github.com/naldomadeira/nestjs-rest-query/commit/395dad994e6bda87c1723d2f2220e0c3cc28b662) Thanks [@naldomadeira](https://github.com/naldomadeira)! - Request limits in the core: `forRoot({ limits })` and `defineQueryRules(..., { limits })` bound the number of filter terms (default 20), `in`/`notIn`/`between` items (100), sort fields (5), `search` length (100) and each string filter value (255). Past any of them the request is `400 QUERY_LIMIT_EXCEEDED`, checked before authorization. `pagination.maxPerPage` defaults to `100` again (it was `500` in alpha.1 and alpha.2). A grammar key that arrives unparsed (`filter[name][eq]` from Fastify's or Express 5's flat query parser) is still `QUERY_SYNTAX_UNKNOWN_PARAM`, now with a message naming the cause and `details.hint: "nested-query-parser-required"`.
+
+- [#54](https://github.com/naldomadeira/nestjs-rest-query/pull/54) [`44e4d26`](https://github.com/naldomadeira/nestjs-rest-query/commit/44e4d2676851243b235060f32ed110d84bd295bc) Thanks [@naldomadeira](https://github.com/naldomadeira)! - v3: núcleo semântico canônico, autorização por path exato, coerção dirigida
+  pelo tipo do campo, perfil textual portável, sources discriminadas e subpaths
+  de adapter isolados.
+
+  A entrada HTTP passa a virar uma AST tipada, validada contra um schema lógico e
+  autorizada por regras exatas; os adapters apenas compilam esse plano. A coerção
+  deixa de ser orientada pela aparência do texto, `%`/`_`/`\` viram literais,
+  `in=[]` retorna zero linhas, a projeção deixa de injetar a PK no JSON e os erros
+  ganham um envelope com código estável.
+
+  Breaking. Ver `docs/v3/migration-from-v2.md`.
+
+- [#76](https://github.com/naldomadeira/nestjs-rest-query/pull/76) [`1721125`](https://github.com/naldomadeira/nestjs-rest-query/commit/172112530953ee9937c0109c01a1f79051d8d901) Thanks [@naldomadeira](https://github.com/naldomadeira)! - First stable `3.0.0`, published under `latest`. The v3 API — a canonical semantic core shared by the TypeORM, Prisma and Drizzle adapters, measured on PostgreSQL, MySQL and SQL Server — replaces the 2.x API; there is no compatibility mode. Read `MIGRATION.md`, "2.x → 3.x", before upgrading, and its "If you already run `3.0.0-alpha.1` or `3.0.0-alpha.2`" table if you ran a prerelease. To stay on the previous major, pin `nestjs-rest-query@^2`.
+
+### Minor Changes
+
+- [#33](https://github.com/naldomadeira/nestjs-rest-query/pull/33) [`102eb49`](https://github.com/naldomadeira/nestjs-rest-query/commit/102eb491feb1c8d611b53590cdef7ed3c09fe15a) Thanks [@naldomadeira](https://github.com/naldomadeira)! - feat(drizzle): support `?filter[<one-rel>][isNull]=true|false` via `nullProbeColumn`
+
+  `DrizzleRelationOne` gains a new optional `nullProbeColumn?: AnyColumn` field. When declared, the adapter can resolve `isNull` filters on a `'one'` relation by emitting `LEFT JOIN ... WHERE <nullProbeColumn> IS [NOT] NULL` — mirroring the behavior TypeORM has via metadata and Prisma has via `is`/`isNot`. If a consumer issues `filter[<rel>][isNull]` without declaring `nullProbeColumn`, the adapter throws a 400 with a clear message pointing to the missing config.
+
+  Migration: zero changes required for existing consumers. Add `nullProbeColumn: <table>.<pk>` to relations where you want to support the new filter.
+
+- [#33](https://github.com/naldomadeira/nestjs-rest-query/pull/33) [`102eb49`](https://github.com/naldomadeira/nestjs-rest-query/commit/102eb491feb1c8d611b53590cdef7ed3c09fe15a) Thanks [@naldomadeira](https://github.com/naldomadeira)! - feat(drizzle,prisma): accept `?filter[<many-rel>][isNull]=true|false` (G3, Caminho B)
+
+  Both adapters now accept `isNull` on a `'many'` relation, with semantics equivalent to TypeORM's existing behavior:
+  - `=true` → roots with **zero** related rows.
+  - `=false` → roots with **at least one** related row.
+
+  Drizzle emits `LEFT JOIN <rel> ON ... WHERE <rel>.<primaryKey> IS [NOT] NULL`. Prisma uses `where: { <rel>: { none: {} } }` for `true` and `{ some: {} }` for `false`. The result set is identical across the three adapters; the previous 400 emitted by Prisma is gone, and Drizzle's previously untested path is now part of the parity matrix.
+
+  Migration: no consumer changes required. The previously thrown error message `Operator "isNull" is not supported on to-many relation "..."` is no longer emitted by any adapter. The associated `ErrorMessages.ISNULL_ON_MANY` template has been removed.
+
+- [#33](https://github.com/naldomadeira/nestjs-rest-query/pull/33) [`102eb49`](https://github.com/naldomadeira/nestjs-rest-query/commit/102eb491feb1c8d611b53590cdef7ed3c09fe15a) Thanks [@naldomadeira](https://github.com/naldomadeira)! - refactor(adapters): centralize 400 error messages (G7, parity gap)
+
+  All `BadRequestException` messages emitted by adapters, handlers, and normalizers now come from a single source of truth in `src/contracts/error-messages.ts` (also exposed as `ErrorMessages` namespace from the package root). The same logical error now produces the same byte-for-byte message regardless of which adapter (TypeORM, Drizzle, or Prisma) is wired up.
+
+  User-visible wording changes:
+  - Drizzle adapter messages no longer carry the `DrizzleAdapter:` prefix.
+  - The Drizzle "ORDER BY a column from 'many' relation" message is now the shorter `Cannot sort by '<path>': sorting through to-many relations is not supported.`, matching the Prisma adapter.
+  - `Invalid filter field name:` becomes `Invalid filter field format:` to align with the existing `Invalid <scope> field format:` wording used elsewhere.
+  - Prisma's `Include path(s) not allowed` becomes `Include(s) not allowed` to match the handler form.
+  - The `Unknown relation '<hop>'` message no longer mentions a specific adapter (e.g. `PrismaSource.relations`); it now says `Declare it in source.relations.`
+
+  Consumers parsing `error.message` should switch to importing the templates from `import { ErrorMessages } from 'nestjs-rest-query'` (or compare against well-known substrings).
+
+- [#67](https://github.com/naldomadeira/nestjs-rest-query/pull/67) [`a1b395d`](https://github.com/naldomadeira/nestjs-rest-query/commit/a1b395d5d0bd9c6627d4eb92fbecb5f70e8487b0) Thanks [@naldomadeira](https://github.com/naldomadeira)! - feat(v3)!: cap `paginate=false` and let endpoints forbid it (consumer report [#6](https://github.com/naldomadeira/nestjs-rest-query/issues/6))
+
+  `?paginate=false` used to return every matching row (`ORDER BY` without `LIMIT`), ignoring `maxPerPage`, and no endpoint could refuse it.
+  - New `forRoot({ pagination: { maxUnpaginatedRows, allowUnpaginated } })`. `maxUnpaginatedRows` defaults to the effective `maxPerPage` (`500`); `allowUnpaginated` defaults to `true`.
+  - New `defineQueryRules(..., { pagination: { maxUnpaginatedRows, allowUnpaginated } })`. Each key an endpoint declares replaces the global one for that endpoint.
+  - Adapters fetch at most `maxUnpaginatedRows + 1` roots. A larger result is `400 PAGINATION_INVALID` with `details: { param: 'paginate', maxRows }` — never a truncated list. A forbidden `paginate=false` is the same `400` before any query runs. With a `many` include the cap counts roots.
+  - `PlanPagination` gains `maxRows`; a third-party adapter should fetch at most `maxRows + 1` rows when `paginate` is `false` (the service re-checks either way).
+  - Swagger documents the cap, and omits `paginate` on endpoints that forbid it.
+
+  **Behaviour change:** an endpoint that returned more than 500 rows with `paginate=false` now gets a `400`. Raise `maxUnpaginatedRows` globally or on that endpoint. See MIGRATION.md, "2.x → 3.x".
+
+  **Default change:** `pagination.maxPerPage` now defaults to `500` (it was `100` in 2.x and in `3.0.0-alpha.0`). `defaultPerPage` stays `10`. Set `maxPerPage: 100` in `forRoot` to keep the old ceiling.
+
+### Patch Changes
+
+- [#33](https://github.com/naldomadeira/nestjs-rest-query/pull/33) [`102eb49`](https://github.com/naldomadeira/nestjs-rest-query/commit/102eb491feb1c8d611b53590cdef7ed3c09fe15a) Thanks [@naldomadeira](https://github.com/naldomadeira)! - docs(parity): mark `?sort=<many-rel>.<col>` as an intentional adapter divergence
+
+  TypeORM permits sorting through a `'many'` relation (legacy: returns the first arbitrary row of the join), while Drizzle and Prisma reject with 400. The behavior is now explicitly documented in `MIGRATION.md` under "Intentional adapter divergences", and the parity matrix encodes it via the new `accept` field on each test case so a future regression in any direction surfaces immediately. No code change in this entry — only docs and test infrastructure.
+
+- [#33](https://github.com/naldomadeira/nestjs-rest-query/pull/33) [`102eb49`](https://github.com/naldomadeira/nestjs-rest-query/commit/102eb491feb1c8d611b53590cdef7ed3c09fe15a) Thanks [@naldomadeira](https://github.com/naldomadeira)! - fix(drizzle): escape % and \_ in search terms (G1, parity gap)
+
+  The Drizzle adapter previously interpolated the user's search term into
+  the ILIKE pattern without escaping `%` or `_`, so `?search=50%25` would
+  match more rows than the literal string `50%`. The TypeORM handler has
+  always escaped these characters, and the Prisma adapter is unaffected
+  because it uses Prisma's literal `contains` operator. Drizzle now
+  matches both: the term is escaped before being wrapped with `%...%`.
+
+- [#33](https://github.com/naldomadeira/nestjs-rest-query/pull/33) [`102eb49`](https://github.com/naldomadeira/nestjs-rest-query/commit/102eb491feb1c8d611b53590cdef7ed3c09fe15a) Thanks [@naldomadeira](https://github.com/naldomadeira)! - fix(prisma): treat filter[\*][in]= and filter[\*][notIn]= (empty) as a no-op (G2, parity gap)
+
+  The Prisma adapter previously rejected empty `in` / `notIn` arrays with
+  a 400, while TypeORM and Drizzle silently dropped the predicate. Prisma
+  now matches: an empty `in` / `notIn` is a no-op, returning the same
+  result set as if the filter had not been provided.
+
+- [#67](https://github.com/naldomadeira/nestjs-rest-query/pull/67) [`a1b395d`](https://github.com/naldomadeira/nestjs-rest-query/commit/a1b395d5d0bd9c6627d4eb92fbecb5f70e8487b0) Thanks [@naldomadeira](https://github.com/naldomadeira)! - fix(v3): bind `decimal` and `date` filter values as text across bundles (consumer report [#1](https://github.com/naldomadeira/nestjs-rest-query/issues/1))
+
+  Every public subpath is its own bundle, so `nestjs-rest-query` and `nestjs-rest-query/typeorm` (and `/prisma`, `/drizzle`) each carried their own copy of `DecimalValue`, `CivilDate` and `RestQueryError`. The plan is built by the root bundle and compiled by the adapter bundle, so the adapter's `instanceof` never matched: the value object reached the driver, and `pg` serialised it with `JSON.stringify` — `filter[price][eq]=29.90` was a `500` (`invalid input syntax for type numeric: ""29.90""`) on TypeORM + PostgreSQL. `date` filters broke the same way in all three adapters, and `400`s thrown by an adapter (e.g. `CAPABILITY_UNAVAILABLE`) surfaced as raw `500`s.
+
+  The three classes now carry a `Symbol.for` brand and a static `Symbol.hasInstance`, so identity holds across bundles and across the CJS/ESM builds. No consumer change required.
+
+- [#70](https://github.com/naldomadeira/nestjs-rest-query/pull/70) [`2a46dc9`](https://github.com/naldomadeira/nestjs-rest-query/commit/2a46dc95a76a8e721a747a4b7f3c124c53040c6f) Thanks [@naldomadeira](https://github.com/naldomadeira)! - fix(drizzle): a `search` target through a nullable `one` relation no longer drops roots without that relation
+
+  `search` is an OR across its targets. With `search: ['name', 'company.name']`, the Drizzle adapter joined `company` with an `INNER JOIN`, so a user without a company disappeared from `data` and from `total` even when its own `name` matched. TypeORM and Prisma kept that user.
+
+  Search targets on `one` relations now join with `LEFT JOIN`, in the data statement and in the count. A relation that is also a filter (an AND term) still joins with `INNER JOIN`.
+
+- [#70](https://github.com/naldomadeira/nestjs-rest-query/pull/70) [`2a46dc9`](https://github.com/naldomadeira/nestjs-rest-query/commit/2a46dc95a76a8e721a747a4b7f3c124c53040c6f) Thanks [@naldomadeira](https://github.com/naldomadeira)! - fix(api): `@Query() query: DynamicQueryDto` survives `ValidationPipe({ whitelist: true })`, and new `@RestQuery()` (consumer report [#4](https://github.com/naldomadeira/nestjs-rest-query/issues/4))
+
+  `DynamicQueryDto` had no class-validator decorators, so a global `ValidationPipe({ whitelist: true })` stripped all eight properties and the handler received an empty object — no `400` (Nest forces `forbidUnknownValues: false`), the query simply stopped filtering, sorting and paginating.
+  - When `class-validator` is installed, `page`, `perPage`, `paginate`, `sort`, `fields`, `includes`, `filter` and `search` are now marked with `@Allow()`, so the whitelist keeps them (nested `filter` included). `class-validator` is now an optional peer dependency — declared so that strict layouts like pnpm's let this package resolve the consumer's copy — and it is loaded lazily: nothing happens when it is absent. This applies to the CommonJS build, which is how Nest apps load the package.
+  - New `@RestQuery()` param decorator returns the raw `request.query` (typed `QueryInputLike`, now exported as a type). `ValidationPipe` does not touch it, so it also works under `forbidNonWhitelisted: true` and in ESM apps. Unknown params are still rejected by `execute()` with `QUERY_SYNTAX_UNKNOWN_PARAM`.
+
+- [#70](https://github.com/naldomadeira/nestjs-rest-query/pull/70) [`2a46dc9`](https://github.com/naldomadeira/nestjs-rest-query/commit/2a46dc95a76a8e721a747a4b7f3c124c53040c6f) Thanks [@naldomadeira](https://github.com/naldomadeira)! - fix(core): `forRoot({ portability: { enforce: true } })` is no longer discarded (consumer report [#5](https://github.com/naldomadeira/nestjs-rest-query/issues/5))
+
+  `forRoot` built its frozen configuration from `pagination`, `textProfile`, `consistency` and `logging` only, so `portability` never reached `QueryBuilderService`. With `enforce: true`, a source without `portabilityProfile` still ran instead of failing with `PORTABILITY_PROFILE_MISMATCH`.
+
+  `portability` is now part of the resolved configuration (default `{ enforce: false }`, also visible in `DynamicQueryBuilderModule.config`), and `forRoot` rejects a non-boolean `enforce` with `SOURCE_CONFIGURATION_INVALID`.
+
+- [#67](https://github.com/naldomadeira/nestjs-rest-query/pull/67) [`a1b395d`](https://github.com/naldomadeira/nestjs-rest-query/commit/a1b395d5d0bd9c6627d4eb92fbecb5f70e8487b0) Thanks [@naldomadeira](https://github.com/naldomadeira)! - fix(swagger): make `dqbSwaggerRequestInterceptor` self-contained (consumer report [#3](https://github.com/naldomadeira/nestjs-rest-query/issues/3))
+
+  `@nestjs/swagger` writes `swaggerOptions.requestInterceptor` into `swagger-ui-init.js` with `fn.toString()`, and the browser runs that text with none of this package in scope. The interceptor returned by `dqbSwaggerRequestInterceptor(document)` was a closure over module helpers, so every Swagger UI "Try it out" failed with `ReferenceError: interceptSwaggerRequest is not defined`.
+
+  Both forms — `dqbSwaggerRequestInterceptor(document)` and passing `dqbSwaggerRequestInterceptor` directly — are now self-contained; the marked routes travel inside the function source as a literal. The form field also accepts several filter expressions joined by `&`. No consumer change required; drop any local replacement you added as a workaround.
+
+- [#67](https://github.com/naldomadeira/nestjs-rest-query/pull/67) [`a1b395d`](https://github.com/naldomadeira/nestjs-rest-query/commit/a1b395d5d0bd9c6627d4eb92fbecb5f70e8487b0) Thanks [@naldomadeira](https://github.com/naldomadeira)! - fix(typeorm): use physical, quoted, schema-qualified identifiers inside `EXISTS` (consumer report [#2](https://github.com/naldomadeira/nestjs-rest-query/issues/2))
+
+  A filter or `search` through a `many` relation compiles to a correlated `EXISTS`, which TypeORM treats as raw SQL. That subquery used the **property** name for the leaf column (`dqb_ex_products.isAccessory` for `@Column({ name: 'is_accessory' })`), left identifiers unquoted (PostgreSQL folded them to lower case) and dropped the table's schema. Any snake_case naming strategy, `@Column({ name })` or non-default schema was a `500`.
+
+  The column now comes from the target entity's metadata, the table from its `tablePath` (schema included), and every identifier — table, alias and column — is quoted by the driver.
+
+- [#70](https://github.com/naldomadeira/nestjs-rest-query/pull/70) [`2a46dc9`](https://github.com/naldomadeira/nestjs-rest-query/commit/2a46dc95a76a8e721a747a4b7f3c124c53040c6f) Thanks [@naldomadeira](https://github.com/naldomadeira)! - fix(typeorm): two-phase pagination no longer returns an empty page when the primary key has its own column name
+
+  With a `many` relation in the projection, pagination runs in two phases: the first selects the page's root keys, the second hydrates them. The first phase read each key from the raw row by its **property** name (`root_userId`), but TypeORM names raw columns after the **physical** column (`root_user_id`). With `@PrimaryGeneratedColumn({ name: 'user_id' }) userId`, or a naming strategy that renames the PK, every key was `undefined` and the response was `200` with the right `total` and an empty `data`.
+
+  Each key part is now selected under an explicit alias, so the lookup no longer depends on how the column is named. Composite keys keep working.
+
 ## 3.0.0-alpha.2
 
 ### Patch Changes
