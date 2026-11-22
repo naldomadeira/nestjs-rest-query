@@ -57,6 +57,19 @@ export class QueryBuilderService {
     object,
     Promise<QuerySchema>
   >();
+  /**
+   * Pares (schema das regras, schema da source) já conferidos.
+   *
+   * O cache por objeto source não acerta quando a source é criada a cada
+   * requisição — o uso que o README ensina (consumer report #7). Os adapters
+   * embarcados devolvem o **mesmo** objeto de schema para a mesma entidade, e
+   * os dois schemas são imutáveis depois de construídos, então o par é a
+   * identidade que decide se a conferência precisa rodar de novo.
+   */
+  private readonly validatedSchemas = new WeakMap<
+    QuerySchema,
+    WeakSet<QuerySchema>
+  >();
 
   constructor(
     @Optional()
@@ -117,9 +130,20 @@ export class QueryBuilderService {
       assertWithinUnpaginatedCap(plan.pagination, result.rows.length);
       return normalizeResult<TRow>(result.rows, result.total, plan);
     } catch (error) {
-      if (error instanceof RestQueryError) throw toHttpException(error);
+      if (error instanceof RestQueryError) throw this.toHttpException(error);
       throw error;
     }
+  }
+
+  private toHttpException(error: RestQueryError) {
+    if (error.statusCode !== 400) {
+      // O 500 sai sem detalhe por padrão; o log é o único lugar onde o
+      // desenvolvedor encontra tabela, coluna e path.
+      this.logger.failure('query configuration error', { ...error.toJSON() });
+    }
+    return toHttpException(error, {
+      exposeInternalDetails: this.config.errors?.exposeInternalDetails,
+    });
   }
 
   private assertConsistencySupported<TSource, TCompiled, TRow, TNative>(
@@ -186,6 +210,9 @@ export class QueryBuilderService {
     const actual = await this.describeSource(source);
     const expected = plan.schema;
 
+    const validated = this.validatedSchemas.get(expected);
+    if (validated?.has(actual)) return;
+
     if (actual.model !== expected.model) {
       throw sourceMismatch(
         source.kind,
@@ -226,6 +253,10 @@ export class QueryBuilderService {
       }
       assertRelation(source.kind, relation, actualRelation);
     }
+
+    // Só o sucesso é lembrado: uma source errada continua falhando sempre.
+    if (validated) validated.add(actual);
+    else this.validatedSchemas.set(expected, new WeakSet([actual]));
   }
 
   private describeSource<TSource, TCompiled, TRow, TNative>(

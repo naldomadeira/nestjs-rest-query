@@ -188,3 +188,27 @@ describe('normalizeResult', () => {
     expect(result.data[0].nickname).toBeNull();
   });
 });
+
+describe('normalizeResult sem adapter (dados de outra fonte)', () => {
+  it('monta o envelope de execute() a partir do plano e de linhas externas', () => {
+    const external = [
+      { id: 7, name: 'Ada', password_hash: 'x', extra: true },
+      { id: 8, name: 'Grace', password_hash: 'y', extra: false },
+    ];
+
+    const result = normalizeResult(
+      external,
+      42,
+      plan({ fields: 'name', page: '2', perPage: '2' })
+    );
+
+    // Só a projeção pedida sai; o que a fonte trouxe a mais é descartado.
+    expect(result).toEqual({
+      data: [{ name: 'Ada' }, { name: 'Grace' }],
+      page: 2,
+      perPage: 2,
+      total: 42,
+      lastPage: 21,
+    });
+  });
+});

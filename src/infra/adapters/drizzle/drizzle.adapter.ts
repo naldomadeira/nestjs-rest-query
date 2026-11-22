@@ -16,9 +16,11 @@ import { compileOrderBy } from './drizzle-sort.compiler';
 import type {
   CompiledDrizzleQuery,
   DrizzleNativeQuery,
+  DrizzleRelationMap,
   DrizzleSourceInput,
   DrizzleSourceOptions,
   DrizzleStatement,
+  DrizzleTable,
 } from './drizzle-statement.interface';
 
 const ESCAPE_CHARACTER = '!';
@@ -157,6 +159,41 @@ export class DrizzleAdapter<
  * source custa um objeto vazio e evita a única alternativa, que seria afirmar
  * a compatibilidade de `DrizzleAdapter<object>` com `DrizzleAdapter<TRow>`.
  */
+/** Um objeto só para "sem relações", para que ele também acerte o cache. */
+const NO_RELATIONS: DrizzleRelationMap = Object.freeze({});
+
+const SCHEMA_CACHE = new WeakMap<
+  DrizzleTable,
+  WeakMap<DrizzleRelationMap, QuerySchema>
+>();
+
+/**
+ * Schema lógico memoizado por (tabela, relações) — consumer report #7.
+ *
+ * `drizzleSource` é chamada a cada requisição no uso documentado, e
+ * `buildSourceSchema` valida e reconstrói o schema inteiro. O resultado só
+ * depende desses dois objetos, que o consumidor declara uma vez no módulo; o
+ * executor (`db`) não entra no schema e por isso não entra na chave. Devolver
+ * o mesmo objeto é também o que deixa o serviço pular a reconferência do par
+ * (regras, schema).
+ */
+function memoizedSourceSchema(
+  table: DrizzleTable,
+  relations: DrizzleRelationMap
+): QuerySchema {
+  let byRelations = SCHEMA_CACHE.get(table);
+  if (!byRelations) {
+    byRelations = new WeakMap();
+    SCHEMA_CACHE.set(table, byRelations);
+  }
+  let schema = byRelations.get(relations);
+  if (!schema) {
+    schema = buildSourceSchema(table, relations);
+    byRelations.set(relations, schema);
+  }
+  return schema;
+}
+
 export function drizzleSource<TRow extends object = object>(
   options: DrizzleSourceOptions<TRow>
 ): QuerySource<
@@ -165,7 +202,7 @@ export function drizzleSource<TRow extends object = object>(
   TRow,
   DrizzleNativeQuery
 > {
-  const relations = options.relations ?? {};
+  const relations = options.relations ?? NO_RELATIONS;
 
   // O executor compila SQL para um dialeto; a source declara outro. Divergir
   // não dá erro em lugar nenhum — dá resultado errado, porque `LIMIT` versus
@@ -189,7 +226,7 @@ export function drizzleSource<TRow extends object = object>(
       dialect: options.dialect,
       table: options.table,
       relations,
-      schema: buildSourceSchema(options.table, relations),
+      schema: memoizedSourceSchema(options.table, relations),
     },
   };
 }

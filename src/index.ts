@@ -52,7 +52,14 @@ export type {
   PlanSearch,
   PlanSort,
 } from './core/semantic-validator';
-export type { NormalizedQueryResult } from './core/result-normalizer';
+// Para quem usa só o plano (`QueryBuilderService.buildPlan`) e busca os dados
+// em outra fonte — um serviço HTTP, um cache —: monta o mesmo envelope e o
+// mesmo JSON canônico que `execute()` devolveria.
+export {
+  normalizeResult,
+  normalizeRows,
+  type NormalizedQueryResult,
+} from './core/result-normalizer';
 export { CivilDate, DecimalValue } from './core/coercion';
 
 // Erros
@@ -61,6 +68,7 @@ export {
   RestQueryErrorCode,
   toHttpException,
   type ErrorDetails,
+  type HttpExceptionOptions,
   type RestQueryErrorEnvelope,
 } from './core/errors';
 
@@ -100,6 +108,7 @@ export type {
   AdapterResult,
   AnyQuerySource,
   CustomizeScope,
+  ErrorsConfigV3,
   LoggingConfigV3,
   PaginationConfigV3,
   PortabilityConfigV3,

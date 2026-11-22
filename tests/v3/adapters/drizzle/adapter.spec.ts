@@ -179,6 +179,25 @@ describe('drizzleSource', () => {
     const schema = await source.adapter.describe(source.input);
     expect(schema.relations.size).toBe(0);
   });
+
+  /**
+   * Consumer report #7: uma source por requisição reconstruía o schema em toda
+   * chamada. O schema só depende da tabela e das relações, então o mesmo par
+   * devolve o mesmo objeto — mesmo com outro executor.
+   */
+  it('memoiza o schema por tabela e relações', () => {
+    const schemaOf = (relations?: DrizzleRelationMap) =>
+      drizzleSource({
+        db: db(),
+        dialect: 'postgres',
+        table: usersTable,
+        relations,
+      }).input.schema;
+
+    expect(schemaOf(userRelations)).toBe(schemaOf(userRelations));
+    expect(schemaOf()).toBe(schemaOf());
+    expect(schemaOf()).not.toBe(schemaOf(userRelations));
+  });
 });
 
 describe('DrizzleAdapter capabilities', () => {

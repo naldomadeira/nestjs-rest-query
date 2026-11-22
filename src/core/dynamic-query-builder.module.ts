@@ -12,7 +12,12 @@ import { DQB_CONFIG_TOKEN } from './constants';
 type ResolvedConfig = Required<
   Pick<
     QueryBuilderConfigV3,
-    'pagination' | 'textProfile' | 'consistency' | 'logging' | 'portability'
+    | 'pagination'
+    | 'textProfile'
+    | 'consistency'
+    | 'logging'
+    | 'portability'
+    | 'errors'
   >
 > & { readonly limits: QueryLimits };
 
@@ -28,6 +33,7 @@ const DEFAULTS: ResolvedConfig = {
   consistency: 'eventual',
   logging: { enabled: false, level: 'info', redactValues: true },
   portability: { enforce: false },
+  errors: { exposeInternalDetails: false },
   limits: resolveQueryLimits(),
 };
 
@@ -56,6 +62,7 @@ export class DynamicQueryBuilderModule {
     assertOfferedConsistency(config);
     assertBooleanPortabilityEnforce(config);
     assertQueryLimitsInput(config.limits, 'limits');
+    assertBooleanExposeInternalDetails(config);
 
     const pagination = {
       defaultPerPage:
@@ -118,6 +125,11 @@ export class DynamicQueryBuilderModule {
       // calado (consumer report #5).
       portability: Object.freeze({
         enforce: config.portability?.enforce ?? DEFAULTS.portability.enforce!,
+      }),
+      errors: Object.freeze({
+        exposeInternalDetails:
+          config.errors?.exposeInternalDetails ??
+          DEFAULTS.errors.exposeInternalDetails!,
       }),
       limits: resolveQueryLimits(config.limits),
     });
@@ -189,6 +201,24 @@ function assertBooleanPortabilityEnforce(config: QueryBuilderConfigV3): void {
     'SOURCE_CONFIGURATION_INVALID',
     'portability.enforce must be a boolean',
     { enforce }
+  );
+}
+
+/**
+ * Mesma razão de `portability.enforce`: `'false'` vindo de variável de
+ * ambiente é truthy, e esta chave decide se nomes internos saem para o
+ * cliente. Nenhuma das duas direções pode ser adivinhada.
+ */
+function assertBooleanExposeInternalDetails(
+  config: QueryBuilderConfigV3
+): void {
+  const expose = config.errors?.exposeInternalDetails;
+  if (expose === undefined || typeof expose === 'boolean') return;
+
+  throw configurationError(
+    'SOURCE_CONFIGURATION_INVALID',
+    'errors.exposeInternalDetails must be a boolean',
+    { exposeInternalDetails: expose }
   );
 }
 

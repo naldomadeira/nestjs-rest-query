@@ -25,6 +25,25 @@ export function normalizeRows(
   return rows.map((row) => projectRow(tree, row as Record<string, unknown>));
 }
 
+/**
+ * Envelope canônico a partir de linhas já buscadas (spec §10.1 e §13).
+ *
+ * É o último passo de `execute()`, e é público para quem usa só o plano: o
+ * consumidor chama `QueryBuilderService.buildPlan(query, rules)`, traduz o
+ * plano para outra fonte (uma API HTTP, um índice de busca), e entrega as
+ * linhas aqui. Cada linha deve trazer os campos pelo **path lógico** do schema
+ * (`name`, e relações aninhadas: `{ company: { name } }`); campos fora da
+ * projeção são descartados e os escalares saem codificados como em
+ * `execute()`. `total` é o total de roots que casam o filtro, sem paginação;
+ * sem ele, vale o tamanho da página.
+ *
+ * @example
+ * ```ts
+ * const plan = this.queries.buildPlan(query, rules);
+ * const { items, count } = await this.upstream.search(toUpstream(plan));
+ * return normalizeResult<UserDto>(items, count, plan);
+ * ```
+ */
 export function normalizeResult<T = Record<string, unknown>>(
   rows: readonly unknown[],
   total: number | undefined,

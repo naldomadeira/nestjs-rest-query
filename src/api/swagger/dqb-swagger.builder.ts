@@ -1,5 +1,5 @@
-import { QueryOperator } from '@domain/operators/operator.types';
-import type { SwaggerRulesView } from './swagger-rules-view';
+import type { QueryOperator } from '@domain/operators/operator.types';
+import type { SwaggerFilterView, SwaggerRulesView } from './swagger-rules-view';
 import { DQB_SWAGGER_EXTENSION_KEY } from './swagger.interceptor';
 
 type ApiQueryFn = (typeof import('@nestjs/swagger'))['ApiQuery'];
@@ -16,29 +16,32 @@ try {
   // @nestjs/swagger nao instalado — Swagger docs desabilitado
 }
 
-function buildOperatorsTable(operators: readonly QueryOperator[]): string {
-  const COLS = 4;
-  const header =
-    Array(COLS)
-      .fill('Operador')
-      .map((h) => `| ${h} `)
-      .join('') + '|';
-  const separator = Array(COLS).fill('|----------').join('') + '|';
-  const rows: string[] = [];
-  for (let i = 0; i < operators.length; i += COLS) {
-    const chunk = operators.slice(i, i + COLS);
-    const cells = chunk.map((op) => `| \`${op}\` `).join('');
-    const padding = Array(COLS - chunk.length)
-      .fill('| ')
-      .join('');
-    rows.push(cells + padding + '|');
-  }
-  return [header, separator, ...rows].join('\n');
+/**
+ * Uma linha por campo, com só os operadores que **aquele** campo autoriza
+ * (consumer report #7): a tabela antiga era a união do endpoint e sugeria
+ * combinações que davam 400.
+ */
+function buildOperatorsTable(filters: readonly SwaggerFilterView[]): string {
+  return [
+    '| Campo | Operadores |',
+    '|-------|------------|',
+    ...filters.map(
+      (filter) =>
+        `| \`${filter.path}\` | ${filter.operators.map((op) => `\`${op}\``).join(', ')} |`
+    ),
+  ].join('\n');
+}
+
+/** Primeiro campo que autoriza o operador, para o exemplo nunca mentir. */
+function firstWith(
+  filters: readonly SwaggerFilterView[],
+  operator: QueryOperator
+): string | undefined {
+  return filters.find((filter) => filter.operators.includes(operator))?.path;
 }
 
 export function buildDQBSwaggerDecorators(
-  rules: SwaggerRulesView,
-  operators: readonly QueryOperator[]
+  rules: SwaggerRulesView
 ): MethodDecorator[] {
   if (!ApiQuery || !ApiExtension) return [];
 
@@ -155,39 +158,48 @@ export function buildDQBSwaggerDecorators(
     );
   }
 
-  if (rules.filters?.length) {
-    const first = rules.filters[0];
+  if (rules.filterOperators.length) {
+    const first = rules.filterOperators[0];
+    const examples: Record<
+      string,
+      { summary: string; description: string; value: string }
+    > = {
+      simples: {
+        summary: 'Filtro',
+        description: `filter[${first.path}][${first.operators[0]}]=valor`,
+        value: `filter[${first.path}][${first.operators[0]}]=valor`,
+      },
+    };
+    const between = firstWith(rules.filterOperators, 'between');
+    if (between) {
+      examples.intervalo = {
+        summary: 'Entre dois valores',
+        description: `filter[${between}][between]=1,100`,
+        value: `filter[${between}][between]=1,100`,
+      };
+    }
+    const isNull = firstWith(rules.filterOperators, 'isNull');
+    if (isNull) {
+      examples.nulo = {
+        summary: 'Campo nulo',
+        description: `filter[${isNull}][isNull]=true`,
+        value: `filter[${isNull}][isNull]=true`,
+      };
+    }
+
     decorators.push(
       ApiQuery({
         name: 'filter',
         required: false,
         type: String,
         description: [
-          'Filtros dinamicos. Formato: `filter[campo][operador]=valor`',
+          'Filtros dinamicos. Formato: `filter[campo][operador]=valor`; `filter[campo]=valor` equivale a `eq`.',
           '',
-          `**Campos disponiveis:** ${rules.filters.map((f) => `\`${f}\``).join(', ')}`,
+          '**Operadores por campo:**',
           '',
-          '**Operadores disponiveis:**',
-          '',
-          buildOperatorsTable(operators),
+          buildOperatorsTable(rules.filterOperators),
         ].join('\n'),
-        examples: {
-          simples: {
-            summary: 'Filtros',
-            description: `filter[${first}][eq]=valor - eq é opcional`,
-            value: `filter[${first}][eq]=valor`,
-          },
-          intervalo: {
-            summary: 'Entre dois valores',
-            description: `filter[id][between]=1,100`,
-            value: `filter[id][between]=1,100`,
-          },
-          nulo: {
-            summary: 'Campo nulo',
-            description: `filter[${first}][isNull]=true`,
-            value: `filter[${first}][isNull]=true`,
-          },
-        },
+        examples,
       })
     );
   }

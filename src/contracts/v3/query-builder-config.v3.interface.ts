@@ -73,6 +73,18 @@ export interface LoggingConfigV3 {
   logger?: LoggerLike;
 }
 
+export interface ErrorsConfigV3 {
+  /**
+   * Devolve ao cliente a mensagem e os `details` de um erro de configuração
+   * (500). Desligado, o 500 leva só o `code` e uma mensagem genérica, e o
+   * detalhe vai para o logger — sempre, mesmo com `logging.enabled: false`.
+   * Ligue em desenvolvimento, nunca num serviço público: a mensagem nomeia
+   * tabelas, colunas e paths internos.
+   * @default false
+   */
+  readonly exposeInternalDetails?: boolean;
+}
+
 export interface PortabilityConfigV3 {
   /**
    * Exige que a source carregue fatos do profile certificado e que eles passem
@@ -98,5 +110,6 @@ export interface QueryBuilderConfigV3 {
   /** @default 'eventual' */
   consistency?: ConsistencyMode;
   portability?: PortabilityConfigV3;
+  errors?: ErrorsConfigV3;
   logging?: LoggingConfigV3;
 }

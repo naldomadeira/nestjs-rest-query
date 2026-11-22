@@ -41,6 +41,9 @@ The stable `3.0.0` changes these on purpose — check each before upgrading:
 | `pagination.maxPerPage`          | default `500`                                                | default `100`, the same as `2.x`. A `perPage` between 101 and 500 is a `400` again unless you set `maxPerPage`; the unpaginated cap follows it (`maxUnpaginatedRows` default)                    |
 | Request size                     | unbounded: any number of filters, `in` values, sorts, search | `400 QUERY_LIMIT_EXCEEDED` past `limits` (defaults `20` filters, `100` list items, `5` sorts, `100`-character search, `255`-character values) — see [Request limits](./README.md#request-limits) |
 | `filter[...]` with a flat parser | `400 QUERY_SYNTAX_UNKNOWN_PARAM`, "Unknown query parameter"  | same code, but the message names the cause and `details.hint` is `nested-query-parser-required` — see [Fastify](./README.md#fastify-and-other-flat-parsers)                                      |
+| Error body                       | `{ statusCode, code, message, details? }`                    | adds `error` (`"Bad Request"` / `"Internal Server Error"`), like every Nest `HttpException`                                                                                                      |
+| `500` (configuration error)      | message and `details` in the response                        | only `code` and a generic message; the full error goes to the logger, even with logging disabled. `errors.exposeInternalDetails: true` restores the alpha body                                   |
+| Swagger `filter` description     | union of every field's operators                             | one row per field, with only that field's operators; examples use a field that accepts the operator                                                                                              |
 | `drizzle-orm` peer               | `>=1.0.0-rc.4 <1.0.0`                                        | `^0.45.0 \|\| >=1.0.0-rc.4 <1.0.0` — the stable 0.45 line is accepted (PostgreSQL and MySQL)                                                                                                     |
 
 To keep the alpha behaviour: `forRoot({ pagination: { maxPerPage: 500 } })`,
@@ -564,11 +567,17 @@ Error bodies are now:
 ```jsonc
 {
   "statusCode": 400,
+  "error": "Bad Request",
   "code": "FIELD_NOT_ALLOWED",
   "message": "filter path is not allowed: secret",
   "details": { "path": "secret", "scope": "filter", "allowed": ["id", "name"] },
 }
 ```
+
+A `500` (an error in your declaration, not in the request) keeps only `code`
+and a generic message by default; the full error goes to the logger. Set
+`forRoot({ errors: { exposeInternalDetails: true } })` in development to get
+the message and `details` in the response.
 
 Branch on `code`, never on the message. `details` never echoes the value the
 client sent. The full code list and the full coercion table are in

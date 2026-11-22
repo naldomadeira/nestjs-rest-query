@@ -1,4 +1,9 @@
-import type { ObjectLiteral, Repository, SelectQueryBuilder } from 'typeorm';
+import type {
+  EntityMetadata,
+  ObjectLiteral,
+  Repository,
+  SelectQueryBuilder,
+} from 'typeorm';
 import type {
   AdapterCapabilities,
   AdapterResult,
@@ -58,6 +63,44 @@ const DIALECT_BY_DRIVER: Readonly<Record<string, SqlDialect>> = {
   'better-sqlite3': 'sqlite',
 };
 
+/** Chave para "sem `fieldKinds`", que não pode ser chave de `WeakMap`. */
+const NO_FIELD_KINDS = Object.freeze({});
+
+const SCHEMA_CACHE = new WeakMap<
+  EntityMetadata,
+  WeakMap<object, QuerySchema>
+>();
+
+/**
+ * Schema lógico memoizado por (metadata da entidade, `fieldKinds`) — consumer
+ * report #7.
+ *
+ * `typeormSource(this.repo)` a cada requisição é o uso documentado, e sem isto
+ * cada chamada percorria a metadata da entidade e das relações de novo. A
+ * metadata é estável durante a vida do `DataSource` e é o que o resolver lê;
+ * `fieldKinds` muda o schema, então entra na chave por identidade — declarado
+ * uma vez no módulo, ele acerta; criado inline a cada chamada, só não acerta.
+ */
+function describeMemoized<T extends ObjectLiteral>(
+  repository: Repository<T>,
+  options: SchemaResolverOptions | undefined
+): QuerySchema {
+  const metadata = repository.metadata;
+  const kindsKey = options?.fieldKinds ?? NO_FIELD_KINDS;
+
+  let byKinds = SCHEMA_CACHE.get(metadata);
+  if (!byKinds) {
+    byKinds = new WeakMap();
+    SCHEMA_CACHE.set(metadata, byKinds);
+  }
+  let schema = byKinds.get(kindsKey);
+  if (!schema) {
+    schema = buildSchemaRegistry(repository, options).get(modelName(metadata))!;
+    byKinds.set(kindsKey, schema);
+  }
+  return schema;
+}
+
 export class TypeOrmAdapter<
   T extends ObjectLiteral,
 > implements RestQueryAdapterV3<
@@ -69,8 +112,7 @@ export class TypeOrmAdapter<
   readonly id = 'typeorm' as const;
 
   async describe(source: TypeOrmSourceInput<T>): Promise<QuerySchema> {
-    const registry = buildSchemaRegistry(source.repository, source.schema);
-    return registry.get(modelName(source.repository.metadata))!;
+    return describeMemoized(source.repository, source.schema);
   }
 
   capabilities(source: TypeOrmSourceInput<T>): AdapterCapabilities {

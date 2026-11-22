@@ -517,6 +517,10 @@ DynamicQueryBuilderModule.forRoot({
   },
   textProfile: 'portable-strict',
   consistency: 'eventual',
+  errors: {
+    // `true` returns the message and details of a 500 to the client
+    exposeInternalDetails: false,
+  },
   logging: {
     enabled: true,
     level: 'info',
@@ -534,6 +538,14 @@ endpoint. See [Request limits](#request-limits).
 
 `adapter` and `operators` are **refused at startup** — the first is decided by
 the source, the second by the endpoint rules.
+
+**A `500` does not carry its details by default.** A configuration error names
+tables, columns and schema paths — exactly what should not reach a public
+client. The response keeps the stable `code` and a generic message, and the
+full error (message and `details`) goes to the configured logger at `error`
+level, **even with `logging.enabled: false`**, because otherwise it would be
+nowhere. Set `errors.exposeInternalDetails: true` in development to see it in
+the response. A `400` is never trimmed: it describes the client's own input.
 
 ## Security model
 
@@ -562,6 +574,7 @@ See [SECURITY.md](./SECURITY.md) for vulnerability reporting.
 | `@DynamicQuery(rules)` / `@ApiDynamicQuery(rules)`        | Store rules in metadata; the second adds Swagger.        |
 | `@QueryRules()`                                           | Parameter decorator — injects the compiled rules.        |
 | `RestQueryError`, `RestQueryErrorCode`, `toHttpException` | The error envelope and its stable codes.                 |
+| `normalizeResult`, `normalizeRows`                        | Build the response envelope from rows you fetched.       |
 | `DynamicQueryDto`                                         | The eight-parameter grammar, as a DTO.                   |
 | `CompiledQueryRules`, `NormalizedQueryResult<T>`          | Public types.                                            |
 
@@ -575,11 +588,31 @@ Errors carry a machine-readable `code` — branch on that, never on the message:
 ```jsonc
 {
   "statusCode": 400,
+  "error": "Bad Request",
   "code": "FIELD_NOT_ALLOWED",
   "message": "filter path is not allowed: secret",
   "details": { "path": "secret" },
 }
 ```
+
+### Using only the plan
+
+`execute()` needs a source the library can compile to. When the data lives
+somewhere else — another service over HTTP, a search index — keep the parsing,
+the authorization and the limits, and build the same envelope yourself:
+
+```typescript
+import { normalizeResult } from 'nestjs-rest-query';
+
+const plan = this.queries.buildPlan(query, rules); // validated, frozen
+const { items, count } = await this.upstream.search(toUpstream(plan));
+return normalizeResult<UserDto>(items, count, plan);
+```
+
+Each row must carry its fields by the schema's logical path (`name`, and
+relations nested: `{ company: { name } }`); anything outside the requested
+projection is dropped, and scalars are encoded exactly as `execute()` does.
+`total` is the count of matching roots without pagination.
 
 ## Try a PR before it ships
 

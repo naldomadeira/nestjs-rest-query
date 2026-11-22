@@ -25,6 +25,33 @@ describe('TypeOrmAdapter', () => {
     expect(schema.primaryKey).toEqual(['id']);
   });
 
+  /**
+   * Consumer report #7: com `typeormSource(this.repo)` a cada requisição, o
+   * schema era reconstruído e reconferido em toda chamada. O mesmo par
+   * (entidade, `fieldKinds`) devolve agora o mesmo objeto.
+   */
+  it('memoiza o schema por entidade e fieldKinds', async () => {
+    const repository = repositoryFor('user.default');
+    const first = await adapter.describe({ repository });
+    expect(await adapter.describe({ repository })).toBe(first);
+    expect(
+      await adapter.describe({ repository, schema: { fieldKinds: undefined } })
+    ).toBe(first);
+
+    const fieldKinds = {};
+    const typed = await adapter.describe({
+      repository,
+      schema: { fieldKinds },
+    });
+    expect(await adapter.describe({ repository, schema: { fieldKinds } })).toBe(
+      typed
+    );
+    // `fieldKinds` muda o schema descrito; outro objeto não reaproveita.
+    expect(
+      await adapter.describe({ repository, schema: { fieldKinds: {} } })
+    ).not.toBe(typed);
+  });
+
   it('deriva o dialeto do driver da conexão', () => {
     expect(adapter.capabilities(input())).toEqual({
       dialect: 'sqlite',

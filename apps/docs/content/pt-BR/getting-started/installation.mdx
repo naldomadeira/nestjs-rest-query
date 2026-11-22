@@ -239,6 +239,12 @@ Sem isso a biblioteca responde `400 QUERY_SYNTAX_UNKNOWN_PARAM` com
 `details.hint: "nested-query-parser-required"`. No Express, use
 `app.set('query parser', 'extended')`.
 
+### `errors`
+
+| Opção                   | Tipo      | Default | Descrição                                                                                                |
+| ----------------------- | --------- | ------- | -------------------------------------------------------------------------------------------------------- |
+| `exposeInternalDetails` | `boolean` | `false` | Devolve ao cliente a mensagem e os `details` de um `500`. Desligado, só o logger os recebe. Só para dev. |
+
 ### `logging`
 
 | Opção          | Tipo                                     | Default       | Descrição                                                              |
