@@ -32,6 +32,21 @@ source of truth for every before/after pair below — `01-starter-app` and
 > the supported version matrix is in
 > [`docs/v3/versions.md`](./docs/v3/versions.md).
 
+### If you already run `3.0.0-alpha.1` or `3.0.0-alpha.2`
+
+The stable `3.0.0` changes these on purpose — check each before upgrading:
+
+| Area                             | `3.0.0-alpha.1` / `alpha.2`                                  | `3.0.0`                                                                                                                                                                                          |
+| -------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pagination.maxPerPage`          | default `500`                                                | default `100`, the same as `2.x`. A `perPage` between 101 and 500 is a `400` again unless you set `maxPerPage`; the unpaginated cap follows it (`maxUnpaginatedRows` default)                    |
+| Request size                     | unbounded: any number of filters, `in` values, sorts, search | `400 QUERY_LIMIT_EXCEEDED` past `limits` (defaults `20` filters, `100` list items, `5` sorts, `100`-character search, `255`-character values) — see [Request limits](./README.md#request-limits) |
+| `filter[...]` with a flat parser | `400 QUERY_SYNTAX_UNKNOWN_PARAM`, "Unknown query parameter"  | same code, but the message names the cause and `details.hint` is `nested-query-parser-required` — see [Fastify](./README.md#fastify-and-other-flat-parsers)                                      |
+| `drizzle-orm` peer               | `>=1.0.0-rc.4 <1.0.0`                                        | `^0.45.0 \|\| >=1.0.0-rc.4 <1.0.0` — the stable 0.45 line is accepted (PostgreSQL and MySQL)                                                                                                     |
+
+To keep the alpha behaviour: `forRoot({ pagination: { maxPerPage: 500 } })`,
+and raise any limit in `forRoot({ limits })` or per endpoint in
+`defineQueryRules(..., { limits })`.
+
 ### If you already run `3.0.0-alpha.0`
 
 An external consumer validated the first alpha on NestJS 11 + `@nestjs/typeorm`
@@ -117,9 +132,12 @@ guide is this section. There is no implicit default adapter any more: the
 adapter is decided by the source you pass to `execute()`.
 
 Operator restriction moved from a global list to a **per-field** declaration in
-the endpoint rules. `defaultPerPage` is still `10`. `maxPerPage` now defaults to `500` (2.x: `100`):
-a `perPage` between 101 and 500 that used to be a `400` is now accepted. Set
-`maxPerPage: 100` to keep the old ceiling.
+the endpoint rules. `defaultPerPage` is still `10` and `maxPerPage` is still
+`100`. (The `3.0.0-alpha.1` and `alpha.2` prereleases defaulted it to `500`;
+`3.0.0` went back to the 2.x value.)
+
+`forRoot` gained `limits` — how big a request may be. v2 had none; see
+[Step 8](#step-8--behaviour-that-changed-on-the-wire).
 
 `pagination` gained two keys, `allowUnpaginated` (default `true`) and
 `maxUnpaginatedRows` (default: the effective `maxPerPage`). v2 had no cap on
@@ -497,22 +515,23 @@ below — **it does not apply to v3.**
 
 At minimum these change what your clients receive:
 
-| Behaviour               | v2                                        | v3                                                                                                        |
-| ----------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Whitelist path matching | prefix — `company` allowed `company.name` | exact                                                                                                     |
-| Value coercion          | by text shape (`"00430123"` → `430123`)   | by declared field kind; bad input is `400 FILTER_VALUE_INVALID`                                           |
-| `in=[]`                 | filter ignored, returns everything        | always-false condition, returns zero rows (`notIn=[]` always true)                                        |
-| Duplicate `sort`        | last/first/both, depending on adapter     | deduplicated; conflicting directions are `400 SORT_CONFLICT`                                              |
-| `%` and `_` in patterns | wildcards                                 | literal characters (see the divergence section)                                                           |
-| Primary key in the JSON | always injected                           | removed when not part of the visible projection                                                           |
-| Error body              | `{ statusCode, message: "<prose>" }`      | stable envelope with a machine-readable `code`                                                            |
-| Swagger decorator       | `@ApiDynamicQuery<T>(whitelists)`         | `@ApiDynamicQuery(compiledRules)`                                                                         |
-| `paginate=false`        | every matching row, no `LIMIT`            | at most `maxUnpaginatedRows` (default `maxPerPage`); above it, `400 PAGINATION_INVALID` — never truncated |
+| Behaviour               | v2                                        | v3                                                                                                                     |
+| ----------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Whitelist path matching | prefix — `company` allowed `company.name` | exact                                                                                                                  |
+| Value coercion          | by text shape (`"00430123"` → `430123`)   | by declared field kind; bad input is `400 FILTER_VALUE_INVALID`                                                        |
+| `in=[]`                 | filter ignored, returns everything        | always-false condition, returns zero rows (`notIn=[]` always true)                                                     |
+| Duplicate `sort`        | last/first/both, depending on adapter     | deduplicated; conflicting directions are `400 SORT_CONFLICT`                                                           |
+| `%` and `_` in patterns | wildcards                                 | literal characters (see the divergence section)                                                                        |
+| Primary key in the JSON | always injected                           | removed when not part of the visible projection                                                                        |
+| Error body              | `{ statusCode, message: "<prose>" }`      | stable envelope with a machine-readable `code`                                                                         |
+| Swagger decorator       | `@ApiDynamicQuery<T>(whitelists)`         | `@ApiDynamicQuery(compiledRules)`                                                                                      |
+| `paginate=false`        | every matching row, no `LIMIT`            | at most `maxUnpaginatedRows` (default `maxPerPage`); above it, `400 PAGINATION_INVALID` — never truncated              |
+| Request size            | unbounded                                 | `400 QUERY_LIMIT_EXCEEDED` past `limits`: 20 filter terms, 100 list items, 5 sorts, 100-char `search`, 255-char values |
 
 `paginate=false` semantics, in full:
 
 - **Global cap.** `forRoot({ pagination: { maxUnpaginatedRows } })`, default
-  the effective `maxPerPage` (`500`). The adapter fetches at most
+  the effective `maxPerPage` (`100`). The adapter fetches at most
   `maxUnpaginatedRows + 1` roots; one more than the cap means the request is
   refused with `400 PAGINATION_INVALID` and `details: { param: 'paginate',
 maxRows }`. With a `many` include the cap counts roots, not join rows.
@@ -525,6 +544,20 @@ maxUnpaginatedRows } })`. Each key the endpoint declares **replaces** the
   brand, forbid `paginate=false` on a large table. Keys it omits inherit.
 - `maxPerPage` still bounds `perPage` only; the unpaginated cap follows it
   until you set `maxUnpaginatedRows` explicitly.
+
+Request limits, in full:
+
+- **Defaults.** `maxFilters: 20` (terms, across paths), `maxListItems: 100`
+  (one `in`/`notIn`/`between`, CSV or array), `maxSorts: 5`,
+  `maxSearchLength: 100` (after `trim`), `maxFilterValueLength: 255` (per item
+  in a list).
+- **Global.** `forRoot({ limits: { ... } })`. **Per endpoint.**
+  `defineQueryRules(..., { limits: { ... } })`, each key replacing the global
+  one for that endpoint. Not a positive integer, or an unknown key, fails at
+  startup.
+- **Refusal.** `400 QUERY_LIMIT_EXCEEDED`, checked before authorization, with
+  `details: { param, limit, max }` (plus `path` and `operator` for filters) —
+  never the value sent.
 
 Error bodies are now:
 

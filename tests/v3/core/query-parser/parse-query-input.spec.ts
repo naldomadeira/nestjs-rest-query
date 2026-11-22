@@ -194,4 +194,34 @@ describe('parseQueryInput e params fora da gramática', () => {
       expect.objectContaining({ code: 'QUERY_SYNTAX_UNKNOWN_PARAM' })
     );
   });
+
+  /**
+   * O Fastify (e o Express 5 no modo `simple`) entrega a query **plana**:
+   * `filter[name][eq]` chega como uma chave literal. Recusar como "param
+   * desconhecido" é correto, mas manda o desenvolvedor procurar no lugar
+   * errado — a causa é o parser HTTP, e a mensagem tem de dizer isso.
+   */
+  describe('query vinda de um parser plano', () => {
+    it.each([
+      'filter[name][eq]',
+      'filter[name]',
+      'filter[company',
+      'sort[0]',
+      'fields[]',
+    ])('aponta o parser HTTP quando chega %p cru', (key) => {
+      expect(() => parseQueryInput({ [key]: 'x' })).toThrow(
+        expect.objectContaining({
+          code: 'QUERY_SYNTAX_UNKNOWN_PARAM',
+          message: expect.stringMatching(/nested query string parser/),
+          details: { param: key, hint: 'nested-query-parser-required' },
+        })
+      );
+    });
+
+    it('não confunde um param desconhecido comum com parser plano', () => {
+      expect(() => parseQueryInput({ 'utm[source]': 'x' })).toThrow(
+        expect.objectContaining({ details: { param: 'utm[source]' } })
+      );
+    });
+  });
 });

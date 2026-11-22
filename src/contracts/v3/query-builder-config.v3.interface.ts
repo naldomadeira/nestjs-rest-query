@@ -27,6 +27,39 @@ export interface PaginationConfigV3 {
   maxUnpaginatedRows?: number;
 }
 
+/**
+ * Quanto um cliente pode pedir numa requisição. Acima de qualquer limite, a
+ * resposta é 400 `QUERY_LIMIT_EXCEEDED`, antes da autorização e de qualquer
+ * acesso ao banco. Todos os valores são inteiros positivos.
+ */
+export interface QueryLimitsConfigV3 {
+  /**
+   * Termos de filtro (`filter[path][operador]`), somados entre os paths.
+   * @default 20
+   */
+  maxFilters?: number;
+  /**
+   * Valores de uma lista (`in`, `notIn`, `between`), em CSV ou em array.
+   * @default 100
+   */
+  maxListItems?: number;
+  /**
+   * Campos de `sort`.
+   * @default 5
+   */
+  maxSorts?: number;
+  /**
+   * Comprimento de `search` depois do `trim`.
+   * @default 100
+   */
+  maxSearchLength?: number;
+  /**
+   * Comprimento de cada valor de filtro string. Numa lista, vale por item.
+   * @default 255
+   */
+  maxFilterValueLength?: number;
+}
+
 export interface LoggingConfigV3 {
   /** @default false */
   enabled?: boolean;
@@ -55,6 +88,11 @@ export interface PortabilityConfigV3 {
  */
 export interface QueryBuilderConfigV3 {
   pagination?: PaginationConfigV3;
+  /**
+   * Limites anti-abuso de toda requisição. Um endpoint pode substituir
+   * qualquer chave em `defineQueryRules({ limits })`.
+   */
+  limits?: QueryLimitsConfigV3;
   /** @default 'portable-strict' */
   textProfile?: TextProfile;
   /** @default 'eventual' */

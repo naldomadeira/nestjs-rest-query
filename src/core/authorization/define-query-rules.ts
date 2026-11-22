@@ -7,6 +7,7 @@ import {
   type SchemaRegistry,
 } from '../schema';
 import { assertOperatorSupported } from '../semantic-validator/operator-matrix';
+import { assertQueryLimitsInput } from '../semantic-validator/query-limits';
 import type { QueryOperator } from '../../domain/operators/operator.types';
 import type {
   CompiledFieldProjection,
@@ -62,6 +63,7 @@ export function defineQueryRules(
   const fields = compileFields(registry, model, input, includes);
   const search = compileSearch(registry, model, input.search ?? []);
   const pagination = compilePagination(input.pagination);
+  const limits = compileLimits(input.limits);
 
   return Object.freeze({
     registry,
@@ -72,7 +74,21 @@ export function defineQueryRules(
     includes,
     search,
     ...(pagination ? { pagination } : {}),
+    ...(limits ? { limits } : {}),
   });
+}
+
+/** Valida os limites do endpoint na construção e guarda só os declarados. */
+function compileLimits(
+  input: QueryRulesInput['limits']
+): CompiledQueryRules['limits'] {
+  if (input === undefined) return undefined;
+  assertQueryLimitsInput(input, 'limits');
+
+  const declared = Object.entries(input).filter(
+    ([, value]) => value !== undefined
+  );
+  return Object.freeze(Object.fromEntries(declared));
 }
 
 /** Valida a política de paginação do endpoint na construção, não na request. */

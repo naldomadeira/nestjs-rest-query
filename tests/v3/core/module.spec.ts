@@ -14,20 +14,55 @@ describe('DynamicQueryBuilderModule.forRoot', () => {
    * única mudança breaking da v3 que não trocava um comportamento errado por
    * um certo. Dobrava calada o payload de quem nunca configurou paginação.
    */
+  /**
+   * `maxPerPage` é 100 na `3.0.0`, como na 2.x. Os alphas 1 e 2 subiram para
+   * 500; o default voltou ao seguro antes da estável, e quem precisa de
+   * páginas maiores declara em `forRoot` ou no endpoint.
+   */
   it('aplica os defaults, com paginação pela Emenda 4 da ADR-001', () => {
     DynamicQueryBuilderModule.forRoot({});
     expect(DynamicQueryBuilderModule.config).toEqual({
       pagination: {
         defaultPerPage: 10,
-        maxPerPage: 500,
+        maxPerPage: 100,
         allowUnpaginated: true,
-        maxUnpaginatedRows: 500,
+        maxUnpaginatedRows: 100,
       },
       textProfile: 'portable-strict',
       consistency: 'eventual',
       logging: { enabled: false, level: 'info', redactValues: true },
       portability: { enforce: false },
+      limits: {
+        maxFilters: 20,
+        maxListItems: 100,
+        maxSorts: 5,
+        maxSearchLength: 100,
+        maxFilterValueLength: 255,
+      },
     });
+  });
+
+  it('mescla parcialmente os limites e recusa limite inválido no boot', () => {
+    DynamicQueryBuilderModule.forRoot({ limits: { maxFilters: 40 } });
+    expect(DynamicQueryBuilderModule.config.limits).toEqual({
+      maxFilters: 40,
+      maxListItems: 100,
+      maxSorts: 5,
+      maxSearchLength: 100,
+      maxFilterValueLength: 255,
+    });
+    expect(Object.isFrozen(DynamicQueryBuilderModule.config.limits)).toBe(true);
+
+    expect(() =>
+      DynamicQueryBuilderModule.forRoot({ limits: { maxSorts: 0 } })
+    ).toThrow(
+      expect.objectContaining({ code: 'SOURCE_CONFIGURATION_INVALID' })
+    );
+    expect(() =>
+      DynamicQueryBuilderModule.forRoot({ limits: { maxSort: 3 } as never })
+    ).toThrow(
+      expect.objectContaining({ code: 'SOURCE_CONFIGURATION_INVALID' })
+    );
   });
 
   it('congela a configuração', () => {
@@ -95,7 +130,7 @@ describe('regression: unpaginated global cap (consumer report #6) — forRoot', 
     });
     expect(DynamicQueryBuilderModule.config.pagination).toEqual({
       defaultPerPage: 10,
-      maxPerPage: 500,
+      maxPerPage: 100,
       allowUnpaginated: false,
       maxUnpaginatedRows: 1000,
     });

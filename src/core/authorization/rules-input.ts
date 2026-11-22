@@ -1,4 +1,5 @@
 import type { QueryOperator } from '../../domain/operators/operator.types';
+import type { QueryLimits } from '../semantic-validator/query-limits';
 
 export interface FilterRuleInput {
   readonly path: string;
@@ -36,4 +37,12 @@ export interface QueryRulesInput {
   readonly includes?: readonly string[];
   readonly search?: readonly string[];
   readonly pagination?: PaginationRulesInput;
+  /**
+   * Limites anti-abuso do endpoint. Cada chave declarada **substitui** a do
+   * `forRoot` para este endpoint — para apertar ou para afrouxar; a omitida
+   * herda a global. Acima do limite, 400 `QUERY_LIMIT_EXCEEDED`.
+   */
+  readonly limits?: QueryLimitsRulesInput;
 }
+
+export type QueryLimitsRulesInput = Partial<QueryLimits>;

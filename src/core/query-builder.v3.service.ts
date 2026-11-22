@@ -75,6 +75,7 @@ export class QueryBuilderService {
       pagination: this.config.pagination,
       textProfile: this.config.textProfile,
       consistency: this.config.consistency,
+      limits: this.config.limits,
     });
 
     return freezePlan(options.transformPlan?.(plan) ?? plan);

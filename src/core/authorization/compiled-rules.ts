@@ -1,5 +1,6 @@
 import type { QueryOperator } from '../../domain/operators/operator.types';
 import type { FieldDescriptor, SchemaRegistry } from '../schema';
+import type { QueryLimits } from '../semantic-validator/query-limits';
 
 export interface CompiledFieldProjection {
   readonly allowed: readonly string[];
@@ -40,6 +41,11 @@ export interface CompiledQueryRules {
    * de `forRoot` na construção do plano.
    */
   readonly pagination?: CompiledPaginationRules;
+  /**
+   * Só as chaves que o endpoint declarou; a ausente herda o `forRoot`, e o
+   * `forRoot` ausente herda os defaults da biblioteca.
+   */
+  readonly limits?: Readonly<Partial<QueryLimits>>;
 }
 
 export interface CompiledPaginationRules {

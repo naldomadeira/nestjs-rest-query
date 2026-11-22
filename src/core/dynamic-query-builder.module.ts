@@ -1,5 +1,10 @@
 import { DynamicModule, Global, Module, Provider } from '@nestjs/common';
 import type { QueryBuilderConfigV3 } from '@contracts/v3';
+import {
+  assertQueryLimitsInput,
+  resolveQueryLimits,
+  type QueryLimits,
+} from './semantic-validator';
 import { configurationError } from './errors';
 import { QueryBuilderService } from './query-builder.v3.service';
 import { DQB_CONFIG_TOKEN } from './constants';
@@ -9,17 +14,21 @@ type ResolvedConfig = Required<
     QueryBuilderConfigV3,
     'pagination' | 'textProfile' | 'consistency' | 'logging' | 'portability'
   >
->;
+> & { readonly limits: QueryLimits };
 
 const DEFAULTS: ResolvedConfig = {
   // `maxUnpaginatedRows` não tem default fixo: herda o `maxPerPage` efetivo,
   // resolvido em `forRoot`. Um só número responde "quantas linhas uma
   // resposta pode ter" até alguém decidir separar os dois.
-  pagination: { defaultPerPage: 10, maxPerPage: 500, allowUnpaginated: true },
+  // `maxPerPage` voltou a 100 na `3.0.0` (foi 500 nos alphas 1 e 2): é o
+  // mesmo teto da 2.x, e o default tem de ser o seguro — quem precisa de
+  // páginas maiores declara.
+  pagination: { defaultPerPage: 10, maxPerPage: 100, allowUnpaginated: true },
   textProfile: 'portable-strict',
   consistency: 'eventual',
   logging: { enabled: false, level: 'info', redactValues: true },
   portability: { enforce: false },
+  limits: resolveQueryLimits(),
 };
 
 /** Chaves da v2 que deixaram de existir (spec §8.2 e §22). */
@@ -46,6 +55,7 @@ export class DynamicQueryBuilderModule {
     assertImplementedTextProfile(config);
     assertOfferedConsistency(config);
     assertBooleanPortabilityEnforce(config);
+    assertQueryLimitsInput(config.limits, 'limits');
 
     const pagination = {
       defaultPerPage:
@@ -109,6 +119,7 @@ export class DynamicQueryBuilderModule {
       portability: Object.freeze({
         enforce: config.portability?.enforce ?? DEFAULTS.portability.enforce!,
       }),
+      limits: resolveQueryLimits(config.limits),
     });
 
     const configProvider: Provider = {

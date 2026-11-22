@@ -87,6 +87,7 @@ describe('RestQueryError', () => {
         'OPERATOR_TYPE_MISMATCH',
         'PAGINATION_INVALID',
         'PORTABILITY_PROFILE_MISMATCH',
+        'QUERY_LIMIT_EXCEEDED',
         'QUERY_SYNTAX_INVALID',
         'QUERY_SYNTAX_UNKNOWN_PARAM',
         'RELATION_NOT_FOUND',

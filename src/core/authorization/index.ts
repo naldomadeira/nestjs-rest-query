@@ -2,6 +2,7 @@ export type {
   FieldProjectionInput,
   FilterRuleInput,
   PaginationRulesInput,
+  QueryLimitsRulesInput,
   QueryRulesInput,
 } from './rules-input';
 export type {
