@@ -12,7 +12,7 @@ import type {
  * Superfície mínima de um client Drizzle.
  *
  * Os dois métodos são opcionais porque **nenhum é comum a todos os dialetos**:
- * no `drizzle-orm` 1.x, `all()` existe só na família SQLite — o único
+ * no `drizzle-orm` 0.45 e no 1.x, `all()` existe só na família SQLite — o único
  * `db.d.ts` do pacote que o declara é o de `sqlite-core`. Postgres, MySQL e
  * SQL Server expõem apenas `execute()`, e cada um devolve uma forma diferente.
  * Qual método chamar e como ler o resultado sai do dialeto declarado pelo
@@ -53,7 +53,7 @@ function asRows(value: unknown, dialect: SqlDialect): readonly Row[] {
 }
 
 /**
- * Método e forma do retorno por dialeto, medidos no `drizzle-orm` 1.0.0-rc.4.
+ * Método e forma do retorno por dialeto, medidos no `drizzle-orm` 0.45.4 e 1.0.0-rc.4.
  *
  * O caso do Postgres é o único com duas formas, e elas são um conjunto fechado
  * de dois drivers oficiais: `postgres-js` devolve um `RowList`, que **é** um

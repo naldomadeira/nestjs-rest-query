@@ -88,10 +88,58 @@ jobs:
         if: always()
         run: docker compose -f test/profiles/docker-compose.yml down -v
 
+  # Linha 0.45 do Drizzle (peer `^0.45.0`), nas células que ela consegue ter.
+  #
+  # Job separado, e não uma dimensão a mais em `cell`, porque o 0.45 não tem
+  # driver de SQL Server (`drizzle-orm/node-mssql` nasce no 1.x): a célula
+  # `mssql` não é "vermelha", é inexistente, e uma dimensão cartesiana a criaria.
+  drizzle-045:
+    name: drizzle 0.45 / ${{ matrix.dialect }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dialect: ${{ github.event_name == 'pull_request' && fromJSON('["postgres"]') || fromJSON('["postgres","mysql"]') }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm add -w -D drizzle-orm@0.45.4
+
+      - name: start the certified profile
+        run: |
+          docker compose -f test/profiles/docker-compose.yml up -d --wait ${{ matrix.dialect }}
+
+      - name: run the parity corpus
+        run: pnpm test:integration
+        env:
+          DQB_ADAPTER: drizzle
+          DQB_DIALECT: ${{ matrix.dialect }}
+          DQB_PG_URL: postgres://dqb:dqb@localhost:55432/dqb
+          DQB_MYSQL_URL: mysql://dqb:dqb@localhost:53306/dqb
+          JEST_JUNIT_OUTPUT_NAME: integration.xml
+
+      - name: fail on skipped cases
+        run: node scripts/assert-no-skips.mjs integration.xml
+
+      - name: stop the profile
+        if: always()
+        run: docker compose -f test/profiles/docker-compose.yml down -v
+
   # Ponto único de required status check.
   #
-  # Não verifica nada por si: quem verifica é o `needs: cell`, que só libera
-  # este job se **todas** as células da matriz tiverem passado. Existe porque
+  # Não verifica nada por si: quem verifica é o `needs`, que só libera este
+  # job se **todas** as células da matriz — e as da linha 0.45 do Drizzle —
+  # tiverem passado. Existe porque
   # uma matriz dinâmica muda de tamanho entre `pull_request` e `push`, e um
   # required check não pode apontar para um nome de job que varia.
   #
@@ -99,7 +147,7 @@ jobs:
   # "nove combinações reais verdes, sem skips", e o pull request roda três.
   matrix-complete:
     name: matrix complete
-    needs: cell
+    needs: [cell, drizzle-045]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:

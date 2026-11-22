@@ -53,11 +53,18 @@ describe('package exports', () => {
 
   it('as faixas de peer refletem a matriz suportada', () => {
     expect(pkg.peerDependencies.typeorm).toBe('^0.3.26 || ^1.0.0');
-    // A faixa é fechada abaixo de `1.0.0` de propósito (ADR-001): em semver,
-    // prereleases de `1.0.0` são menores que `1.0.0`, então ela aceita os RCs
-    // medidos na matriz e recusa o GA até uma release nossa que a reexecutou.
+    // Duas linhas, cada uma fechada no que foi medido.
+    //
+    // `^0.45.0` é a linha estável do Drizzle, medida no corpus de referência e
+    // nas células PostgreSQL e MySQL (o 0.45 não tem driver de SQL Server).
+    //
+    // A linha 1.x é fechada abaixo de `1.0.0` de propósito (ADR-001): em
+    // semver, prereleases de `1.0.0` são menores que `1.0.0`, então ela aceita
+    // os RCs e recusa o GA até uma release nossa que reexecutou a matriz.
     // `<2.0.0` faria o oposto — admitiria o GA sem nenhuma célula rodada.
-    expect(pkg.peerDependencies['drizzle-orm']).toBe('>=1.0.0-rc.4 <1.0.0');
+    expect(pkg.peerDependencies['drizzle-orm']).toBe(
+      '^0.45.0 || >=1.0.0-rc.4 <1.0.0'
+    );
     expect(pkg.peerDependencies['@prisma/client']).toBe('^6.19.0 || ^7.0.0');
   });
 
