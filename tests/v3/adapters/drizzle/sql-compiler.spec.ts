@@ -1,4 +1,4 @@
-import { SQLiteDialect } from 'drizzle-orm/sqlite-core';
+import * as sqliteCore from 'drizzle-orm/sqlite-core';
 import type { SQL } from 'drizzle-orm/sql/sql';
 import { buildQueryPlan } from '@core/query-plan';
 import {
@@ -25,7 +25,21 @@ import {
   usersTable,
 } from '../../fixtures/drizzle-tables';
 
-const dialect = new SQLiteDialect();
+/**
+ * Renderizador SQLite das duas linhas de peer.
+ *
+ * No `drizzle-orm` 0.45 o `SQLiteDialect` é abstrato e a classe concreta é
+ * `SQLiteSyncDialect`; no 1.x o `SQLiteDialect` é concreto e a outra não
+ * existe. Escolher pelo que o pacote exporta mantém um arquivo só compilando e
+ * rodando nas duas linhas (o job `test-peers` roda a suíte no 0.45).
+ */
+type SqlRenderer = {
+  sqlToQuery(query: SQL): { sql: string; params: unknown[] };
+};
+const exported = sqliteCore as unknown as Record<string, unknown>;
+const RendererClass = (exported.SQLiteSyncDialect ??
+  exported.SQLiteDialect) as new () => SqlRenderer;
+const dialect = new RendererClass();
 
 /** Renderiza para texto. As aspas são do SQLite; a forma é o que se testa. */
 function render(query: SQL): { sql: string; params: readonly unknown[] } {

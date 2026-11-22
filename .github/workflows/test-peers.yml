@@ -6,9 +6,6 @@ on:
   pull_request:
     branches: [main, 'feat/v3-**']
 
-# O job do Drizzle sai daqui até a fase 5 da v3: sem adapter Drizzle, ele
-# ficaria verde sem exercitar nada e sugeriria suporte à linha 0.45, que a v3
-# explicitamente não tem (o alvo é 1.x).
 jobs:
   typeorm:
     name: TypeORM ${{ matrix.typeorm }}
@@ -52,4 +49,29 @@ jobs:
             @nestjs/core@${{ matrix.nestjs }} \
             @nestjs/platform-express@${{ matrix.nestjs }} \
             @nestjs/testing@${{ matrix.nestjs }}
+      - run: pnpm test
+
+  # A linha 0.45 do Drizzle é peer suportado (`^0.45.0`) e o devDependency do
+  # repo fica no 1.x, que é o único com driver de SQL Server. Este job troca o
+  # Drizzle pela 0.45 e roda o corpus de referência e o typecheck dos testes:
+  # é o que impede um uso de API exclusivo do 1.x de entrar no adapter calado.
+  # As células reais da 0.45 rodam no `database-matrix`.
+  drizzle:
+    name: Drizzle ${{ matrix.drizzle }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        drizzle: ['0.45.4']
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm add -w -D drizzle-orm@${{ matrix.drizzle }}
+      - run: pnpm typecheck
+      - run: pnpm typecheck:tests
       - run: pnpm test
