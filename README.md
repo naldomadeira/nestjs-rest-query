@@ -97,7 +97,7 @@ to `execute()`:
 
 ```typescript
 DynamicQueryBuilderModule.forRoot({
-  pagination: { defaultPerPage: 10, maxPerPage: 500 },
+  pagination: { defaultPerPage: 10, maxPerPage: 100 },
   textProfile: 'portable-strict',
 });
 
@@ -131,7 +131,7 @@ import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
 @Module({
   imports: [
     DynamicQueryBuilderModule.forRoot({
-      pagination: { defaultPerPage: 10, maxPerPage: 500 },
+      pagination: { defaultPerPage: 10, maxPerPage: 100 },
     }),
   ],
 })
@@ -267,6 +267,10 @@ Two things that differ from `2.x` and bite quietly:
   `?utm_source=`, a cache-buster, a `?lang=` your middleware appends — is
   `400 QUERY_SYNTAX_UNKNOWN_PARAM`, not silently dropped. Pass the subset, which
   is what `@Query() query: DynamicQueryDto` already hands you.
+- **`filter[...]` needs a nested query string parser.** Express 5 and Fastify
+  both parse the query string _flat_ by default, so `filter[email][ilike]`
+  arrives as a literal key. See
+  [Fastify and other flat parsers](#fastify-and-other-flat-parsers).
 
 ### 4. Get a typed response
 
@@ -357,7 +361,7 @@ user.name_folded = foldText(user.name); // value.normalize('NFC').toLowerCase()
 
 **`paginate=false` is capped, never unbounded.** An unpaginated response may
 hold at most `pagination.maxUnpaginatedRows` rows (default: the effective
-`maxPerPage`, so `500` out of the box). The adapter fetches at most one row past
+`maxPerPage`, so `100` out of the box). The adapter fetches at most one row past
 the cap; if the result is larger, the request is a `400 PAGINATION_INVALID` —
 the list is never silently truncated. An endpoint can declare its own policy in
 the rules, which replaces the global one for that endpoint:
@@ -381,6 +385,97 @@ they try, and field selection stays inside the declared `fields` list.
 **Paths are exact.** Authorizing `company` does _not_ authorize `company.name`;
 declare each one. If you are migrating from `2.x`, review every whitelist — the
 old prefix matching may have been exposing more than you intended.
+
+## Request limits
+
+The whitelist decides _what_ a client may ask for; the limits decide _how
+much_. They are checked on the parsed query, before authorization and before
+any database access, and every one of them is a
+`400 QUERY_LIMIT_EXCEEDED` whose `details` name the limit and its ceiling —
+never the value that was sent:
+
+| Limit                  | Default | Counts                                                    |
+| ---------------------- | ------- | --------------------------------------------------------- |
+| `maxFilters`           | `20`    | filter terms (`filter[path][op]`), across all paths       |
+| `maxListItems`         | `100`   | values of one `in` / `notIn` / `between`, CSV or array    |
+| `maxSorts`             | `5`     | `sort` fields                                             |
+| `maxSearchLength`      | `100`   | characters of `search`, after trimming                    |
+| `maxFilterValueLength` | `255`   | characters of each string filter value; per item in lists |
+
+Set them globally, and replace any of them per endpoint — to tighten or to
+loosen:
+
+```typescript
+DynamicQueryBuilderModule.forRoot({
+  limits: { maxFilters: 10, maxSearchLength: 50 },
+});
+
+defineQueryRules(registry, 'product', {
+  // ...
+  limits: { maxListItems: 500 }, // a bulk lookup by id on this endpoint only
+});
+```
+
+```jsonc
+{
+  "statusCode": 400,
+  "code": "QUERY_LIMIT_EXCEEDED",
+  "message": "Too many values in filter[id][in]: at most 100 are allowed",
+  "details": {
+    "param": "filter",
+    "path": "id",
+    "operator": "in",
+    "limit": "maxListItems",
+    "max": 100,
+  },
+}
+```
+
+A limit that is not a positive integer, or a key that is not one of the five,
+fails at startup.
+
+## Fastify and other flat parsers
+
+The grammar is nested — `filter[email][ilike]=acme` must reach the controller
+as `{ filter: { email: { ilike: 'acme' } } }`. Both NestJS platforms parse the
+query string **flat** by default (Express 5's `simple` parser, Fastify's
+`fast-querystring`), and then `filter[email][ilike]` arrives as one literal
+key. The library recognises that shape and answers with a `400` that names the
+cause (`details.hint: "nested-query-parser-required"`) instead of a bare
+"unknown parameter".
+
+**Express:** `app.set('query parser', 'extended')`.
+
+**Fastify** (5.x): hand `qs` to `routerOptions.querystringParser`:
+
+```typescript
+import { NestFactory } from '@nestjs/core';
+import {
+  FastifyAdapter,
+  type NestFastifyApplication,
+} from '@nestjs/platform-fastify';
+import { parse } from 'qs';
+
+const app = await NestFactory.create<NestFastifyApplication>(
+  AppModule,
+  new FastifyAdapter({
+    routerOptions: {
+      querystringParser: (querystring) =>
+        parse(querystring, {
+          depth: 3, // filter[path][in][0] is the deepest the grammar goes
+          parameterLimit: 100, // qs drops the keys past it, it does not throw
+          arrayLimit: 100, // match limits.maxListItems
+          allowDots: false, // REQUIRED: true would split filter[company.name]
+        }),
+    },
+  })
+);
+```
+
+`allowDots` must stay `false`: relation paths use dots, and `qs` with
+`allowDots: true` turns `filter[company.name][eq]` into the key
+`filter[company` — the library then refuses it with the same hint. On Fastify
+4, `querystringParser` is a top-level option instead of `routerOptions`.
 
 ## Swagger / OpenAPI
 
@@ -409,9 +504,16 @@ failed with a `ReferenceError`.
 DynamicQueryBuilderModule.forRoot({
   pagination: {
     defaultPerPage: 10,
-    maxPerPage: 500,
+    maxPerPage: 100,
     allowUnpaginated: true, // `false` refuses ?paginate=false everywhere
-    maxUnpaginatedRows: 500, // defaults to the effective maxPerPage
+    maxUnpaginatedRows: 100, // defaults to the effective maxPerPage
+  },
+  limits: {
+    maxFilters: 20,
+    maxListItems: 100,
+    maxSorts: 5,
+    maxSearchLength: 100,
+    maxFilterValueLength: 255,
   },
   textProfile: 'portable-strict',
   consistency: 'eventual',
@@ -427,7 +529,8 @@ All fields are optional; the values above are the defaults, except `logging`,
 which is off. `maxPerPage` is an upper bound, not a silent clamp: a larger
 `perPage` is a `400`. The same goes for `maxUnpaginatedRows`: an unpaginated
 result above it is a `400`, not a truncated list. Endpoint rules may replace
-`allowUnpaginated` and `maxUnpaginatedRows` for that endpoint.
+`allowUnpaginated`, `maxUnpaginatedRows` and any of the `limits` for that
+endpoint. See [Request limits](#request-limits).
 
 `adapter` and `operators` are **refused at startup** — the first is decided by
 the source, the second by the endpoint rules.
@@ -437,6 +540,10 @@ the source, the second by the endpoint rules.
 Whitelist-first is the primary defense. Consumers should still:
 
 - Keep the endpoint rules minimal — least privilege, and paths are exact.
+- Keep the [request limits](#request-limits) tight; loosen them per endpoint,
+  where a bigger request is a feature, not globally.
+- Bound the query string before it reaches the library: `qs`'s
+  `parameterLimit`/`depth` on Fastify, and your proxy's URL length limit.
 - Never expose internal columns (`password_hash`, internal flags) in `fields` or `sorts`.
 - Layer auth/authz (NestJS guards) above the query.
 - Enforce tenant scoping in the controller before calling `execute()`.

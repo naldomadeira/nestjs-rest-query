@@ -2,11 +2,14 @@ import { parseQueryInput, type QueryInputLike } from '../query-parser';
 import { authorize, type CompiledQueryRules } from '../authorization';
 import { requireSchema, resolvePath, type SchemaRegistry } from '../schema';
 import {
+  assertWithinQueryLimits,
+  resolveQueryLimits,
   validateFilterTerm,
   validatePagination,
   validateSearch,
   validateSort,
   type PaginationLimits,
+  type QueryLimits,
 } from '../semantic-validator';
 import { freezePlan } from './freeze-plan';
 import type {
@@ -20,17 +23,23 @@ export interface BuildPlanOptions {
   readonly pagination?: Partial<PaginationLimits>;
   readonly textProfile?: TextProfile;
   readonly consistency?: ConsistencyMode;
+  /**
+   * Limites anti-abuso globais (`forRoot`). Ausentes, valem os defaults da
+   * biblioteca — nunca "sem limite".
+   */
+  readonly limits?: Partial<QueryLimits>;
 }
 
 const DEFAULT_LIMITS: PaginationLimits = {
   defaultPerPage: 10,
-  maxPerPage: 500,
+  maxPerPage: 100,
 };
 
 /**
  * Entrada HTTP -> plano tipado (spec §7).
  *
- * A ordem importa: sintaxe, depois autorização, depois coerção. Um path não
+ * A ordem importa: sintaxe, depois limites, depois autorização, depois
+ * coerção. Um path não
  * autorizado nunca chega ao codec, e um valor nunca é coagido antes de sabermos
  * que o campo existe e que o operador é válido para ele.
  */
@@ -40,6 +49,12 @@ export function buildQueryPlan(
   options: BuildPlanOptions = {}
 ): TypedQueryPlan {
   const ast = parseQueryInput(input);
+  // Antes da autorização: recusar uma lista de dez mil valores não pode
+  // depender de o campo estar ou não na whitelist, e é o caminho mais barato.
+  assertWithinQueryLimits(
+    ast,
+    resolveQueryLimits(options.limits, rules.limits)
+  );
   const resolved = authorize(ast, rules);
 
   const { sorts, tieBreak } = validateSort(

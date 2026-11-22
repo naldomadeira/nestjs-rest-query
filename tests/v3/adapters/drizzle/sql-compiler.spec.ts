@@ -330,7 +330,7 @@ describe('toDataSql', () => {
 
     const rendered = render(toDataSql(data));
     expect(rendered.sql).toContain('limit ? offset ?');
-    expect(rendered.params.slice(-2)).toEqual([501, 0]);
+    expect(rendered.params.slice(-2)).toEqual([101, 0]);
   });
 
   it('omite a paginação quando o statement não traz limit', () => {

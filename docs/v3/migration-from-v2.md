@@ -50,18 +50,20 @@ default implícito — quem determina o adapter é a source.
 DynamicQueryBuilderModule.forRoot({
   adapter: new DrizzleAdapter(),
   operators: { allowed: ['eq', 'like'] },
-  pagination: { defaultPerPage: 10, maxPerPage: 500 },
+  pagination: { defaultPerPage: 10, maxPerPage: 100 },
 });
 
 // v3
 DynamicQueryBuilderModule.forRoot({
   pagination: {
     defaultPerPage: 10,
-    maxPerPage: 500,
+    maxPerPage: 100,
     // teto de `paginate=false`; ver §7.1
     allowUnpaginated: true,
     maxUnpaginatedRows: 100,
   },
+  // tamanho máximo de uma requisição; ver §8
+  limits: { maxFilters: 20, maxListItems: 100, maxSorts: 5 },
   textProfile: 'portable-strict',
   consistency: 'eventual',
   logging: { enabled: true, level: 'info', redactValues: true },
@@ -73,9 +75,9 @@ DynamicQueryBuilderModule.forRoot({
 `forRoot no longer accepts "<chave>"; see the v2 to v3 migration guide`. A
 restrição de operadores agora é **por campo**, declarada nas regras do endpoint.
 
-`defaultPerPage` continua `10`. `maxPerPage` passa a ter default `500` (na 2.x era
-`100`): um `perPage` entre 101 e 500, que antes era `400`, agora é aceito. Para
-manter o teto antigo, declare `maxPerPage: 100`. O design de 2026-09-03 trazia `20` no bloco de
+`defaultPerPage` continua `10` e `maxPerPage` continua `100`, como na 2.x. (Os
+prereleases `3.0.0-alpha.1` e `alpha.2` tinham default `500`; a `3.0.0` voltou
+ao valor da 2.x, porque o default tem de ser o seguro.) O design de 2026-09-03 trazia `20` no bloco de
 exemplo da §8.2 e o código o seguiu; a
 [Emenda 4 da ADR-001](../superpowers/specs/2026-09-04-v3-adr-001-matriz-e-escopo-da-3.0.0.md)
 desfez isso. Se você leu uma versão anterior deste guia que mandava fixar
@@ -594,10 +596,26 @@ As mensagens em string saem; o corpo passa a ser um envelope estável.
 Faça branch pelo `code`, não pela mensagem. `details` nunca carrega o valor
 enviado pelo cliente.
 
+**Tamanho da requisição.** A v2 não tinha limite; a v3 recusa com
+`400 QUERY_LIMIT_EXCEEDED`, antes da autorização, o que passar de `limits`:
+`maxFilters` (20 termos), `maxListItems` (100 valores num `in`/`notIn`/
+`between`), `maxSorts` (5), `maxSearchLength` (100 caracteres) e
+`maxFilterValueLength` (255 por valor, por item numa lista). Global em
+`forRoot({ limits })`, substituível por endpoint em
+`defineQueryRules(..., { limits })`. `details` traz `limit` e `max`, nunca o
+valor.
+
+**Parser de query plano.** Fastify e Express 5 (modo `simple`) entregam
+`filter[name][eq]` como chave literal. A recusa continua sendo
+`QUERY_SYNTAX_UNKNOWN_PARAM`, mas com `details.hint:
+"nested-query-parser-required"` e uma mensagem que aponta o parser HTTP — ver
+"Fastify and other flat parsers" no README.
+
 Códigos: `QUERY_SYNTAX_INVALID`, `QUERY_SYNTAX_UNKNOWN_PARAM`,
-`FIELD_NOT_ALLOWED`, `FIELD_NOT_FOUND`, `RELATION_NOT_FOUND`,
-`OPERATOR_NOT_ALLOWED`, `OPERATOR_TYPE_MISMATCH`, `FILTER_VALUE_INVALID`,
-`PAGINATION_INVALID`, `SORT_CONFLICT`, `CAPABILITY_UNAVAILABLE`,
+`QUERY_LIMIT_EXCEEDED`, `FIELD_NOT_ALLOWED`, `FIELD_NOT_FOUND`,
+`RELATION_NOT_FOUND`, `OPERATOR_NOT_ALLOWED`, `OPERATOR_TYPE_MISMATCH`,
+`FILTER_VALUE_INVALID`, `PAGINATION_INVALID`, `SORT_CONFLICT`,
+`CAPABILITY_UNAVAILABLE`,
 `PORTABILITY_PROFILE_MISMATCH`, `SOURCE_CONFIGURATION_INVALID`,
 `ADAPTER_CONTRACT_VIOLATION`.
 

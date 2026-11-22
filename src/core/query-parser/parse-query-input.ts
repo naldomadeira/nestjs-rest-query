@@ -73,12 +73,33 @@ function assertKnownParams(input: QueryInputLike): void {
     // `undefined`. Recusar aqui puniria a DTO por existir.
     if (input[param] === undefined) continue;
 
+    if (looksLikeFlatGrammarKey(param)) {
+      throw inputError(
+        'QUERY_SYNTAX_UNKNOWN_PARAM',
+        `Query parameter "${param}" arrived unparsed: the HTTP adapter is using a flat query string parser. Configure a nested query string parser (qs, with allowDots: false) — see "Fastify and other flat parsers" in the README`,
+        { param, hint: 'nested-query-parser-required' }
+      );
+    }
+
     throw inputError(
       'QUERY_SYNTAX_UNKNOWN_PARAM',
       `Unknown query parameter "${param}"`,
       { param }
     );
   }
+}
+
+/**
+ * `filter[name][eq]` como **chave** só existe quando ninguém expandiu os
+ * colchetes: com `qs`, ela vira `{ filter: { name: { eq } } }` e nunca chega
+ * crua. Ver a chave crua de um param da gramática é, portanto, sinal do parser
+ * HTTP plano — o default do Fastify e o modo `simple` do Express 5 —, e não de
+ * um cliente errado. `qs` com `allowDots: true` também cai aqui, porque parte
+ * `filter[company.name]` no ponto.
+ */
+function looksLikeFlatGrammarKey(param: string): boolean {
+  const bracket = param.indexOf('[');
+  return bracket > 0 && GRAMMAR_PARAM_NAMES.has(param.slice(0, bracket));
 }
 
 function assertSafePath(path: string, param: string): string {

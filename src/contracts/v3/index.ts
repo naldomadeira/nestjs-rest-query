@@ -14,4 +14,5 @@ export type {
   PaginationConfigV3,
   PortabilityConfigV3,
   QueryBuilderConfigV3,
+  QueryLimitsConfigV3,
 } from './query-builder-config.v3.interface';

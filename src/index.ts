@@ -32,6 +32,7 @@ export {
   type FieldProjectionInput,
   type FilterRuleInput,
   type PaginationRulesInput,
+  type QueryLimitsRulesInput,
   type QueryRulesInput,
 } from './core/authorization';
 export { foldText } from './core/text-profile';
@@ -103,6 +104,7 @@ export type {
   PaginationConfigV3,
   PortabilityConfigV3,
   QueryBuilderConfigV3,
+  QueryLimitsConfigV3,
   QuerySource,
   RestQueryAdapterV3,
   SqlDialect,

@@ -508,7 +508,7 @@ describe('PrismaAdapter compile', () => {
     const data = compile({ paginate: 'false' }, 'user.default');
 
     expect(data.skip).toBeUndefined();
-    expect(data.take).toBe(501);
+    expect(data.take).toBe(101);
   });
 });
 

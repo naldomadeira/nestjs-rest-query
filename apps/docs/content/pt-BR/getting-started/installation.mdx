@@ -153,7 +153,7 @@ import { DynamicQueryBuilderModule } from 'nestjs-rest-query';
 @Module({
   imports: [
     DynamicQueryBuilderModule.forRoot({
-      pagination: { defaultPerPage: 10, maxPerPage: 500 },
+      pagination: { defaultPerPage: 10, maxPerPage: 100 },
     }),
   ],
 })
@@ -182,7 +182,7 @@ O `forRoot` aceita um objeto `QueryBuilderConfigV3`.
 | Opção                | Tipo      | Default      | Descrição                                                                       |
 | -------------------- | --------- | ------------ | ------------------------------------------------------------------------------- |
 | `defaultPerPage`     | `number`  | `10`         | Itens por página quando a requisição não traz `perPage`.                        |
-| `maxPerPage`         | `number`  | `500`        | Teto. Um `perPage` maior é `400`, não um corte silencioso.                      |
+| `maxPerPage`         | `number`  | `100`        | Teto. Um `perPage` maior é `400`, não um corte silencioso.                      |
 | `allowUnpaginated`   | `boolean` | `true`       | `false` recusa `?paginate=false` com `400` em todo endpoint.                    |
 | `maxUnpaginatedRows` | `number`  | `maxPerPage` | Teto de linhas de uma resposta `paginate=false`; acima dele é `400`, não corte. |
 
@@ -192,6 +192,52 @@ um `maxUnpaginatedRows` que não seja inteiro positivo estoura
 `SOURCE_CONFIGURATION_INVALID` enquanto o módulo carrega. Um endpoint pode
 substituir as duas chaves de `paginate=false` nas regras — veja
 [Paginação](/pt-BR/docs/usage/endpoint-whitelist-rules#paginação).
+
+### `limits`
+
+O tamanho máximo de uma requisição. Checados sobre a query já parseada, antes da
+autorização e de qualquer acesso ao banco; acima de qualquer um a requisição é
+`400 QUERY_LIMIT_EXCEEDED`, com `details` nomeando o limite (`limit`) e o teto
+(`max`), nunca o valor enviado.
+
+| Opção                  | Tipo     | Default | Conta                                                        |
+| ---------------------- | -------- | ------- | ------------------------------------------------------------ |
+| `maxFilters`           | `number` | `20`    | termos de filtro (`filter[path][op]`), somando os paths      |
+| `maxListItems`         | `number` | `100`   | valores de um `in` / `notIn` / `between`, em CSV ou em array |
+| `maxSorts`             | `number` | `5`     | campos de `sort`                                             |
+| `maxSearchLength`      | `number` | `100`   | caracteres de `search`, depois do `trim`                     |
+| `maxFilterValueLength` | `number` | `255`   | caracteres de cada valor de filtro string; por item na lista |
+
+Valor que não seja inteiro positivo, ou chave fora das cinco, estoura
+`SOURCE_CONFIGURATION_INVALID` na inicialização. Um endpoint substitui qualquer
+um com `defineQueryRules(..., { limits })`.
+
+### Fastify: exige um parser de query aninhado
+
+O Fastify parseia a query plana, então `filter[name][eq]` chega como uma chave
+literal. Entregue o `qs` ao adapter, com `allowDots: false` — `true` partiria
+caminhos de relação como `filter[company.name]` no ponto:
+
+```typescript title="main.ts"
+import { FastifyAdapter } from '@nestjs/platform-fastify';
+import { parse } from 'qs';
+
+new FastifyAdapter({
+  routerOptions: {
+    querystringParser: (querystring) =>
+      parse(querystring, {
+        depth: 3,
+        parameterLimit: 100,
+        arrayLimit: 100,
+        allowDots: false,
+      }),
+  },
+});
+```
+
+Sem isso a biblioteca responde `400 QUERY_SYNTAX_UNKNOWN_PARAM` com
+`details.hint: "nested-query-parser-required"`. No Express, use
+`app.set('query parser', 'extended')`.
 
 ### `logging`
 

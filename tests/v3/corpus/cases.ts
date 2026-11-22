@@ -827,7 +827,7 @@ export const CORPUS_CASES: readonly CorpusCase[] = [
     description: 'perPage não pode exceder maxPerPage',
     tags: ['pagination'],
     rules: 'user.default',
-    query: { perPage: '501' },
+    query: { perPage: '101' },
     expect: { kind: 'error', status: 400, code: 'PAGINATION_INVALID' },
   },
   {
