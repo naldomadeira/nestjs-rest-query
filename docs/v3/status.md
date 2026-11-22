@@ -51,15 +51,15 @@ qualquer par delas é a forma mais fácil de superestimar o estado:
 
 ## Estado por adapter
 
-|                                 | TypeORM            | Prisma                                          | Drizzle                                        |
-| ------------------------------- | ------------------ | ----------------------------------------------- | ---------------------------------------------- |
-| Corpus no dialeto de referência | 84/84              | 84/84 (8 com recusa declarada)                  | 84/84                                          |
-| Usa o ORM de verdade            | sim                | sim, client gerado por dialeto                  | sim                                            |
-| PostgreSQL / MySQL / SQL Server | **94/94 nas três** | **87/87 nas três**                              | **87/87 nas três**                             |
-| Linha de peer medida            | 0.3.x e 1.x        | 6.19 e 7.8                                      | 1.0.0-rc.4 (três) e 0.45.4 (PostgreSQL, MySQL) |
-| Branches                        | **100%**           | **100%**                                        | **100%**                                       |
-| Divergências declaradas         | nenhuma            | 5 operadores de padrão em SQLite e MSSQL        | nenhuma                                        |
-| Lacuna própria                  | —                  | generator a partir de `schema.prisma` (`3.1.0`) | coleção aninhada sob outra relação             |
+|                                 | TypeORM            | Prisma                                          | Drizzle                                               |
+| ------------------------------- | ------------------ | ----------------------------------------------- | ----------------------------------------------------- |
+| Corpus no dialeto de referência | 84/84              | 84/84 (8 com recusa declarada)                  | 84/84                                                 |
+| Usa o ORM de verdade            | sim                | sim, client gerado por dialeto                  | sim                                                   |
+| PostgreSQL / MySQL / SQL Server | **95/95 nas três** | **88/88 nas três**                              | **88/88 nas três**; 0.45: 88/88 em PostgreSQL e MySQL |
+| Linha de peer medida            | 0.3.x e 1.x        | 6.19 e 7.8                                      | 1.0.0-rc.4 (três) e 0.45.4 (PostgreSQL, MySQL)        |
+| Branches                        | **100%**           | **100%**                                        | **100%**                                              |
+| Divergências declaradas         | nenhuma            | 5 operadores de padrão em SQLite e MSSQL        | nenhuma                                               |
+| Lacuna própria                  | —                  | generator a partir de `schema.prisma` (`3.1.0`) | coleção aninhada sob outra relação                    |
 
 ### TypeORM
 
@@ -139,20 +139,20 @@ novos do corpus medem isso **sem** exceção declarada.
 
 ## Gates da `3.0.0` (§23)
 
-| Gate                                            | Estado                                                                                        |
-| ----------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Nove combinações reais verdes, sem skips        | **sim** — 84 casos de corpus por célula, `assert-no-skips` em todas, medido em 2026-09-23     |
-| Peer do Drizzle fechado no que foi medido       | sim — `^0.45.0 \|\| >=1.0.0-rc.4 <1.0.0`; 0.45.4 em PostgreSQL e MySQL, 1.x RC nas três       |
-| Nenhum cast no uso público documentado          | sim — provado pelos quatro exemplos em `strict`, que foi o que o achou                        |
-| Nenhum peer opcional carregado pelo core        | sim — provado por consumer fixture                                                            |
-| Exemplos compilam e passam smoke E2E            | **sim** — 61 testes E2E, job `examples` na CI                                                 |
-| Códigos de erro e JSON canônico idênticos       | sim — mesmo runner e mesmas expectativas nas nove células                                     |
-| Cobertura de branches críticos acima de 95%     | **sim** — três adapters em 100%, com piso por área no `jest.config.ts`                        |
-| Nenhum achado de segurança alto ou crítico      | **sim, datado** — CodeQL e Scorecard verdes sobre código v3 em `main` (`a46d211`), 2026-09-08 |
-| Benchmarks dentro do orçamento                  | **sim, datado** — ver abaixo                                                                  |
-| Migration guide validado num consumidor v2 real | **sim** — três consumidores, 32 furos achados e corrigidos                                    |
-| Matriz pública de versões coincide com a CI     | sim — `versions.md`, comparada ao workflow por teste                                          |
-| Profiles de banco passam nos checks             | sim — collector em `src/`, incluindo o fuso do cliente por sonda                              |
+| Gate                                            | Estado                                                                                                                    |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Nove combinações reais verdes, sem skips        | **sim** — nove células mais as duas do Drizzle 0.45, `assert-no-skips` em todas, medido em 2026-11-22 (local, Node 22.23) |
+| Peer do Drizzle fechado no que foi medido       | sim — `^0.45.0 \|\| >=1.0.0-rc.4 <1.0.0`; 0.45.4 em PostgreSQL e MySQL, 1.x RC nas três                                   |
+| Nenhum cast no uso público documentado          | sim — provado pelos quatro exemplos em `strict`, que foi o que o achou                                                    |
+| Nenhum peer opcional carregado pelo core        | sim — provado por consumer fixture                                                                                        |
+| Exemplos compilam e passam smoke E2E            | **sim** — 61 testes E2E, job `examples` na CI                                                                             |
+| Códigos de erro e JSON canônico idênticos       | sim — mesmo runner e mesmas expectativas nas nove células                                                                 |
+| Cobertura de branches críticos acima de 95%     | **sim** — três adapters em 100%, com piso por área no `jest.config.ts`                                                    |
+| Nenhum achado de segurança alto ou crítico      | **sim, datado** — CodeQL e Scorecard verdes sobre código v3 em `main` (`a46d211`), 2026-09-08                             |
+| Benchmarks dentro do orçamento                  | **sim, datado** — ver abaixo                                                                                              |
+| Migration guide validado num consumidor v2 real | **sim** — três consumidores, 32 furos achados e corrigidos                                                                |
+| Matriz pública de versões coincide com a CI     | sim — `versions.md`, comparada ao workflow por teste                                                                      |
+| Profiles de banco passam nos checks             | sim — collector em `src/`, incluindo o fuso do cliente por sonda                                                          |
 
 ### Benchmark (§18.4), datado
 
@@ -169,17 +169,17 @@ Benchmark com I/O mediria a latência do banco, não da biblioteca.
 
 ### Cobertura
 
-Medida na última execução completa de `pnpm test:cov` (53 suites, **991
-testes**, zero skip), em 2026-09-23:
+Medida na última execução completa de `pnpm test:cov` (58 suites, **1060
+testes**, zero skip), em 2026-11-22:
 
 | Área                       | Statements | Branches   | Piso no `jest.config.ts` |
 | -------------------------- | ---------- | ---------- | ------------------------ |
-| Total                      | 98.2%      | 95.44%     | —                        |
+| Total                      | 98.24%     | 95.74%     | —                        |
 | `infra/adapters/typeorm`   | **100%**   | **100%**   | 100% (catraca)           |
 | `infra/adapters/prisma`    | **100%**   | **100%**   | 100% (catraca)           |
 | `infra/adapters/drizzle`   | **100%**   | **100%**   | 100% (catraca)           |
-| `core`                     | 96.2%      | 92.65%     | 95 / 91                  |
-| `api` (superfície Swagger) | 98.77%     | **78.79%** | 90 / 62                  |
+| `core`                     | 96.39%     | 93.18%     | 95 / 91                  |
+| `api` (superfície Swagger) | 98.73%     | **83.78%** | 90 / 62                  |
 
 Os pisos são o valor medido arredondado para baixo, não metas. Os adapters
 entram em 100% de propósito: é por eles que passa a promessa de paridade, e
