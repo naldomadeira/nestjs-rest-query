@@ -44,6 +44,7 @@ On `3.0.0-alpha.0` there is no cap at all (whole table).
 ```jsonc
 {
   "statusCode": 400,
+  "error": "Bad Request",
   "code": "FIELD_NOT_ALLOWED",
   "message": "filter path is not allowed: secret",
   "details": { "path": "secret", "scope": "filter" },
@@ -51,16 +52,20 @@ On `3.0.0-alpha.0` there is no cap at all (whole table).
 ```
 
 Branch on `code`, never on `message`; `details` never echoes the client value.
+A `500` keeps only `statusCode`, `error`, `code` and a generic message unless
+`forRoot({ errors: { exposeInternalDetails: true } })`; the full error is always
+logged.
 
-| Code                           | Status | Typical cause                                                                               |
-| ------------------------------ | ------ | ------------------------------------------------------------------------------------------- |
-| `QUERY_SYNTAX_UNKNOWN_PARAM`   | 400    | a key outside the eight (`utm_source`, `_`, `sorts`, `lang`)                                |
-| `QUERY_SYNTAX_INVALID`         | 400    | malformed filter, unsafe path characters, wildcard from client                              |
-| `FIELD_NOT_ALLOWED`            | 400    | path not in the rules (also for paths that do not exist)                                    |
-| `OPERATOR_NOT_ALLOWED`         | 400    | operator not declared for that field                                                        |
-| `FILTER_VALUE_INVALID`         | 400    | value does not match the field kind                                                         |
-| `PAGINATION_INVALID`           | 400    | bad `page`/`perPage`/`paginate`, above `maxPerPage`, forbidden or over-cap `paginate=false` |
-| `SORT_CONFLICT`                | 400    | same path sorted both ways                                                                  |
-| `CAPABILITY_UNAVAILABLE`       | 400    | adapter cannot honour it (Prisma pattern ops on SQLite/SQL Server)                          |
-| `SOURCE_CONFIGURATION_INVALID` | 500    | schema ≠ source (kind, nullable, PK, relation), bad `forRoot`/rules                         |
-| `ADAPTER_CONTRACT_VIOLATION`   | 500    | unsupported shape (e.g. Drizzle nested collection)                                          |
+| Code                           | Status | Typical cause                                                                                   |
+| ------------------------------ | ------ | ----------------------------------------------------------------------------------------------- |
+| `QUERY_SYNTAX_UNKNOWN_PARAM`   | 400    | a key outside the eight (`utm_source`, `_`, `sorts`, `lang`)                                    |
+| `QUERY_SYNTAX_INVALID`         | 400    | malformed filter, unsafe path characters, wildcard from client                                  |
+| `FIELD_NOT_ALLOWED`            | 400    | path not in the rules (also for paths that do not exist)                                        |
+| `OPERATOR_NOT_ALLOWED`         | 400    | operator not declared for that field                                                            |
+| `FILTER_VALUE_INVALID`         | 400    | value does not match the field kind                                                             |
+| `QUERY_LIMIT_EXCEEDED`         | 400    | past `limits`: filter terms, list items, sorts, `search` or value length; `details.limit`/`max` |
+| `PAGINATION_INVALID`           | 400    | bad `page`/`perPage`/`paginate`, above `maxPerPage`, forbidden or over-cap `paginate=false`     |
+| `SORT_CONFLICT`                | 400    | same path sorted both ways                                                                      |
+| `CAPABILITY_UNAVAILABLE`       | 400    | adapter cannot honour it (Prisma pattern ops on SQLite/SQL Server)                              |
+| `SOURCE_CONFIGURATION_INVALID` | 500    | schema ≠ source (kind, nullable, PK, relation), bad `forRoot`/rules                             |
+| `ADAPTER_CONTRACT_VIOLATION`   | 500    | unsupported shape (e.g. Drizzle nested collection)                                              |

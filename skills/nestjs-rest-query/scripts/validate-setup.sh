@@ -48,8 +48,8 @@ if [ -f "$PROJECT_ROOT/package.json" ]; then
   fi
   VERSION="${INSTALLED:-$RANGE}"
   case "$VERSION" in
-    *3.*|alpha|*alpha*) LINE="3.x" ;;
-    *2.*|latest) LINE="2.x" ;;
+    *3.*|alpha|*alpha*|latest) LINE="3.x" ;;
+    *2.*) LINE="2.x" ;;
   esac
   SRC_DIR="$PROJECT_ROOT/src"
   if [ -d "$SRC_DIR" ]; then
@@ -66,9 +66,11 @@ if [ -f "$PROJECT_ROOT/package.json" ]; then
     [ "$LINE" = "unknown" ] && [ -n "$CODE_LINE" ] && LINE="$CODE_LINE"
   fi
   echo "Detected API line: $LINE (version: ${VERSION:-none})"
-  if [ "$VERSION" = "3.0.0-alpha.0" ]; then
-    warn "3.0.0-alpha.0 has known defects fixed in later alphas (decimal/date filters, TypeORM many-relation filters, Swagger interceptor, uncapped paginate=false) — upgrade: pnpm add nestjs-rest-query@alpha"
-  fi
+  case "$VERSION" in
+    *3.0.0-alpha*)
+      warn "$VERSION is a 3.x prerelease; 3.0.0 fixes its known defects and changes maxPerPage (back to 100), adds request limits and hides 500 details — upgrade: pnpm add nestjs-rest-query@^3 (see MIGRATION.md)"
+      ;;
+  esac
 fi
 
 # 2. Detect which ORM is in use
@@ -100,14 +102,16 @@ done
 if [ -n "$MAIN_FILE" ]; then
   if grep -rqE "query parser['\"][[:space:]]*,[[:space:]]*['\"]extended" "$PROJECT_ROOT/src" 2>/dev/null; then
     pass "Extended query parser configured (searched src/)"
+  elif grep -rqE "querystringParser" "$PROJECT_ROOT/src" 2>/dev/null; then
+    pass "Custom Fastify querystringParser configured (searched src/) — make sure it is nested (qs) with allowDots: false"
   else
-    fail "Missing extended query parser in $(basename "$MAIN_FILE")" \
-      "Add: app.set('query parser', 'extended');"
+    fail "Missing nested query parser in $(basename "$MAIN_FILE")" \
+      "Express: app.set('query parser', 'extended');  Fastify: new FastifyAdapter({ routerOptions: { querystringParser: (q) => qs.parse(q, { depth: 3, allowDots: false }) } })"
   fi
 
   if [ "$LINE" = "3.x" ]; then
-    if grep -q "whitelist:[[:space:]]*true" "$MAIN_FILE"; then
-      warn "ValidationPipe({ whitelist: true }) strips DynamicQueryDto in 3.x — read the query with a custom param decorator (see references/v3/setup.md)"
+    if grep -q "forbidNonWhitelisted:[[:space:]]*true" "$MAIN_FILE"; then
+      warn "ValidationPipe({ forbidNonWhitelisted: true }) can refuse the nested filter object — read the query with @RestQuery() (see references/v3/setup.md)"
     fi
   elif grep -q "enableImplicitConversion" "$MAIN_FILE"; then
     pass "enableImplicitConversion found in $(basename "$MAIN_FILE")"

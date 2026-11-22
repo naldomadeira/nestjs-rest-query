@@ -27,10 +27,10 @@ source of truth for every before/after pair below — `01-starter-app` and
 > that plan. There is no compatibility mode. A 2.x application does not
 > compile against v3, and several observable behaviours changed on purpose.
 
-> **Prerelease.** v3 is not a stable `3.0.0` yet. Current per-cell state and the
-> remaining release gates are in [`docs/v3/status.md`](./docs/v3/status.md);
-> the supported version matrix is in
-> [`docs/v3/versions.md`](./docs/v3/versions.md).
+> Per-cell state and the declared gaps are in
+> [`docs/v3/status.md`](./docs/v3/status.md); the supported version matrix is
+> in [`docs/v3/versions.md`](./docs/v3/versions.md). `latest` on npm is `3.x`
+> from `3.0.0`; pin `nestjs-rest-query@^2` to stay on the previous major.
 
 ### If you already run `3.0.0-alpha.1` or `3.0.0-alpha.2`
 
@@ -106,16 +106,17 @@ configuration fails when the application boots instead of on the first request.
 v3 tightens every ORM peer. All four remain optional; the root package loads no
 ORM.
 
-| Peer             | v3 range              | What breaks on the way up                                            |
-| ---------------- | --------------------- | -------------------------------------------------------------------- |
-| `typeorm`        | `^0.3.26 \|\| ^1.0.0` | nothing in the library API; see [ESM](#step-7--esm-nestjstypeorm-12) |
-| `drizzle-orm`    | `>=1.0.0-rc.4 <1.0.0` | four things — see [Drizzle](#drizzle-specifics)                      |
-| `@prisma/client` | `^6.19.0 \|\| ^7.0.0` | five things if you go to 7.x — see [Prisma](#prisma-specifics)       |
-| `@nestjs/common` | `^11.0.0`             | unchanged                                                            |
+| Peer             | v3 range                           | What breaks on the way up                                                          |
+| ---------------- | ---------------------------------- | ---------------------------------------------------------------------------------- |
+| `typeorm`        | `^0.3.26 \|\| ^1.0.0`              | nothing in the library API; see [ESM](#step-7--esm-nestjstypeorm-12)               |
+| `drizzle-orm`    | `^0.45.0 \|\| >=1.0.0-rc.4 <1.0.0` | nothing on 0.45; three things if you go to 1.x — see [Drizzle](#drizzle-specifics) |
+| `@prisma/client` | `^6.19.0 \|\| ^7.0.0`              | five things if you go to 7.x — see [Prisma](#prisma-specifics)                     |
+| `@nestjs/common` | `^11.0.0`                          | unchanged                                                                          |
 
-A 2.x Drizzle consumer was on `0.45.x`, which v3 does **not** accept: the range
-is closed on the measured release candidates. That upgrade is mandatory, not
-optional.
+A 2.x Drizzle consumer is on `0.45.x`, and `3.0.0` accepts it: the stable line
+is measured on PostgreSQL and MySQL. Upgrading Drizzle is only needed for SQL
+Server, which `0.45` has no driver for. (The `3.0.0-alpha.*` prereleases
+accepted only the 1.x release candidates.)
 
 ### Step 2 — `forRoot`
 
@@ -638,10 +639,20 @@ rather than from the ORM; Prisma has no equivalent at all.
 
 ### Drizzle specifics
 
-A 2.x consumer was on `0.45.x`, and the library range is
-`>=1.0.0-rc.4 <1.0.0` — so this upgrade is mandatory. Four things break, none of
-them mentioned by Drizzle's own release notes in a way you would connect to this
-library:
+The range is `^0.45.0 || >=1.0.0-rc.4 <1.0.0`. A 2.x consumer on `0.45.x` can
+stay there on PostgreSQL and MySQL; only SQL Server needs the 1.x line, because
+`0.45` has no SQL Server driver.
+
+On **either** line, one thing changes from 2.x:
+
+- **`db.all()` only exists in the SQLite family.** PostgreSQL, MySQL and SQL
+  Server expose `execute()`, and each returns a different shape. Which method
+  to call comes from the dialect you declare to `drizzleDatabase({ client,
+dialect })`, never from inspecting the object, so the dialect is a required
+  argument.
+
+If you **do** move to 1.x, three more things break, none of them mentioned by
+Drizzle's own release notes in a way you would connect to this library:
 
 1. **`drizzle(client, { schema })` no longer exists.** The 1.x signature leaves
    only `drizzle({ client })`. The `{ schema }` argument served the relational
@@ -655,10 +666,10 @@ library:
    `"declaration": false`. `skipLibCheck` does not help with this one (it is
    still needed for a different reason: `drizzle-orm@1.0.0-rc.4` errors inside
    its own `.d.cts` under TypeScript 6).
-4. **`db.all()` only exists in the SQLite family.** PostgreSQL, MySQL and SQL
-   Server expose `execute()`, and each returns a different shape. Which method
-   to call comes from the dialect you declare, never from inspecting the object,
-   so the dialect is a required argument.
+
+`drizzle-orm` `1.0.0-rc.5` and later are ESM-only. The published adapter loads
+them in CJS and ESM on Node 22.12+ (which `require`s ESM), but the parity matrix
+is measured on `rc.4`.
 
 Then the source itself. v2 handed the adapter Drizzle column objects; v3 takes a
 logical descriptor and plain names:

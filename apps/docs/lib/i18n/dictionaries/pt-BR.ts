@@ -58,9 +58,9 @@ export const ptBR: Dictionary = {
   },
   home: {
     notice: {
-      title: 'Estas páginas descrevem a v3, publicada como prerelease',
-      body: 'A API 3.x mostrada aqui está no npm como 3.0.0-alpha.0, sob a tag alpha. A tag latest continua apontando para a 2.1.0, então uma instalação normal entrega a API 2.x — peça nestjs-rest-query@alpha para receber a v3. A 3.0.0 estável depende da validação deste alpha. A v3 não tem modo de compatibilidade; leia o guia de migração antes de subir.',
-      linkLabel: 'Gates que faltam para a release',
+      title: 'Estas páginas descrevem a v3',
+      body: 'A API 3.x mostrada aqui é a major latest no npm; fixe nestjs-rest-query@^2 para ficar na 2.x. A v3 não tem modo de compatibilidade — leia o guia de migração antes de subir da 2.x.',
+      linkLabel: 'Estado por célula e lacunas declaradas',
     },
     hero: {
       eyebrow: 'NestJS · TypeORM · Prisma · Drizzle',

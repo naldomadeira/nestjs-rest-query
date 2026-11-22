@@ -28,21 +28,20 @@ biblioteca. Os quatro peers de ORM/Swagger são declarados **opcionais**, e o
 entrypoint raiz não carrega nenhum deles: `import ... from 'nestjs-rest-query'`
 nunca puxa um ORM.
 
-| Pacote             | Faixa                 | Obrigatório     |
-| ------------------ | --------------------- | --------------- |
-| `@nestjs/common`   | `^11.0.0`             | Sim             |
-| `@nestjs/core`     | `^11.0.0`             | Sim             |
-| `reflect-metadata` | `^0.2.0`              | Sim             |
-| `typeorm`          | `^0.3.26 \|\| ^1.0.0` | Um dos adapters |
-| `drizzle-orm`      | `>=1.0.0-rc.4 <1.0.0` | Um dos adapters |
-| `@prisma/client`   | `^6.19.0 \|\| ^7.0.0` | Um dos adapters |
-| `@nestjs/swagger`  | `^11.0.0`             | Opcional        |
+| Pacote             | Faixa                              | Obrigatório     |
+| ------------------ | ---------------------------------- | --------------- |
+| `@nestjs/common`   | `^11.0.0`                          | Sim             |
+| `@nestjs/core`     | `^11.0.0`                          | Sim             |
+| `reflect-metadata` | `^0.2.0`                           | Sim             |
+| `typeorm`          | `^0.3.26 \|\| ^1.0.0`              | Um dos adapters |
+| `drizzle-orm`      | `^0.45.0 \|\| >=1.0.0-rc.4 <1.0.0` | Um dos adapters |
+| `@prisma/client`   | `^6.19.0 \|\| ^7.0.0`              | Um dos adapters |
+| `@nestjs/swagger`  | `^11.0.0`                          | Opcional        |
 
-<Callout type="warn" title="Drizzle 0.45.x não é suportado">
-  A faixa de `drizzle-orm` é fechada nos release candidates contra os quais a
-  matriz de paridade foi medida. Um projeto em `0.45.x` permanece na linha `2.x`
-  desta biblioteca; subir o Drizzle é obrigatório, não opcional, e quebra quatro
-  coisas — veja a página do [adapter Drizzle](/pt-BR/docs/adapters/drizzle).
+<Callout type="info" title="Drizzle: duas linhas">
+  A linha estável `0.45.x` roda em PostgreSQL e MySQL. SQL Server exige a linha
+  1.x, cuja faixa é fechada nos release candidates que a matriz de paridade
+  mediu — veja a página do [adapter Drizzle](/pt-BR/docs/adapters/drizzle).
 </Callout>
 
 O `@nestjs/swagger` só é necessário para gerar documentação OpenAPI com
@@ -107,7 +106,7 @@ passa ao `execute()`, e cada fábrica de source vive no seu próprio subpath.
 `drizzleSource({ db, dialect, table, relations })` mais
 `drizzleDatabase({ client, dialect })`, os dois de `nestjs-rest-query/drizzle`.
 
-- Drizzle `1.0.0-rc.4` ou posterior dentro da faixa, num driver suportado.
+- Drizzle `0.45.x` (PostgreSQL, MySQL) ou `1.0.0-rc.4` e posteriores dentro da faixa (também SQL Server), num driver suportado.
 - O adapter não lê o seu `pgTable`. Você declara um **descritor lógico** com
   `createDrizzleTable({ name, model, columns })` e as relações por path
   pontuado.

@@ -11,8 +11,9 @@ below.
 
 Checklist the steps map to:
 
-1. Peers: TypeORM `^0.3.26 || ^1`, Drizzle `>=1.0.0-rc.4 <1.0.0` (0.45 is
-   refused), Prisma `^6.19 || ^7`.
+1. Peers: TypeORM `^0.3.26 || ^1`, Drizzle `^0.45.0 || >=1.0.0-rc.4 <1.0.0`
+   (0.45 stays on PostgreSQL/MySQL; SQL Server needs the 1.x RCs), Prisma
+   `^6.19 || ^7`.
 2. `forRoot`: remove `adapter` and `operators` (refused at boot).
 3. Replace each `RulesConfig` with `defineQuerySchema` (per model) +
    `defineQueryRules` (per endpoint): operators move per field, every nested

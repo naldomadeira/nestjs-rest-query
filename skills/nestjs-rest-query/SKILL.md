@@ -7,7 +7,7 @@ description: |
   declaring whitelist rules (RulesConfig in 2.x; defineQuerySchema + defineQueryRules in 3.x), wiring
   typeormSource/prismaSource/drizzleSource, adding Swagger (ApiDynamicQuery, dqbSwaggerRequestInterceptor),
   migrating 2.x → 3.x, or debugging its 400/500 errors (FIELD_NOT_ALLOWED, PAGINATION_INVALID,
-  SOURCE_CONFIGURATION_INVALID, QUERY_SYNTAX_UNKNOWN_PARAM).
+  SOURCE_CONFIGURATION_INVALID, QUERY_SYNTAX_UNKNOWN_PARAM, QUERY_LIMIT_EXCEEDED).
 ---
 
 # nestjs-rest-query
@@ -22,16 +22,16 @@ Read the consumer's `package.json` (and the lockfile when the range is loose),
 then confirm with the import style. Done when you can name the line **and** the
 exact installed version.
 
-| Signal                                                                                                                                                                                       | Line                                                          |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| `"nestjs-rest-query": "^2…"`, or `latest`; `forRoot({ adapter })`, `RulesConfig`, `@ApiDynamicQuery<T>({ filters: […] })`, `execute(repository, …)`                                          | **2.x**                                                       |
-| `"3.0.0-alpha…"` / `@alpha`; `defineQuerySchema`, `defineQueryRules`, `typeormSource()` / `prismaSource()` / `drizzleSource()` imported from `nestjs-rest-query/<orm>`, `execute(source, …)` | **3.x**                                                       |
-| `@multitechbr/nestjs-dynamic-query-builder`                                                                                                                                                  | the pre-rename package: MIGRATION.md, "From `@multitechbr/…`" |
+| Signal                                                                                                                                                                                                          | Line                                                          |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `"nestjs-rest-query": "^2…"`; `forRoot({ adapter })`, `RulesConfig`, `@ApiDynamicQuery<T>({ filters: […] })`, `execute(repository, …)`                                                                          | **2.x**                                                       |
+| `"^3…"`, `latest`, `"3.0.0-alpha…"` / `@alpha`; `defineQuerySchema`, `defineQueryRules`, `typeormSource()` / `prismaSource()` / `drizzleSource()` imported from `nestjs-rest-query/<orm>`, `execute(source, …)` | **3.x**                                                       |
+| `@multitechbr/nestjs-dynamic-query-builder`                                                                                                                                                                     | the pre-rename package: MIGRATION.md, "From `@multitechbr/…`" |
 
 Mixed signals (a `3.x` package with `RulesConfig` code) mean an upgrade in
-progress: treat it as a migration. No package yet: `latest` resolves to **2.x**
-(stable); **3.x** is a prerelease under the `alpha` tag. State which one you are
-installing and why before writing code.
+progress: treat it as a migration. No package yet: `latest` resolves to **3.x**
+(stable since `3.0.0`); `nestjs-rest-query@^2` pins the previous major. State
+which one you are installing and why before writing code.
 
 `bash scripts/validate-setup.sh <project-root>` runs these checks and the
 per-line bootstrap checks.
@@ -57,7 +57,7 @@ Per model you write a **schema** (what the model is) and per endpoint **rules**
 
 ```typescript
 // app.module.ts — only shared policy; `adapter`/`operators` are refused here
-DynamicQueryBuilderModule.forRoot({ pagination: { defaultPerPage: 10, maxPerPage: 500 } });
+DynamicQueryBuilderModule.forRoot({ pagination: { defaultPerPage: 10, maxPerPage: 100 } });
 
 // product.schema.ts
 export const productSchema = defineQuerySchema({
@@ -99,13 +99,24 @@ return this.queryBuilder.execute(this.source, query, rules);
 list(@Query() query: DynamicQueryDto, @QueryRules() rules: CompiledQueryRules) { … }
 ```
 
-`main.ts` needs `app.set('query parser', 'extended')` (Express 5 defaults to
-`simple`, and `filter[name][eq]` would never become an object).
+`main.ts` needs a **nested** query string parser: on Express,
+`app.set('query parser', 'extended')` (Express 5 defaults to `simple`); on
+Fastify, `new FastifyAdapter({ routerOptions: { querystringParser: (q) =>
+qs.parse(q, { depth: 3, parameterLimit: 100, arrayLimit: 100, allowDots: false }) } })`.
+`allowDots` must stay `false` — `true` splits `filter[company.name]` at the dot.
+Without a nested parser, `filter[name][eq]` arrives as a literal key and the
+library answers `400 QUERY_SYNTAX_UNKNOWN_PARAM` with
+`details.hint: "nested-query-parser-required"`.
 
 Grammar: exactly `filter`, `sort`, `fields`, `includes`, `search`, `page`,
 `perPage`, `paginate`. Any other query key is `400 QUERY_SYNTAX_UNKNOWN_PARAM` —
 strip an endpoint's own params before `execute()`. `paginate=false` is capped
 (default: `maxPerPage` rows; above it a `400`, never a truncated list).
+Request size is bounded by `limits` (`forRoot` and per endpoint in
+`defineQueryRules`): 20 filter terms, 100 list items, 5 sorts, 100-char
+`search`, 255-char values — past any, `400 QUERY_LIMIT_EXCEEDED`. A `500`
+carries only `code` by default; the full error is in the server log
+(`errors.exposeInternalDetails: true` for development).
 
 ### Where the detail lives
 
@@ -117,12 +128,12 @@ strip an endpoint's own params before `execute()`. `paginate=false` is capped
 | `typeormSource` / `prismaSource` + manifest / `drizzleSource` + tables, `customize`   | [`references/v3/adapters.md`](references/v3/adapters.md)                 |
 | An error, a 500, an empty/ignored filter, anything that "worked in 2.x"               | [`references/v3/troubleshooting.md`](references/v3/troubleshooting.md)   |
 
-### Prerelease: check the installed alpha
+### Check the installed version
 
-`3.0.0-alpha.0` has known defects that later alphas fix (decimal/date filters,
-TypeORM filters through `many` relations on snake_case columns, the Swagger
-interceptor, unbounded `paginate=false`) and one still open everywhere
-(`@Query() DynamicQueryDto` emptied by `ValidationPipe({ whitelist: true })`).
-Before blaming the consumer's code for a 500 or an ignored filter, compare the
-installed version with the table in
+The `3.0.0-alpha.*` prereleases have defects and defaults that `3.0.0` changed
+(decimal/date filters, TypeORM filters through `many` relations, the Swagger
+interceptor, unbounded `paginate=false`, `DynamicQueryDto` under
+`ValidationPipe({ whitelist: true })`, `maxPerPage` 500, no request limits, 500s
+leaking internal names). Before blaming the consumer's code for a 500 or an
+ignored filter, compare the installed version with the table in
 [`references/v3/troubleshooting.md`](references/v3/troubleshooting.md#known-defects-by-version).

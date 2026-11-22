@@ -5,14 +5,25 @@ for that version explains the symptom before any consumer code does.
 
 ## Known defects by version
 
-| Symptom                                                                                                                                                | `3.0.0-alpha.0` | Later alphas   | Action on alpha.0                                                        |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------- | -------------- | ------------------------------------------------------------------------ |
-| `decimal` filter → 500 `invalid input syntax for type numeric: ""29.90""`; `date` filters fail on every adapter; an adapter 400 shows up as a bare 500 | defect          | fixed          | upgrade                                                                  |
-| TypeORM filter/`search` through a `many` relation → 500 `column dqb_ex_….isaccessory does not exist` or `relation "…" does not exist`                  | defect          | fixed          | upgrade; until then keep property = column name and the default schema   |
-| Swagger UI "Try it out" fails for every route with `ReferenceError: interceptSwaggerRequest is not defined`                                            | defect          | fixed          | upgrade; or a self-contained local `requestInterceptor`                  |
-| `paginate=false` returns the whole table                                                                                                               | defect (no cap) | capped         | upgrade; `maxUnpaginatedRows`/`allowUnpaginated` do not exist on alpha.0 |
-| Filters/sort/page silently ignored, 200 with the default page, under `ValidationPipe({ whitelist: true })`                                             | defect          | **still open** | take the query via a custom param decorator (`references/v3/setup.md`)   |
-| `forRoot({ portability: { enforce: true } })` has no effect                                                                                            | defect          | still open     | call `assertProfileFacts`/`checkPortabilityProfile` yourself at boot     |
+| Symptom                                                                                                                                                | `3.0.0-alpha.0` | Later alphas     | Action on alpha.0                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------- | ---------------- | ------------------------------------------------------------------------ |
+| `decimal` filter → 500 `invalid input syntax for type numeric: ""29.90""`; `date` filters fail on every adapter; an adapter 400 shows up as a bare 500 | defect          | fixed            | upgrade                                                                  |
+| TypeORM filter/`search` through a `many` relation → 500 `column dqb_ex_….isaccessory does not exist` or `relation "…" does not exist`                  | defect          | fixed            | upgrade; until then keep property = column name and the default schema   |
+| Swagger UI "Try it out" fails for every route with `ReferenceError: interceptSwaggerRequest is not defined`                                            | defect          | fixed            | upgrade; or a self-contained local `requestInterceptor`                  |
+| `paginate=false` returns the whole table                                                                                                               | defect (no cap) | capped           | upgrade; `maxUnpaginatedRows`/`allowUnpaginated` do not exist on alpha.0 |
+| Filters/sort/page silently ignored, 200 with the default page, under `ValidationPipe({ whitelist: true })`                                             | defect          | fixed in alpha.2 | upgrade; or `@RestQuery()`                                               |
+| `forRoot({ portability: { enforce: true } })` has no effect                                                                                            | defect          | fixed in alpha.2 | upgrade; or call the checks yourself                                     |
+
+### What `3.0.0` changed from the alphas
+
+- `maxPerPage` defaults to `100` (alpha.1/alpha.2: `500`): a `perPage` of
+  101–500 is a `400 PAGINATION_INVALID` again; set `maxPerPage` to keep it.
+- Request `limits` are new: `400 QUERY_LIMIT_EXCEEDED` past 20 filter terms,
+  100 list items, 5 sorts, a 100-char `search` or a 255-char value. Raise them
+  in `forRoot({ limits })` or per endpoint.
+- A `500` no longer returns its message and `details`; read the server log or
+  set `errors.exposeInternalDetails: true` in development.
+- Error bodies gained `error`; Swagger lists operators per field.
 
 ## By error
 
@@ -37,8 +48,16 @@ for that version explains the symptom before any consumer code does.
 - **Boot fails in `forRoot`** — `adapter`/`operators` keys (2.x), a
   `textProfile` other than `portable-strict`, `consistency: 'transactional'`,
   invalid pagination numbers.
-- **Filters arrive as strings / ignored** — missing
-  `app.set('query parser', 'extended')`.
+- **Filters arrive as strings / ignored, or `QUERY_SYNTAX_UNKNOWN_PARAM` for
+  `filter[...]`** — no nested query string parser: Express
+  `app.set('query parser', 'extended')`; Fastify `qs` in
+  `routerOptions.querystringParser` with `allowDots: false`
+  (`details.hint: "nested-query-parser-required"`).
+- **`QUERY_LIMIT_EXCEEDED`** — the request passed one of `limits`;
+  `details.limit` names which. Raise it for that endpoint in
+  `defineQueryRules(..., { limits })` if the bigger request is legitimate.
+- **A `500` with only `code`** — by design from `3.0.0`; the message and
+  `details` are in the server log.
 - **`ilike` misses accented text** — folding is NFC + lower case only; no
   accent stripping by design.
 - **Text sort order differs from expectations** — ordering follows the column
