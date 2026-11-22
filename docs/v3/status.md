@@ -1,19 +1,15 @@
 # Estado da v3
 
-**Versão-alvo:** `3.0.0` · **Última medição:** 2026-09-23 (Node v24.15.0) ·
-**Stack em `main` desde:** 2026-09-08 · **Prerelease no npm:**
-`3.0.0-alpha.0`, tag `alpha`, 2026-09-08
+**Versão:** `3.0.0` · **Última medição:** 2026-11-22 (Node v22.23) ·
+**Stack em `main` desde:** 2026-09-08 · **Prereleases no npm:**
+`3.0.0-alpha.0` (2026-09-08) a `3.0.0-alpha.2`, tag `alpha`
 
-> A `3.0.0` estável **não** está pronta. O `3.0.0-alpha.0` está publicado sob a
-> tag `alpha` (a `latest` segue na `2.1.0` de propósito) e foi validado por um
-> consumidor de fora em 2026-09-23 — NestJS 11 + `@nestjs/typeorm` 11 + TypeORM
-> 0.3 + PostgreSQL + `ValidationPipe({ whitelist: true })` + Swagger UI. A
-> validação achou sete defeitos: quatro foram corrigidos na `3.0.0-alpha.1`,
-> o #4 e o #5 na `3.0.0-alpha.2`, e só o #7 segue aberto. Ver
-> [o que a validação externa encontrou](#o-que-a-validação-externa-encontrou).
-> A matriz de paridade segue verde nas nove células, agora com 84 casos de
-> corpus por célula. A lista
-> está no fim.
+> A `3.0.0` é a primeira estável da v3 e sai sob a tag `latest`. O que a
+> separava dos alphas — peer do Drizzle só em RC, nenhum limite de tamanho de
+> requisição, `maxPerPage` de 500 e o defeito #7 da validação externa — está
+> resolvido, e o registro de cada decisão está em
+> [o que bloqueava a estável](#o-que-bloqueava-a-300-estável). A matriz de
+> paridade segue verde nas nove células e ganhou duas, do Drizzle `0.45`.
 
 Esta página descreve o que existe e o que falta. O
 [design aprovado](../superpowers/specs/2026-09-03-v3-paridade-orm-bancos-design.md)
@@ -42,27 +38,28 @@ qualquer par delas é a forma mais fácil de superestimar o estado:
 
 ## Fases de entrega
 
-| Fase | Escopo                | Estado       | Evidência                                                                                        |
-| ---- | --------------------- | ------------ | ------------------------------------------------------------------------------------------------ |
-| 0    | Contrato e baseline   | **completa** | corpus em `tests/v3/corpus/`, perfis em `test/profiles/`                                         |
-| 1    | Core semântico        | **completa** | parser, AST, autorização exata, codecs, plano, normalizador                                      |
-| 2    | API e distribuição    | **completa** | sources discriminadas, `transformPlan`, `customize` com escopo, 4 subpaths, `verify:package`     |
-| 3    | TypeORM de referência | **completa** | corpus verde em SQLite e nas três células reais; branches em 100%                                |
-| 4    | Prisma                | **completa** | idem, com client gerado por dialeto e manifesto validado contra os 4 `schema.prisma`             |
-| 5    | Drizzle               | **completa** | idem, via `postgres-js`, `mysql2` e `node-mssql`                                                 |
-| 6    | Paridade completa     | **completa** | nove células verdes com 84 casos de corpus cada, `assert-no-skips` em todas                      |
-| 7    | Hardening e release   | **completa** | exemplos, guias, cobertura e bench fechados; falta publicar alpha/rc e datar segurança em `main` |
+| Fase | Escopo                | Estado       | Evidência                                                                                                 |
+| ---- | --------------------- | ------------ | --------------------------------------------------------------------------------------------------------- |
+| 0    | Contrato e baseline   | **completa** | corpus em `tests/v3/corpus/`, perfis em `test/profiles/`                                                  |
+| 1    | Core semântico        | **completa** | parser, AST, autorização exata, codecs, plano, normalizador                                               |
+| 2    | API e distribuição    | **completa** | sources discriminadas, `transformPlan`, `customize` com escopo, 4 subpaths, `verify:package`              |
+| 3    | TypeORM de referência | **completa** | corpus verde em SQLite e nas três células reais; branches em 100%                                         |
+| 4    | Prisma                | **completa** | idem, com client gerado por dialeto e manifesto validado contra os 4 `schema.prisma`                      |
+| 5    | Drizzle               | **completa** | idem, via `postgres-js`, `mysql2` e `node-mssql`                                                          |
+| 6    | Paridade completa     | **completa** | nove células verdes com 84 casos de corpus cada, `assert-no-skips` em todas                               |
+| 7    | Hardening e release   | **completa** | exemplos, guias, cobertura e bench fechados; `3.0.0` estável sob `latest` depois da revisão de 2026-11-22 |
 
 ## Estado por adapter
 
-|                                 | TypeORM            | Prisma                                          | Drizzle                            |
-| ------------------------------- | ------------------ | ----------------------------------------------- | ---------------------------------- |
-| Corpus no dialeto de referência | 84/84              | 84/84 (8 com recusa declarada)                  | 84/84                              |
-| Usa o ORM de verdade            | sim                | sim, client gerado por dialeto                  | sim                                |
-| PostgreSQL / MySQL / SQL Server | **94/94 nas três** | **87/87 nas três**                              | **87/87 nas três**                 |
-| Branches                        | **100%**           | **100%**                                        | **100%**                           |
-| Divergências declaradas         | nenhuma            | 5 operadores de padrão em SQLite e MSSQL        | nenhuma                            |
-| Lacuna própria                  | —                  | generator a partir de `schema.prisma` (`3.1.0`) | coleção aninhada sob outra relação |
+|                                 | TypeORM            | Prisma                                          | Drizzle                                               |
+| ------------------------------- | ------------------ | ----------------------------------------------- | ----------------------------------------------------- |
+| Corpus no dialeto de referência | 84/84              | 84/84 (8 com recusa declarada)                  | 84/84                                                 |
+| Usa o ORM de verdade            | sim                | sim, client gerado por dialeto                  | sim                                                   |
+| PostgreSQL / MySQL / SQL Server | **95/95 nas três** | **88/88 nas três**                              | **88/88 nas três**; 0.45: 88/88 em PostgreSQL e MySQL |
+| Linha de peer medida            | 0.3.x e 1.x        | 6.19 e 7.8                                      | 1.0.0-rc.4 (três) e 0.45.4 (PostgreSQL, MySQL)        |
+| Branches                        | **100%**           | **100%**                                        | **100%**                                              |
+| Divergências declaradas         | nenhuma            | 5 operadores de padrão em SQLite e MSSQL        | nenhuma                                               |
+| Lacuna própria                  | —                  | generator a partir de `schema.prisma` (`3.1.0`) | coleção aninhada sob outra relação                    |
 
 ### TypeORM
 
@@ -109,7 +106,11 @@ a lacuna declarada para a `3.1.0`.
 ### Drizzle
 
 `drizzleSource`, `DrizzleAdapter` e `drizzleDatabase({ client, dialect })` sobre
-`drizzle-orm 1.0.0-rc.4`. Relações por path pontuado, planner de junções
+`drizzle-orm 1.0.0-rc.4` e `0.45.4`. O adapter só usa o template `sql`
+(`identifier`, `join`, `raw`, binds) e o `all()`/`execute()` dos clients, e as
+duas linhas têm essa superfície com as mesmas formas de retorno — por isso a
+`0.45` entrou sem mudança de código. A `0.45` não tem driver de SQL Server, e
+essa célula não existe (não é vermelha: é inexistente). Relações por path pontuado, planner de junções
 idempotente, `EXISTS` correlacionado para qualquer salto `many` — inclusive
 cadeias, com o segundo salto como join **dentro** da subconsulta —, coleção de
 primeiro nível hidratada por consulta própria. `ILIKE` nunca é emitido.
@@ -138,20 +139,20 @@ novos do corpus medem isso **sem** exceção declarada.
 
 ## Gates da `3.0.0` (§23)
 
-| Gate                                            | Estado                                                                                        |
-| ----------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Nove combinações reais verdes, sem skips        | **sim** — 84 casos de corpus por célula, `assert-no-skips` em todas, medido em 2026-09-23     |
-| Peer do Drizzle fechado nos RCs medidos         | sim — `>=1.0.0-rc.4 <1.0.0`                                                                   |
-| Nenhum cast no uso público documentado          | sim — provado pelos quatro exemplos em `strict`, que foi o que o achou                        |
-| Nenhum peer opcional carregado pelo core        | sim — provado por consumer fixture                                                            |
-| Exemplos compilam e passam smoke E2E            | **sim** — 61 testes E2E, job `examples` na CI                                                 |
-| Códigos de erro e JSON canônico idênticos       | sim — mesmo runner e mesmas expectativas nas nove células                                     |
-| Cobertura de branches críticos acima de 95%     | **sim** — três adapters em 100%, com piso por área no `jest.config.ts`                        |
-| Nenhum achado de segurança alto ou crítico      | **sim, datado** — CodeQL e Scorecard verdes sobre código v3 em `main` (`a46d211`), 2026-09-08 |
-| Benchmarks dentro do orçamento                  | **sim, datado** — ver abaixo                                                                  |
-| Migration guide validado num consumidor v2 real | **sim** — três consumidores, 32 furos achados e corrigidos                                    |
-| Matriz pública de versões coincide com a CI     | sim — `versions.md`, comparada ao workflow por teste                                          |
-| Profiles de banco passam nos checks             | sim — collector em `src/`, incluindo o fuso do cliente por sonda                              |
+| Gate                                            | Estado                                                                                                                    |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Nove combinações reais verdes, sem skips        | **sim** — nove células mais as duas do Drizzle 0.45, `assert-no-skips` em todas, medido em 2026-11-22 (local, Node 22.23) |
+| Peer do Drizzle fechado no que foi medido       | sim — `^0.45.0 \|\| >=1.0.0-rc.4 <1.0.0`; 0.45.4 em PostgreSQL e MySQL, 1.x RC nas três                                   |
+| Nenhum cast no uso público documentado          | sim — provado pelos quatro exemplos em `strict`, que foi o que o achou                                                    |
+| Nenhum peer opcional carregado pelo core        | sim — provado por consumer fixture                                                                                        |
+| Exemplos compilam e passam smoke E2E            | **sim** — 61 testes E2E, job `examples` na CI                                                                             |
+| Códigos de erro e JSON canônico idênticos       | sim — mesmo runner e mesmas expectativas nas nove células                                                                 |
+| Cobertura de branches críticos acima de 95%     | **sim** — três adapters em 100%, com piso por área no `jest.config.ts`                                                    |
+| Nenhum achado de segurança alto ou crítico      | **sim, datado** — CodeQL e Scorecard verdes sobre código v3 em `main` (`a46d211`), 2026-09-08                             |
+| Benchmarks dentro do orçamento                  | **sim, datado** — ver abaixo                                                                                              |
+| Migration guide validado num consumidor v2 real | **sim** — três consumidores, 32 furos achados e corrigidos                                                                |
+| Matriz pública de versões coincide com a CI     | sim — `versions.md`, comparada ao workflow por teste                                                                      |
+| Profiles de banco passam nos checks             | sim — collector em `src/`, incluindo o fuso do cliente por sonda                                                          |
 
 ### Benchmark (§18.4), datado
 
@@ -168,17 +169,17 @@ Benchmark com I/O mediria a latência do banco, não da biblioteca.
 
 ### Cobertura
 
-Medida na última execução completa de `pnpm test:cov` (53 suites, **991
-testes**, zero skip), em 2026-09-23:
+Medida na última execução completa de `pnpm test:cov` (58 suites, **1060
+testes**, zero skip), em 2026-11-22:
 
 | Área                       | Statements | Branches   | Piso no `jest.config.ts` |
 | -------------------------- | ---------- | ---------- | ------------------------ |
-| Total                      | 98.2%      | 95.44%     | —                        |
+| Total                      | 98.24%     | 95.74%     | —                        |
 | `infra/adapters/typeorm`   | **100%**   | **100%**   | 100% (catraca)           |
 | `infra/adapters/prisma`    | **100%**   | **100%**   | 100% (catraca)           |
 | `infra/adapters/drizzle`   | **100%**   | **100%**   | 100% (catraca)           |
-| `core`                     | 96.2%      | 92.65%     | 95 / 91                  |
-| `api` (superfície Swagger) | 98.77%     | **78.79%** | 90 / 62                  |
+| `core`                     | 96.39%     | 93.18%     | 95 / 91                  |
+| `api` (superfície Swagger) | 98.73%     | **83.78%** | 90 / 62                  |
 
 Os pisos são o valor medido arredondado para baixo, não metas. Os adapters
 entram em 100% de propósito: é por eles que passa a promessa de paridade, e
@@ -204,15 +205,11 @@ nada.
 
 ## Bloqueadores e pendências nomeadas
 
-O que sobrou depois do PR5 — e só o primeiro impede a `3.0.0` de sair.
+O que sobrou depois do PR5. Nenhum item aberto impede a `3.0.0`.
 
-1. **Validar o `3.0.0-alpha.0` num consumidor de fora.** O alpha saiu em
-   2026-09-08 sob a tag `alpha` (release `6adf0ac`), então o que bloqueava —
-   não haver nada publicado para instalar — deixou de existir. Os dois gates da
-   §23 que sobram aqui, build em consumidor isolado e guia de migração validado
-   num projeto v2 de terceiro, só podem ser provados por alguém de fora; é isso
-   que o alpha existe para provocar antes de um rc. A `latest` continua na
-   `2.1.0`, então quem instalar sem a tag não recebe a v3.
+1. ~~**Validar o `3.0.0-alpha.0` num consumidor de fora.**~~ Feito em
+   2026-09-23; os sete defeitos que a validação achou estão corrigidos (ver
+   abaixo). Nenhuma das pendências seguintes bloqueia a `3.0.0`.
 2. **Coleção aninhada sob outra relação no Drizzle** falha fechado.
 3. **`decimal(38,6)` não passa como parâmetro vinculado no tedious.** O
    `Decimal` do tedious 20 faz `parseFloat` na validação e `writeUInt64LE`
@@ -241,6 +238,28 @@ O que sobrou depois do PR5 — e só o primeiro impede a `3.0.0` de sair.
    mesma decisão está aberta: estreitar o pattern ou provar que não há o que
    medir.
 
+8. **Drizzle `1.0.0-rc.5` em diante não é medido pela matriz.** A partir do
+   rc.5 o `drizzle-orm` é ESM-only, e o harness (Jest em CJS) não o carrega. A
+   faixa de peer os admite; o `dist` publicado funciona com o rc.6 em CJS e
+   ESM no Node 22.12+ (smoke contra PostgreSQL em 2026-11-22), mas a paridade
+   só está medida no rc.4. Fecha quando a matriz rodar o harness em ESM ou
+   quando o Drizzle 1.x sair do RC, o que vier primeiro.
+
+## O que bloqueava a `3.0.0` estável
+
+Revisão de 2026-11-22, feita para que um consumidor de fora (NestJS 11 + Fastify
+5 + Drizzle `0.45.x` + PostgreSQL) pudesse adotar a v3. Cada item foi resolvido
+em PR próprio, com teste:
+
+| Bloqueio                                                                                                                                    | Como foi resolvido                                                                                                                                                                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Peer `drizzle-orm` só em RC (`>=1.0.0-rc.4 <1.0.0`), com a `latest` do Drizzle em `0.45.4` — uma estável não pode depender só de prerelease | Faixa `^0.45.0 \|\| >=1.0.0-rc.4 <1.0.0`. Sem mudança no adapter: medido no 0.45.4 no corpus de referência e nas células PostgreSQL e MySQL, que entraram no `database-matrix` (job `drizzle-045`, exigido pelo `matrix complete`) e no `test-peers`. O teto da 1.x continua abaixo do GA, por teste (`exports-map.spec.ts`). |
+| Nenhum limite de tamanho: `in` com milhares de valores, filtros e sorts sem teto, `search` de qualquer comprimento                          | `limits` no `forRoot` e por endpoint em `defineQueryRules`, com defaults seguros (20 / 100 / 5 / 100 / 255) e `400 QUERY_LIMIT_EXCEEDED` checado antes da autorização. `tests/v3/core/semantic-validator/query-limits.spec.ts`.                                                                                               |
+| `maxPerPage` com default `500` no código e `100` no JSDoc                                                                                   | Default `100`, o mesmo da 2.x; documentado no `MIGRATION.md` para quem roda alpha.1/alpha.2.                                                                                                                                                                                                                                  |
+| Fastify entrega a query plana e `filter[...]` virava "param desconhecido" sem pista                                                         | Seção no README e no site com `routerOptions.querystringParser` + `qs` (`allowDots: false` — medido que `true` parte `filter[company.name]`), e a recusa passou a nomear o parser (`details.hint`). `tests/v3/api/fastify.spec.ts` sobe NestJS 11 + Fastify 5.12 com e sem o parser.                                          |
+| Sem helper público para montar o envelope a partir de linhas de outra fonte                                                                 | `normalizeResult` e `normalizeRows` exportados na raiz.                                                                                                                                                                                                                                                                       |
+| Defeito #7 da validação externa                                                                                                             | Corrigido; ver a tabela abaixo.                                                                                                                                                                                                                                                                                               |
+
 ## O que a validação externa encontrou
 
 Primeira validação do `3.0.0-alpha.0` por um consumidor de fora, em
@@ -250,15 +269,15 @@ documentação ensina. Nenhum dos defeitos abaixo aparecia na suíte da
 biblioteca, e a razão é a mesma nos dois primeiros: a suíte importava tudo de
 `src/`, e o consumidor importa o pacote publicado.
 
-| #   | Defeito                                                                                                                                                                                                                                                                                                                                                                                                          | Estado                                                                                                                                                                                                                                                                                                                                            |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Filtro em `decimal` era 500 (`invalid input syntax for type numeric: ""29.90""`). Cada subpath publicado é um bundle com **a sua cópia** de `DecimalValue`/`CivilDate`/`RestQueryError`; o `instanceof` do adapter não reconhecia o valor do núcleo, o objeto chegava ao driver e o `pg` o serializava com `JSON.stringify`. `date` quebrava nos três adapters; erros 400 lançados pelo adapter viravam 500 cru. | **corrigido** — identidade por `Symbol.for` + `Symbol.hasInstance`. O corpus inteiro passou a rodar com o núcleo numa cópia separada da do adapter (`tests/v3/fixtures/published-layout.ts`), e o consumer fixture do `verify:package` exercita o tarball real.                                                                                   |
-| 2   | Filtro/`search` por relação `many` no TypeORM usava o nome da propriedade, sem aspas e sem schema, dentro do `EXISTS`.                                                                                                                                                                                                                                                                                           | **corrigido** — coluna física, tabela com schema e citação uniforme. O modelo canônico ganhou `post.isPinned` sobre a coluna `is_pinned`, medido nos três adapters.                                                                                                                                                                               |
-| 3   | `dqbSwaggerRequestInterceptor(document)` devolvia uma closure; o `@nestjs/swagger` a serializa com `toString()` e todo "Try it out" falhava com `ReferenceError`.                                                                                                                                                                                                                                                | **corrigido** — função autocontida, testada no texto serializado pelo próprio `buildJSInitOptions` do `@nestjs/swagger`, avaliado num contexto `vm` vazio.                                                                                                                                                                                        |
-| 4   | `@Query() query: DynamicQueryDto` + `ValidationPipe({ whitelist: true })` esvazia a DTO em silêncio: 200 com a listagem default.                                                                                                                                                                                                                                                                                 | **corrigido** — as oito propriedades da `DynamicQueryDto` recebem `@Allow()` quando o `class-validator` está instalado (peer opcional, carregado sob demanda no build CJS), e `@RestQuery()` entrega a query crua para quem roda ESM ou `forbidNonWhitelisted`. `tests/v3/api/validation-pipe.spec.ts` sobe um controller real sob o pipe global. |
-| 5   | `forRoot({ portability: { enforce: true } })` é descartado pela configuração congelada.                                                                                                                                                                                                                                                                                                                          | **corrigido** — `portability` entra na configuração resolvida (default `{ enforce: false }`), e um `enforce` não booleano é `SOURCE_CONFIGURATION_INVALID` no boot.                                                                                                                                                                               |
-| 6   | `paginate=false` devolvia a tabela inteira, sem teto e sem como recusar.                                                                                                                                                                                                                                                                                                                                         | **corrigido** — teto global `pagination.maxUnpaginatedRows` (default: o `maxPerPage` efetivo), `allowUnpaginated`, e as duas por endpoint em `defineQueryRules`. Acima do teto é 400, nunca lista truncada. Ver [migration-from-v2 §7.1](./migration-from-v2.md#71-paginatefalse-tem-teto).                                                       |
-| 7   | Cache de schema inócuo com source por request, detalhe de erro de configuração no 500, envelope sem `error`, Swagger com união de operadores.                                                                                                                                                                                                                                                                    | **aberto.** A correção do #1 torna o #7 um pouco mais visível: erro de configuração lançado **pelo adapter** passa a sair como `InternalServerErrorException` com `details`, como já saía o lançado pelo núcleo.                                                                                                                                  |
+| #   | Defeito                                                                                                                                                                                                                                                                                                                                                                                                          | Estado                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Filtro em `decimal` era 500 (`invalid input syntax for type numeric: ""29.90""`). Cada subpath publicado é um bundle com **a sua cópia** de `DecimalValue`/`CivilDate`/`RestQueryError`; o `instanceof` do adapter não reconhecia o valor do núcleo, o objeto chegava ao driver e o `pg` o serializava com `JSON.stringify`. `date` quebrava nos três adapters; erros 400 lançados pelo adapter viravam 500 cru. | **corrigido** — identidade por `Symbol.for` + `Symbol.hasInstance`. O corpus inteiro passou a rodar com o núcleo numa cópia separada da do adapter (`tests/v3/fixtures/published-layout.ts`), e o consumer fixture do `verify:package` exercita o tarball real.                                                                                                                                                                                                                                     |
+| 2   | Filtro/`search` por relação `many` no TypeORM usava o nome da propriedade, sem aspas e sem schema, dentro do `EXISTS`.                                                                                                                                                                                                                                                                                           | **corrigido** — coluna física, tabela com schema e citação uniforme. O modelo canônico ganhou `post.isPinned` sobre a coluna `is_pinned`, medido nos três adapters.                                                                                                                                                                                                                                                                                                                                 |
+| 3   | `dqbSwaggerRequestInterceptor(document)` devolvia uma closure; o `@nestjs/swagger` a serializa com `toString()` e todo "Try it out" falhava com `ReferenceError`.                                                                                                                                                                                                                                                | **corrigido** — função autocontida, testada no texto serializado pelo próprio `buildJSInitOptions` do `@nestjs/swagger`, avaliado num contexto `vm` vazio.                                                                                                                                                                                                                                                                                                                                          |
+| 4   | `@Query() query: DynamicQueryDto` + `ValidationPipe({ whitelist: true })` esvazia a DTO em silêncio: 200 com a listagem default.                                                                                                                                                                                                                                                                                 | **corrigido** — as oito propriedades da `DynamicQueryDto` recebem `@Allow()` quando o `class-validator` está instalado (peer opcional, carregado sob demanda no build CJS), e `@RestQuery()` entrega a query crua para quem roda ESM ou `forbidNonWhitelisted`. `tests/v3/api/validation-pipe.spec.ts` sobe um controller real sob o pipe global.                                                                                                                                                   |
+| 5   | `forRoot({ portability: { enforce: true } })` é descartado pela configuração congelada.                                                                                                                                                                                                                                                                                                                          | **corrigido** — `portability` entra na configuração resolvida (default `{ enforce: false }`), e um `enforce` não booleano é `SOURCE_CONFIGURATION_INVALID` no boot.                                                                                                                                                                                                                                                                                                                                 |
+| 6   | `paginate=false` devolvia a tabela inteira, sem teto e sem como recusar.                                                                                                                                                                                                                                                                                                                                         | **corrigido** — teto global `pagination.maxUnpaginatedRows` (default: o `maxPerPage` efetivo), `allowUnpaginated`, e as duas por endpoint em `defineQueryRules`. Acima do teto é 400, nunca lista truncada. Ver [migration-from-v2 §7.1](./migration-from-v2.md#71-paginatefalse-tem-teto).                                                                                                                                                                                                         |
+| 7   | Cache de schema inócuo com source por request, detalhe de erro de configuração no 500, envelope sem `error`, Swagger com união de operadores.                                                                                                                                                                                                                                                                    | **corrigido na `3.0.0`** — o TypeORM memoiza o `describe()` por (metadata, `fieldKinds`), o `drizzleSource` memoiza o schema por (tabela, relações) e o serviço pula o par (schema das regras, schema da source) já conferido; o 500 sai só com `code` e mensagem genérica, com o erro completo no logger mesmo com log desligado (`errors.exposeInternalDetails` para dev); o envelope ganhou `error`; o Swagger lista os operadores de cada campo. Ver `tests/v3/core/consumer-report-7.spec.ts`. |
 
 Os casos `regression/*` do corpus e `tests/v3/integration/consumer-regressions.spec.ts`
 reproduzem cada condição original e foram vistos falhar contra o código do

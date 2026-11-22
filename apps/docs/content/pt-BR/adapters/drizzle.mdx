@@ -14,12 +14,19 @@ pnpm add drizzle-orm postgres
 # mysql2 para MySQL, ou o driver do SQL Server
 ```
 
-<Callout type="warn" title="0.45.x não é suportado">
+<Callout type="info" title="Duas linhas do Drizzle">
 
-A faixa de peer é `>=1.0.0-rc.4 <1.0.0` — fechada nos release candidates contra
-os quais a matriz de paridade foi medida. Um consumidor `2.x` em `0.45.x` tem de
-subir, e quatro coisas quebram no caminho, nenhuma delas descrita pelas release
-notes do próprio Drizzle de um jeito que você conectaria a esta biblioteca:
+A faixa de peer é `^0.45.0 || >=1.0.0-rc.4 <1.0.0`. A linha estável `0.45.x` é
+medida em PostgreSQL e MySQL; SQL Server exige a linha 1.x, porque o `0.45` não
+tem driver de SQL Server. A faixa 1.x é fechada nos release candidates que a
+matriz de paridade mediu.
+
+Nas duas linhas, **`db.all()` só existe na família SQLite**: PostgreSQL, MySQL e
+SQL Server expõem `execute()`, cada um com uma forma de retorno. Qual método
+chamar sai do dialeto que você declara, nunca da inspeção do objeto — e é por
+isso que o dialeto é argumento obrigatório.
+
+Sair do `0.45` para a 1.x quebra mais três coisas:
 
 1. **`drizzle(client, { schema })` não existe mais.** A assinatura da 1.x deixa
    só `drizzle({ client })`. O argumento `{ schema }` servia à API relacional
@@ -33,10 +40,6 @@ notes do próprio Drizzle de um jeito que você conectaria a esta biblioteca:
    `skipLibCheck` não resolve este — ele continua necessário por outro motivo,
    porque o `drizzle-orm@1.0.0-rc.4` dá erro dentro do próprio `.d.cts` no
    TypeScript 6.
-4. **`db.all()` só existe na família SQLite.** PostgreSQL, MySQL e SQL Server
-   expõem `execute()`, e cada um devolve uma forma diferente. Qual método
-   chamar sai do dialeto que você declara, nunca da inspeção do objeto — e é
-   por isso que o dialeto é argumento obrigatório.
 
 </Callout>
 

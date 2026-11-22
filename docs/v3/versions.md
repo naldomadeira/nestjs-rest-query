@@ -33,6 +33,7 @@ compilador de cada adapter implementa a semântica do plano. Ele roda em
 | Prisma     | 7.8.0 (CLI e client) | matriz, com driver adapter oficial por dialeto                   |
 | Drizzle    | 1.0.0-rc.4           | matriz, via `postgres-js`, `mysql2` e `node-mssql`               |
 | Drizzle    | 0.45.4               | referência, PostgreSQL e MySQL (`database-matrix`, `test-peers`) |
+| Fastify    | 5.12                 | `tests/v3/api/fastify.spec.ts`, com e sem o parser `qs`          |
 | PostgreSQL | 18                   | `postgres:18`                                                    |
 | MySQL      | 8.4 LTS              | `mysql:8.4`                                                      |
 | SQL Server | 2022                 | `mcr.microsoft.com/mssql/server:2022-latest`                     |
@@ -48,6 +49,21 @@ compilador de cada adapter implementa a semântica do plano. Ele roda em
 
 Os quatro são **opcionais**: o pacote raiz não carrega ORM nenhum, e isso é
 provado por consumidor isolado em `verify:package`.
+
+### Por que a faixa do Drizzle tem duas linhas
+
+Até o `3.0.0-alpha.2` a faixa era só `>=1.0.0-rc.4 <1.0.0`. Com a `latest` do
+`drizzle-orm` em `0.45.4`, isso fazia uma versão estável da biblioteca exigir um
+prerelease de outro projeto — e deixava de fora todo consumidor v2 de Drizzle.
+O adapter só depende do template `sql` e do `all()`/`execute()` dos clients,
+que a `0.45` já tem com as mesmas formas de retorno; medido o 0.45.4 no corpus
+de referência e nas células PostgreSQL e MySQL, a linha entrou sem mudança de
+código. A faixa ficou:
+
+- `^0.45.0` — a linha estável, sem SQL Server (o `0.45` não tem o driver);
+- `>=1.0.0-rc.4 <1.0.0` — os RCs, abaixo do GA. `<2.0.0` admitiria o `1.0.0`
+  sem nenhuma célula rodada, e `exports-map.spec.ts` recusa esse alargamento
+  até uma release nossa reexecutar a matriz no GA.
 
 ## O que não é suportado
 

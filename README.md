@@ -38,18 +38,18 @@ NestJS has controllers. TypeORM has a query builder. The boilerplate between the
 
 ## Compatibility
 
-| nestjs-rest-query  | NestJS | TypeORM               | Drizzle               | Prisma                | Node   |
-| ------------------ | ------ | --------------------- | --------------------- | --------------------- | ------ |
-| `3.x` (prerelease) | `11.x` | `^0.3.26 \|\| ^1.0.0` | `>=1.0.0-rc.4 <1.0.0` | `^6.19.0 \|\| ^7.0.0` | `>=22` |
-| `2.1.x`            | `11.x` | `0.3.x`               | `0.45.x`              | `5.x \| 6.x \| 7.x`   | `>=20` |
-| `2.0.x`            | `11.x` | `0.3.x`               | `0.45.x`              | —                     | `>=20` |
-| `1.x`              | `11.x` | `0.3.x`               | —                     | —                     | `>=20` |
+| nestjs-rest-query | NestJS | TypeORM               | Drizzle                            | Prisma                | Node   |
+| ----------------- | ------ | --------------------- | ---------------------------------- | --------------------- | ------ |
+| `3.x`             | `11.x` | `^0.3.26 \|\| ^1.0.0` | `^0.45.0 \|\| >=1.0.0-rc.4 <1.0.0` | `^6.19.0 \|\| ^7.0.0` | `>=22` |
+| `2.1.x`           | `11.x` | `0.3.x`               | `0.45.x`                           | `5.x \| 6.x \| 7.x`   | `>=20` |
+| `2.0.x`           | `11.x` | `0.3.x`               | `0.45.x`                           | —                     | `>=20` |
+| `1.x`             | `11.x` | `0.3.x`               | —                                  | —                     | `>=20` |
 
-The `3.x` row is what the prerelease requires, not a suggestion: Drizzle
-`0.45.x` is **not** accepted by v3. **This README documents the `3.x` API.** If
-you are on `2.1.x`, the upgrade path is
-[MIGRATION.md, "2.x → 3.x"](./MIGRATION.md#2x--3x); the full v3 matrix lives in
-[`docs/v3/versions.md`](./docs/v3/versions.md).
+**This README documents the `3.x` API.** If you are on `2.1.x`, the upgrade
+path is [MIGRATION.md, "2.x → 3.x"](./MIGRATION.md#2x--3x); the full v3 matrix
+lives in [`docs/v3/versions.md`](./docs/v3/versions.md). Drizzle `0.45.x` runs
+on PostgreSQL and MySQL; Drizzle on SQL Server needs the `1.x` line, because
+`0.45` has no SQL Server driver.
 
 ## Adapters
 
@@ -63,13 +63,9 @@ you are on `2.1.x`, the upgrade path is
 > corpus against PostgreSQL, MySQL and SQL Server — nine cells, no skips. The
 > adapter is chosen by the **source** you pass to `execute()`, not by `forRoot`.
 >
-> `3.x` is still a prerelease: `3.0.0-alpha.0` is on npm under the `alpha` tag.
-> Its first external validation found defects; the ones fixed since, and the one
-> that still blocks stable `3.0.0`, are listed in
-> [`docs/v3/status.md`](./docs/v3/status.md). The `drizzle-orm` peer is
-> closed on the release candidates the matrix measured, so the `1.0.0` GA cannot
-> satisfy it until a release of ours re-runs the nine cells — that is a
-> deliberate refusal, not a missing feature
+> The `drizzle-orm` 1.x range is closed on the release candidates the matrix
+> measured, so the `1.0.0` GA cannot satisfy it until a release of ours re-runs
+> the nine cells — that is a deliberate refusal, not a missing feature
 > ([ADR-001](./docs/superpowers/specs/2026-09-04-v3-adr-001-matriz-e-escopo-da-3.0.0.md),
 > amendment 1). Per-cell state and declared gaps:
 > [`docs/v3/status.md`](./docs/v3/status.md).
@@ -78,14 +74,14 @@ Want a different ORM? [Open a discussion](https://github.com/naldomadeira/nestjs
 
 ## Install
 
-`3.x` is a prerelease, published under the `alpha` tag. The `latest` tag still
-points at `2.1.0`, so the tag is required to get the API this README documents:
-
 ```bash
-pnpm add nestjs-rest-query@alpha
+pnpm add nestjs-rest-query
 # or
-npm install nestjs-rest-query@alpha
+npm install nestjs-rest-query
 ```
+
+`latest` is `3.x`. To stay on the previous major, pin it:
+`pnpm add nestjs-rest-query@^2`.
 
 Peer dependencies: `@nestjs/common`, `@nestjs/core`, `reflect-metadata`. Optionally `typeorm` (for TypeORM), `drizzle-orm` (for Drizzle), or `@prisma/client` (for Prisma). Add `@nestjs/swagger` for OpenAPI integration (optional).
 

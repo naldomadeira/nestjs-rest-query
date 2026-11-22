@@ -1,10 +1,5 @@
 import Link from 'next/link';
-import {
-  AlertTriangle,
-  ArrowRight,
-  CheckCircle2,
-  CircleDashed,
-} from 'lucide-react';
+import { ArrowRight, CheckCircle2, CircleDashed, Info } from 'lucide-react';
 import { defaultLocale, getDictionary, type Locale } from '../lib/i18n';
 
 type HomeContentProps = {
@@ -36,10 +31,10 @@ export const HomeContent = ({ locale }: HomeContentProps) => {
 
   return (
     <main className="mx-auto mt-[var(--fd-nav-height)] w-full max-w-5xl overflow-x-clip px-4 pb-24 pt-16 sm:px-6 lg:pt-24">
-      {/* Prerelease notice */}
+      {/* v3 notice */}
       <aside className="mb-12 flex flex-col gap-2 rounded-lg border border-amber-500/40 bg-amber-500/[0.06] p-5">
         <p className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400">
-          <AlertTriangle className="size-4 shrink-0" aria-hidden />
+          <Info className="size-4 shrink-0" aria-hidden />
           {t.home.notice.title}
         </p>
         <p className="text-sm leading-relaxed text-muted-foreground">

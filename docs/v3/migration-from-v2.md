@@ -684,10 +684,13 @@ está aqui.
 Nada na API da biblioteca. `^0.3.26 || ^1.0.0` passam o corpus. O que quebra é o
 ESM do `@nestjs/typeorm@12` — [§12](#12-esm-nestjstypeorm-12).
 
-### 11.2. Drizzle `0.45.x` → `1.0.0-rc.*`
+### 11.2. Drizzle: `0.45.x` ou `1.0.0-rc.*`
 
-A faixa da v3 é `>=1.0.0-rc.4 <1.0.0`: **todo** consumidor v2 de Drizzle (que
-estava em `0.45.x`) é obrigado a subir para uma RC. Quatro coisas quebram:
+A faixa da `3.0.0` é `^0.45.0 || >=1.0.0-rc.4 <1.0.0`. Um consumidor v2 em
+`0.45.x` pode ficar nele em PostgreSQL e MySQL; só SQL Server exige a linha 1.x,
+porque o `0.45` não tem driver de SQL Server. (Os prereleases `3.0.0-alpha.*`
+aceitavam só as RCs.) O item 4 abaixo vale nas duas linhas; os itens 1 a 3 só
+para quem sobe para a 1.x:
 
 1. **`drizzle(client, { schema })` não existe mais.** A assinatura 1.x só aceita
    `drizzle({ client })`. O `{ schema }` servia à API relacional (`db.query.*`),

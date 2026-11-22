@@ -58,9 +58,9 @@ export const en: Dictionary = {
   },
   home: {
     notice: {
-      title: 'These pages describe v3, published as a prerelease',
-      body: 'The 3.x API shown here is on npm as 3.0.0-alpha.0, under the alpha tag. The latest tag still points at 2.1.0, so a plain install gives you the 2.x API — ask for nestjs-rest-query@alpha to get v3. Stable 3.0.0 waits on validation of this alpha. v3 has no compatibility mode; read the migration guide before upgrading.',
-      linkLabel: 'Remaining release gates',
+      title: 'These pages describe v3',
+      body: 'The 3.x API shown here is the latest major on npm; pin nestjs-rest-query@^2 to stay on 2.x. v3 has no compatibility mode — read the migration guide before upgrading from 2.x.',
+      linkLabel: 'Per-cell state and declared gaps',
     },
     hero: {
       eyebrow: 'NestJS · TypeORM · Prisma · Drizzle',

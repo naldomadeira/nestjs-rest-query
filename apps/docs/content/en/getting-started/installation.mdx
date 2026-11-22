@@ -6,22 +6,20 @@ description: How to install and configure nestjs-rest-query in your project.
 ## Install the package
 
 ```bash tab="pnpm"
-pnpm add nestjs-rest-query@alpha
+pnpm add nestjs-rest-query
 ```
 
 ```bash tab="npm"
-npm install nestjs-rest-query@alpha
+npm install nestjs-rest-query
 ```
 
 ```bash tab="yarn"
-yarn add nestjs-rest-query@alpha
+yarn add nestjs-rest-query
 ```
 
-<Callout type="warn">
-  The `@alpha` tag is not optional while `3.x` is a prerelease. It currently
-  resolves to `3.0.0-alpha.0`, which is the API these pages describe; `latest`
-  still points at `2.1.0`, so dropping the tag installs the `2.x` API instead
-  and none of the code here will compile against it.
+<Callout type="info">
+  `latest` is `3.x`, the API these pages describe. To stay on the previous
+  major, install `nestjs-rest-query@^2`.
 </Callout>
 
 Then install the ORM you use. All ORM peers are optional and the root
