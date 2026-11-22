@@ -10,6 +10,7 @@ export type {
 } from './rest-query-adapter.v3.interface';
 export type { AnyQuerySource, QuerySource } from './query-source.interface';
 export type {
+  ErrorsConfigV3,
   LoggingConfigV3,
   PaginationConfigV3,
   PortabilityConfigV3,

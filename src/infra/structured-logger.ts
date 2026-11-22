@@ -35,6 +35,15 @@ export class StructuredLogger {
     this.inner.error(message, meta);
   }
 
+  /**
+   * Erro que a resposta HTTP não carrega mais (um 500 sem detalhe). Ignora
+   * `enabled` de propósito: se nem a resposta nem o log tiverem o detalhe, um
+   * erro de configuração em produção fica invisível.
+   */
+  failure(message: string, meta?: LogMeta): void {
+    this.inner.error(message, meta);
+  }
+
   warn(message: string, meta?: LogMeta): void {
     if (!this.shouldLog('warn')) return;
     this.inner.warn(message, meta);

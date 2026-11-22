@@ -254,6 +254,7 @@ Quem produz esse JSON é o núcleo, não o adapter. Duas consequências:
 ```json
 {
   "statusCode": 400,
+  "error": "Bad Request",
   "code": "FIELD_NOT_ALLOWED",
   "message": "filter path is not allowed: secret",
   "details": { "path": "secret", "scope": "filter", "allowed": ["id", "name"] }
@@ -283,6 +284,13 @@ Ramifique no `code`, nunca na `message`.
 A divisão é deliberada: entrada do cliente é `400`, e erro na sua declaração é
 `500`, porque é bug da aplicação e não da requisição. A maior parte dos erros de
 configuração aparece enquanto a aplicação sobe, não numa requisição.
+
+Por padrão o `500` deixa o detalhe no servidor: o corpo leva o `code` e uma
+mensagem genérica, e o erro completo — mensagem e `details`, que nomeiam
+tabelas, colunas e paths do schema — vai para o logger configurado, no nível
+`error`, mesmo com `logging.enabled: false`. `forRoot({ errors: {
+exposeInternalDetails: true } })` o devolve na resposta, para desenvolvimento.
+O `400` nunca é reduzido.
 
 ## Como a whitelist protege o endpoint
 

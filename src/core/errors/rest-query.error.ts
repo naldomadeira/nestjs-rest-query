@@ -4,6 +4,12 @@ export type ErrorDetails = Readonly<Record<string, unknown>>;
 
 export interface RestQueryErrorEnvelope {
   statusCode: number;
+  /**
+   * Frase HTTP do status (`Bad Request`, `Internal Server Error`): o campo que
+   * todo `HttpException` do Nest traz, e que um filtro de exceção genérico
+   * costuma ler.
+   */
+  error: string;
   code: RestQueryErrorCode;
   message: string;
   details?: ErrorDetails;
@@ -54,12 +60,18 @@ export class RestQueryError extends Error {
   toJSON(): RestQueryErrorEnvelope {
     const envelope: RestQueryErrorEnvelope = {
       statusCode: this.statusCode,
+      error: httpReasonPhrase(this.statusCode),
       code: this.code,
       message: this.message,
     };
     if (this.details) envelope.details = this.details;
     return envelope;
   }
+}
+
+/** Os dois status que o contrato emite: 400 para input, 500 para o resto. */
+export function httpReasonPhrase(statusCode: number): string {
+  return statusCode === 400 ? 'Bad Request' : 'Internal Server Error';
 }
 
 /** Erro causado por input do cliente. Sempre 400 (spec §17.1). */

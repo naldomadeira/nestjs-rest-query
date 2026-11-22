@@ -1,6 +1,5 @@
 import { QUERY_RULES_METADATA_KEY } from '@core/constants';
 import { ApiDynamicQuery, DynamicQuery } from '@src/index';
-import { resolveAllowedOperators } from '@api/decorators/api-dynamic-query.decorator';
 import { toSwaggerRulesView } from '@api/swagger/swagger-rules-view';
 import { RULES_PRESETS } from '../fixtures/rules';
 
@@ -39,20 +38,6 @@ describe('@ApiDynamicQuery', () => {
   });
 });
 
-describe('resolveAllowedOperators', () => {
-  it('documenta a união dos operadores declarados por campo', () => {
-    const operators = resolveAllowedOperators(rules);
-    expect(operators).toContain('ilike');
-    expect(operators).toContain('between');
-    expect(new Set(operators).size).toBe(operators.length);
-  });
-
-  it('cai na lista completa quando o endpoint não declara filtros', () => {
-    const noFilters = RULES_PRESETS['post.portable-order'];
-    expect(resolveAllowedOperators(noFilters).length).toBeGreaterThan(0);
-  });
-});
-
 describe('toSwaggerRulesView', () => {
   it('achata as regras compiladas em listas de paths', () => {
     const view = toSwaggerRulesView(rules);
@@ -64,6 +49,18 @@ describe('toSwaggerRulesView', () => {
 
   it('qualifica os campos de relação com o path da relação', () => {
     expect(toSwaggerRulesView(rules).fields).toContain('company.name');
+  });
+
+  it('guarda os operadores de cada campo, na ordem declarada', () => {
+    const view = toSwaggerRulesView(rules);
+    expect(view.filterOperators).toContainEqual({
+      path: 'active',
+      operators: ['eq'],
+    });
+    expect(view.filterOperators).toContainEqual({
+      path: 'score',
+      operators: ['eq', 'gt', 'gte', 'lt', 'lte', 'between'],
+    });
   });
 
   it('nunca expõe campos internos', () => {
@@ -125,5 +122,43 @@ describe('regression: unpaginated global cap (consumer report #6) — Swagger', 
     );
     expect(names).toContain('page');
     expect(names).not.toContain('paginate');
+  });
+});
+
+/**
+ * Consumer report #7: a documentação listava a **união** dos operadores do
+ * endpoint, então `filter[active][between]` aparecia como possível e dava 400.
+ * Cada campo passa a mostrar só os operadores que ele autoriza.
+ */
+describe('regression: Swagger documenta os operadores por campo (consumer report #7)', () => {
+  const filterParameter = () => {
+    class Endpoint {
+      list(): void {}
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(
+      Endpoint.prototype,
+      'list'
+    )!;
+    ApiDynamicQuery(rules)(Endpoint.prototype, 'list', descriptor);
+    const parameters = (Reflect.getMetadata(
+      'swagger/apiParameters',
+      descriptor.value
+    ) ?? []) as { name: string; description?: string }[];
+    return parameters.find((parameter) => parameter.name === 'filter');
+  };
+
+  it('uma linha por campo, com só os operadores dele', () => {
+    const description = filterParameter()?.description ?? '';
+    expect(description).toContain('| Campo | Operadores |');
+    expect(description).toContain('| `active` | `eq` |');
+    expect(description).toContain(
+      '| `score` | `eq`, `gt`, `gte`, `lt`, `lte`, `between` |'
+    );
+  });
+
+  it('não sugere um operador que o campo do exemplo não autoriza', () => {
+    const description = filterParameter()?.description ?? '';
+    // `active` só aceita `eq`: nenhuma linha pode associá-lo a `between`.
+    expect(description).not.toMatch(/`active`[^\n]*between/);
   });
 });

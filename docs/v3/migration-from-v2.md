@@ -587,6 +587,7 @@ As mensagens em string saem; o corpo passa a ser um envelope estável.
 // v3
 {
   "statusCode": 400,
+  "error": "Bad Request",
   "code": "FIELD_NOT_ALLOWED",
   "message": "filter path is not allowed: secret",
   "details": { "path": "secret", "scope": "filter", "allowed": ["id", "name"] }
@@ -595,6 +596,11 @@ As mensagens em string saem; o corpo passa a ser um envelope estável.
 
 Faça branch pelo `code`, não pela mensagem. `details` nunca carrega o valor
 enviado pelo cliente.
+
+Um `500` (erro de declaração, não da requisição) leva por padrão só o `code` e
+uma mensagem genérica; o erro completo vai para o logger, mesmo com o log
+desligado. `forRoot({ errors: { exposeInternalDetails: true } })` devolve
+mensagem e `details` na resposta, para desenvolvimento.
 
 **Tamanho da requisição.** A v2 não tinha limite; a v3 recusa com
 `400 QUERY_LIMIT_EXCEEDED`, antes da autorização, o que passar de `limits`:

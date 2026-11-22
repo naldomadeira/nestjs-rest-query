@@ -28,6 +28,8 @@ describe('entrypoint raiz', () => {
       'defineQuerySchema',
       'defineQueryRules',
       'buildQueryPlan',
+      'normalizeResult',
+      'normalizeRows',
       'foldText',
       'RestQueryError',
       'RestQueryErrorCode',

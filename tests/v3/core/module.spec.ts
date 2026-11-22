@@ -32,6 +32,7 @@ describe('DynamicQueryBuilderModule.forRoot', () => {
       consistency: 'eventual',
       logging: { enabled: false, level: 'info', redactValues: true },
       portability: { enforce: false },
+      errors: { exposeInternalDetails: false },
       limits: {
         maxFilters: 20,
         maxListItems: 100,

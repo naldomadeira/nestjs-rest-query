@@ -21,6 +21,7 @@ describe('RestQueryError', () => {
     expect(err).toBeInstanceOf(RestQueryError);
     expect(err.toJSON()).toEqual({
       statusCode: 400,
+      error: 'Bad Request',
       code: 'FILTER_VALUE_INVALID',
       message: 'Valor inválido para o campo age',
       details: { path: 'age', operator: 'gte', expected: 'integer' },
@@ -30,6 +31,7 @@ describe('RestQueryError', () => {
   it('omite details quando não há detalhes', () => {
     expect(inputError('SORT_CONFLICT', 'conflito').toJSON()).toEqual({
       statusCode: 400,
+      error: 'Bad Request',
       code: 'SORT_CONFLICT',
       message: 'conflito',
     });

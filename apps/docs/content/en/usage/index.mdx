@@ -254,6 +254,7 @@ The core, not the adapter, produces this JSON. Two consequences:
 ```json
 {
   "statusCode": 400,
+  "error": "Bad Request",
   "code": "FIELD_NOT_ALLOWED",
   "message": "filter path is not allowed: secret",
   "details": { "path": "secret", "scope": "filter", "allowed": ["id", "name"] }
@@ -284,6 +285,13 @@ The split is deliberate: client input is `400`, and a mistake in your
 declaration is `500`, because it is a bug in the application, not in the
 request. Most configuration errors surface while the application boots rather
 than on a request.
+
+A `500` leaves its details on the server by default: the body keeps `code` and a
+generic message, and the full error — message and `details`, which name tables,
+columns and schema paths — goes to the configured logger at `error` level, even
+with `logging.enabled: false`. `forRoot({ errors: { exposeInternalDetails:
+true } })` returns it in the response, for development. A `400` is never
+trimmed.
 
 ## How the whitelist protects the endpoint
 
